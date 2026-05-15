@@ -51,6 +51,7 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
   )
 
   const [images, setImages] = useState<GigImageRow[]>(initialImages ?? [])
+  const [currentGigId, setCurrentGigId] = useState<string | null>(gig?.id ?? null)
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -103,6 +104,7 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
 
     let gigId = gig?.id
 
+    // Create gig if in create mode
     if (mode === 'create') {
       const { data: newGig, error: createError } = await supabase
         .from('gigs')
@@ -115,10 +117,14 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
         setLoading(false)
         return
       }
-      // Redirect to edit page so user can add images
-      router.push(`/admin/gigs/${newGig.id}/edit`)
+      
+      gigId = newGig.id
+      setCurrentGigId(gigId)
+      setLoading(false)
+      // Form stays on page with image uploader now visible
       return
     } else {
+      // Update gig if in edit mode
       const { error: updateError } = await supabase
         .from('gigs')
         .update(gigData)
@@ -129,12 +135,12 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
         setLoading(false)
         return
       }
+      gigId = gig!.id
     }
 
     // Sync checklist
     if (gigId) {
       if (mode === 'edit') {
-        // Delete removed items
         const keepIds = checklist.filter((i) => i.id).map((i) => i.id!)
         if (initialChecklist) {
           const toDelete = initialChecklist
@@ -161,15 +167,22 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
       }
     }
 
+    setLoading(false)
+    router.push('/admin/gigs')
+    router.refresh()
+  }
+
+  async function handleFinish() {
+    setLoading(true)
     router.push('/admin/gigs')
     router.refresh()
   }
 
   const GIG_STATUSES: GigRow['status'][] = ['draft', 'open', 'claimed', 'in_review', 'completed', 'archived']
+  const isCreatedButNotSaved = mode === 'create' && currentGigId && !gig
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
-      {/* Basic info */}
       <div className="card">
         <div className="card-header">
           <h2 className="font-sans font-semibold text-foreground">Gig details</h2>
@@ -177,17 +190,17 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
         <div className="card-body space-y-4">
           <div>
             <label className="field-label">Title *</label>
-            <input name="title" value={form.title} onChange={handleChange} className="field-input" required placeholder="Refinish dining table" />
+            <input name="title" value={form.title} onChange={handleChange} className="field-input" required placeholder="Refinish dining table" disabled={isCreatedButNotSaved} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="field-label">Furniture type</label>
-              <input name="furniture_type" value={form.furniture_type} onChange={handleChange} className="field-input" placeholder="table, chair, dresser…" />
+              <input name="furniture_type" value={form.furniture_type} onChange={handleChange} className="field-input" placeholder="table, chair, dresser…" disabled={isCreatedButNotSaved} />
             </div>
             <div>
               <label className="field-label">Status</label>
-              <select name="status" value={form.status} onChange={handleChange} className="field-input">
+              <select name="status" value={form.status} onChange={handleChange} className="field-input" disabled={isCreatedButNotSaved}>
                 {GIG_STATUSES.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
@@ -197,48 +210,46 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
 
           <div>
             <label className="field-label">Summary <span className="font-normal text-muted-foreground">(shown on card)</span></label>
-            <input name="summary" value={form.summary} onChange={handleChange} className="field-input" placeholder="Brief one-liner for the gig board" />
+            <input name="summary" value={form.summary} onChange={handleChange} className="field-input" placeholder="Brief one-liner for the gig board" disabled={isCreatedButNotSaved} />
           </div>
 
           <div>
             <label className="field-label">Full description</label>
-            <textarea name="description" value={form.description} onChange={handleChange} className="field-input resize-none h-32" placeholder="Detailed description, materials, expectations…" />
+            <textarea name="description" value={form.description} onChange={handleChange} className="field-input resize-none h-32" placeholder="Detailed description, materials, expectations…" disabled={isCreatedButNotSaved} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="field-label">Location</label>
-              <input name="location_text" value={form.location_text} onChange={handleChange} className="field-input" placeholder="Nashville, TN" />
+              <input name="location_text" value={form.location_text} onChange={handleChange} className="field-input" placeholder="Nashville, TN" disabled={isCreatedButNotSaved} />
             </div>
             <div>
               <label className="field-label">Pay amount ($)</label>
-              <input name="pay_amount" type="number" step="0.01" min="0" value={form.pay_amount} onChange={handleChange} className="field-input" placeholder="150" required />
+              <input name="pay_amount" type="number" step="0.01" min="0" value={form.pay_amount} onChange={handleChange} className="field-input" placeholder="150" required disabled={isCreatedButNotSaved} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="field-label">Due date</label>
-              <input name="due_date" type="date" value={form.due_date} onChange={handleChange} className="field-input" />
+              <input name="due_date" type="date" value={form.due_date} onChange={handleChange} className="field-input" disabled={isCreatedButNotSaved} />
             </div>
             <div>
               <label className="field-label">Required skills <span className="font-normal text-muted-foreground">(comma-separated)</span></label>
-              <input name="required_skills" value={form.required_skills} onChange={handleChange} className="field-input" placeholder="sanding, painting, staining" />
+              <input name="required_skills" value={form.required_skills} onChange={handleChange} className="field-input" placeholder="sanding, painting, staining" disabled={isCreatedButNotSaved} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Image uploader */}
-      {mode === 'edit' && gig && (
-        <GigImageUploader gigId={gig.id} images={images} onImagesChange={setImages} />
+      {((mode === 'edit' && gig) || isCreatedButNotSaved) && currentGigId && (
+        <GigImageUploader gigId={currentGigId} images={images} onImagesChange={setImages} />
       )}
 
-      {/* Checklist builder */}
       <div className="card">
         <div className="card-header flex items-center justify-between">
           <h2 className="font-sans font-semibold text-foreground">Checklist</h2>
-          <Button type="button" variant="ghost" size="sm" onClick={addChecklistItem} className="gap-1.5">
+          <Button type="button" variant="ghost" size="sm" onClick={addChecklistItem} className="gap-1.5" disabled={isCreatedButNotSaved}>
             <Plus className="w-3.5 h-3.5" />
             Add item
           </Button>
@@ -250,7 +261,7 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
             </div>
           )}
           {checklist.map((item, index) => (
-            <div key={index} className="px-6 py-4 space-y-3">
+            <div key={index} className="px-6 py-4 space-y-3" style={{ opacity: isCreatedButNotSaved ? 0.5 : 1 }}>
               <div className="flex items-start gap-3">
                 <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0 mt-2">
                   {index + 1}
@@ -262,12 +273,14 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
                     className="field-input"
                     placeholder="Step title"
                     required
+                    disabled={isCreatedButNotSaved}
                   />
                   <input
                     value={item.description}
                     onChange={(e) => updateChecklistItem(index, 'description', e.target.value)}
                     className="field-input text-xs"
                     placeholder="Optional description…"
+                    disabled={isCreatedButNotSaved}
                   />
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <input
@@ -275,6 +288,7 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
                       checked={item.required}
                       onChange={(e) => updateChecklistItem(index, 'required', e.target.checked)}
                       className="accent-accent"
+                      disabled={isCreatedButNotSaved}
                     />
                     Required
                   </label>
@@ -283,6 +297,7 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
                   type="button"
                   onClick={() => removeChecklistItem(index)}
                   className="p-1 text-muted-foreground hover:text-destructive transition-colors mt-2 shrink-0"
+                  disabled={isCreatedButNotSaved}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -295,12 +310,25 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex gap-3">
-        <Button type="submit" variant="accent" loading={loading}>
-          {mode === 'create' ? 'Create gig' : 'Save changes'}
-        </Button>
-        <Button type="button" variant="outline" onClick={() => router.push('/admin/gigs')}>
-          Cancel
-        </Button>
+        {isCreatedButNotSaved ? (
+          <>
+            <Button type="button" variant="accent" onClick={handleFinish} loading={loading}>
+              Finish
+            </Button>
+            <Button type="button" variant="outline" onClick={() => router.push('/admin/gigs')}>
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button type="submit" variant="accent" loading={loading}>
+              {mode === 'create' ? 'Create gig' : 'Save changes'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => router.push('/admin/gigs')}>
+              Cancel
+            </Button>
+          </>
+        )}
       </div>
     </form>
   )
