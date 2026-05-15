@@ -30,7 +30,8 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
   const router = useRouter()
   const supabase = createClient()
 
-  const [step, setStep] = useState<Step>(mode === 'edit' ? 'details' : 'details')
+  const [step, setStep] = useState<Step>('details')
+  const [savedGigId, setSavedGigId] = useState<string | null>(gig?.id ?? null)
 
   const [form, setForm] = useState({
     title: gig?.title ?? '',
@@ -81,13 +82,14 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
     setChecklist((prev) => prev.filter((_, i) => i !== index))
   }
 
-  async function handleSaveAndNext() {
+  async function handleNextFromDetails() {
     if (mode === 'edit') {
+      // In edit mode, just go to images
       setStep('images')
       return
     }
 
-    // For create mode, save gig first
+    // In create mode, save gig first
     setLoading(true)
     setError('')
 
@@ -121,8 +123,7 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
       return
     }
 
-    // Update form to have the gig
-    ;(form as any).gigId = newGig.id
+    setSavedGigId(newGig.id)
     setLoading(false)
     setStep('images')
   }
@@ -136,7 +137,8 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
       .map((s) => s.trim())
       .filter(Boolean)
 
-    let gigId = gig?.id
+    let gigId = savedGigId
+
     const gigData = {
       title: form.title,
       slug: gig?.slug || slugify(form.title),
@@ -162,14 +164,6 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
         return
       }
       gigId = gig.id
-    } else {
-      // In create mode, gig already exists from handleSaveAndNext
-      gigId = (form as any).gigId
-      if (!gigId) {
-        setError('Gig ID not found')
-        setLoading(false)
-        return
-      }
     }
 
     // Sync checklist
@@ -219,13 +213,13 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
 
         <ChevronRight className="w-4 h-4 text-muted-foreground mx-2" />
 
+        <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'images' ? 'bg-accent text-white' : 'bg-muted text-muted-foreground'}`}>
+          2
+        </div>
+        <span className="text-sm font-medium">Images</span>
+
         {mode === 'create' && (
           <>
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'images' ? 'bg-accent text-white' : 'bg-muted text-muted-foreground'}`}>
-              2
-            </div>
-            <span className="text-sm font-medium">Images</span>
-
             <ChevronRight className="w-4 h-4 text-muted-foreground mx-2" />
 
             <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'review' ? 'bg-accent text-white' : 'bg-muted text-muted-foreground'}`}>
@@ -358,8 +352,8 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           <div className="flex gap-3">
-            <Button type="button" variant="accent" onClick={handleSaveAndNext} loading={loading}>
-              {mode === 'create' ? 'Next: Upload Images' : 'Next: Upload Images'}
+            <Button type="button" variant="accent" onClick={handleNextFromDetails} loading={loading}>
+              Next: Upload Images
             </Button>
             <Button type="button" variant="outline" onClick={() => router.push('/admin/gigs')}>
               Cancel
@@ -368,69 +362,72 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
         </div>
       )}
 
-      {/* Step 2: Images (create mode only) */}
-      {step === 'images' && mode === 'create' && (
+      {/* Step 2: Images */}
+      {step === 'images' && savedGigId && (
         <div className="space-y-6">
-          <GigImageUploader gigId={(form as any).gigId} images={images} onImagesChange={setImages} />
+          <GigImageUploader gigId={savedGigId} images={images} onImagesChange={setImages} />
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           <div className="flex gap-3">
-            <Button type="button" variant="accent" onClick={() => setStep('review')} loading={loading}>
-              Next: Review
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setStep('details')}>
-              Back
-            </Button>
+            {mode === 'create' ? (
+              <>
+                <Button type="button" variant="accent" onClick={() => setStep('review')} loading={loading}>
+                  Next: Review
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setStep('details')}>
+                  Back
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button type="button" variant="accent" onClick={handleSubmit} loading={loading}>
+                  Save Changes
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setStep('details')}>
+                  Back
+                </Button>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {/* Step 3: Review (create mode) or Step 2: Images (edit mode) */}
-      {(step === 'review' || (step === 'images' && mode === 'edit')) && (
+      {/* Step 3: Review (create mode only) */}
+      {step === 'review' && mode === 'create' && (
         <div className="space-y-6">
-          {mode === 'edit' && (
-            <GigImageUploader gigId={gig!.id} images={images} onImagesChange={setImages} />
-          )}
-
-          {step === 'review' && (
-            <div className="card">
-              <div className="card-header">
-                <h2 className="font-sans font-semibold text-foreground">Review your gig</h2>
+          <div className="card">
+            <div className="card-header">
+              <h2 className="font-sans font-semibold text-foreground">Review your gig</h2>
+            </div>
+            <div className="card-body space-y-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Title</p>
+                <p className="text-lg font-semibold text-foreground">{form.title}</p>
               </div>
-              <div className="card-body space-y-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">Title</p>
-                  <p className="text-lg font-semibold text-foreground">{form.title}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Pay amount</p>
-                  <p className="text-lg font-semibold text-foreground">${form.pay_amount}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Description</p>
-                  <p className="text-sm text-foreground whitespace-pre-wrap">{form.description}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Images uploaded</p>
-                  <p className="text-sm text-foreground">{images.length} image(s)</p>
-                </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Pay amount</p>
+                <p className="text-lg font-semibold text-foreground">${form.pay_amount}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Description</p>
+                <p className="text-sm text-foreground whitespace-pre-wrap">{form.description}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Images uploaded</p>
+                <p className="text-sm text-foreground">{images.length} image(s)</p>
               </div>
             </div>
-          )}
+          </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           <div className="flex gap-3">
             <Button type="button" variant="accent" onClick={handleSubmit} loading={loading}>
-              {mode === 'create' ? 'Create Gig' : 'Save Changes'}
+              Create Gig
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => (mode === 'create' ? setStep('review') : setStep('details'))}
-            >
-              {mode === 'create' ? 'Back' : 'Back to Details'}
+            <Button type="button" variant="outline" onClick={() => setStep('images')}>
+              Back
             </Button>
             <Button type="button" variant="outline" onClick={() => router.push('/admin/gigs')}>
               Cancel
