@@ -363,9 +363,9 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
       )}
 
       {/* Step 2: Images */}
-      {step === 'images' && savedGigId && (
+      {step === 'images' && (savedGigId || (mode === 'edit' && gig)) && (
         <div className="space-y-6">
-          <GigImageUploader gigId={savedGigId} images={images} onImagesChange={setImages} />
+          <GigImageUploader gigId={mode === 'edit' && gig ? gig.id : savedGigId!} images={images} onImagesChange={setImages} />
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
