@@ -67,7 +67,7 @@ export const CITIES_BY_STATE: Record<string, string[]> = {
   Florida: ['Jacksonville', 'Miami', 'Tampa', 'Orlando', 'St. Petersburg', 'Hialeah', 'Tallahassee', 'Port St. Lucie', 'Fort Lauderdale', 'Cape Coral', 'Fort Myers', 'West Palm Beach', 'Lakeland', 'Gainesville', 'Coral Springs', 'Miami Gardens', 'Clearwater', 'Deerfield Beach', 'Pembroke Pines', 'Hollywood', 'Miramar', 'Boca Raton', 'Pompano Beach', 'Palm Bay', 'Bradenton', 'Sarasota', 'Sunrise', 'Delray Beach', 'Largo', 'Naples', 'Davie', 'Kissimmee', 'Ocala', 'Pinellas Park', 'Jacksonville Beach', 'Riviera Beach', 'Daytona Beach', 'Weston', 'Coconut Creek', 'Leesburg', 'St. Augustine', 'Tamarac', 'Aventura'],
   Georgia: ['Atlanta', 'Augusta', 'Columbus', 'Savannah', 'Athens', 'Macon', 'Marietta', 'Sandy Springs', 'Roswell', 'Valdosta', 'Alpharetta', 'Peachtree City', 'Dalton', 'Smyrna', 'Johns Creek', 'Dunwoody', 'Kennesaw', 'Decatur', 'Cumming', 'Douglasville'],
   Hawaii: ['Honolulu', 'Kailua', 'Kaneohe', 'Waipahu', 'Mililani', 'Kapolei', 'Kihei', 'Lahaina'],
-  Idaho: ['Boise', 'Meridian', 'Pocatello', 'Idaho Falls', 'Nampa', 'Caldwell', 'Twin Falls', 'Coeur d''Alene'],
+  Idaho: ['Boise', 'Meridian', 'Pocatello', 'Idaho Falls', 'Nampa', 'Caldwell', 'Twin Falls', 'Coeur d\'Alene'],
   Illinois: ['Chicago', 'Aurora', 'Rockford', 'Joliet', 'Naperville', 'Springfield', 'Peoria', 'Elgin', 'Waukegan', 'Cicero', 'Arlington Heights', 'Evanston', 'Downers Grove', 'Schaumburg', 'Bolingbrook', 'Des Plaines', 'Decatur', 'Skokie', 'Champaign', 'Oak Lawn', 'Tinley Park', 'Oak Park', 'Palatine', 'Wheaton', 'Lombard', 'Berwyn', 'Quincy', 'Urbana', 'Mount Prospect', 'Normal', 'Hoffman Estates', 'Carol Stream', 'Bloomingdale', 'Barrington'],
   Indiana: ['Indianapolis', 'Fort Wayne', 'Evansville', 'South Bend', 'Mishawaka', 'Bloomington', 'Muncie', 'Lafayette', 'Gary', 'Hammond', 'Terre Haute', 'Anderson', 'Kokomo', 'Carmel', 'Fishers', 'Greenwood'],
   Iowa: ['Des Moines', 'Cedar Rapids', 'Davenport', 'Iowa City', 'Dubuque', 'Waterloo', 'Sioux City', 'Ames', 'Council Bluffs', 'Bettendorf', 'Ankeny'],
@@ -80,7 +80,7 @@ export const CITIES_BY_STATE: Record<string, string[]> = {
   Michigan: ['Detroit', 'Grand Rapids', 'Warren', 'Sterling Heights', 'Lansing', 'Ann Arbor', 'Flint', 'Dearborn', 'Livonia', 'Westland', 'Farmington Hills', 'Kalamazoo', 'Taylor', 'Southfield', 'Dearborn Heights', 'Troy', 'Pontiac', 'Saginaw', 'Jackson', 'Inkster', 'Battle Creek', 'Wyandotte', 'Canton', 'Clinton Township', 'Muskegon', 'Roseville', 'Eastpointe'],
   Minnesota: ['Minneapolis', 'St. Paul', 'Rochester', 'Bloomington', 'Duluth', 'St. Cloud', 'Mankato', 'Maple Grove', 'Edina', 'Plymouth', 'St. Louis Park', 'Coon Rapids', 'Burnsville', 'Eden Prairie', 'Minnetonka', 'Maplewood', 'Eagan', 'Rosemont', 'Fridley', 'Richfield'],
   Mississippi: ['Jackson', 'Gulfport', 'Biloxi', 'Hattiesburg', 'Meridian', 'Greenville', 'Tupelo'],
-  Missouri: ['Kansas City', 'St. Louis', 'Springfield', 'Independence', 'Columbia', 'St. Joseph', 'Joplin', 'Lee''s Summit', 'O''Fallon', 'Florissant', 'St. Peters', 'Raytown', 'Blue Springs', 'University City', 'Chesterfield', 'Kirkwood', 'Mexico'],
+  Missouri: ['Kansas City', 'St. Louis', 'Springfield', 'Independence', 'Columbia', 'St. Joseph', 'Joplin', 'Lee\'s Summit', 'O\'Fallon', 'Florissant', 'St. Peters', 'Raytown', 'Blue Springs', 'University City', 'Chesterfield', 'Kirkwood', 'Mexico'],
   Montana: ['Billings', 'Missoula', 'Great Falls', 'Bozeman'],
   Nebraska: ['Omaha', 'Lincoln', 'Bellevue', 'Grand Island', 'Kearney', 'Fremont'],
   Nevada: ['Las Vegas', 'Henderson', 'North Las Vegas', 'Reno', 'Sparks', 'Carson City', 'Elko'],
@@ -108,3 +108,6 @@ export const CITIES_BY_STATE: Record<string, string[]> = {
   Wyoming: ['Cheyenne', 'Casper', 'Laramie'],
   'District of Columbia': ['Washington'],
 }
+@echo off
+cd /d "%~dp0"
+powershell -NoProfile -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/CoryLT/furniture-gig/main/components/admin/GigFormMultiStep.tsx' -OutFile 'components/admin/GigFormMultiStep.tsx'"
