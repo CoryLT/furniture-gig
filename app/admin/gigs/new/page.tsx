@@ -1,4 +1,4 @@
-import GigForm from '@/components/admin/GigForm'
+import GigFormMultiStep from '@/components/admin/GigFormMultiStep'
 
 export default function NewGigPage() {
   return (
@@ -9,7 +9,7 @@ export default function NewGigPage() {
         </a>
         <h1 className="text-3xl text-foreground mt-2">New Gig</h1>
       </div>
-      <GigForm mode="create" />
+      <GigFormMultiStep mode="create" />
     </div>
   )
 }

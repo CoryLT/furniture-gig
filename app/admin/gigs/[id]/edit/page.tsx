@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import GigForm from '@/components/admin/GigForm'
+import GigFormMultiStep from '@/components/admin/GigFormMultiStep'
 import type { GigRow, GigChecklistItemRow, GigImageRow } from '@/types/database'
 
 interface Props {
@@ -45,7 +45,7 @@ export default async function EditGigPage({ params }: Props) {
         <h1 className="text-3xl text-foreground mt-2">Edit Gig</h1>
         <p className="text-muted-foreground text-sm mt-1 font-mono">{gig.slug}</p>
       </div>
-      <GigForm gig={gig} checklist={checklist} images={images} mode="edit" />
+      <GigFormMultiStep gig={gig} checklist={checklist} images={images} mode="edit" />
     </div>
   )
 }
