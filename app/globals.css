@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm off-white base */
+    --background: 36 20% 97%;
+    --foreground: 20 10% 8%;
+
+    /* Cards slightly whiter */
+    --card: 0 0% 100%;
+    --card-foreground: 20 10% 8%;
+
+    /* Near-black primary */
+    --primary: 20 10% 10%;
+    --primary-foreground: 36 20% 97%;
+
+    /* Stone secondary */
+    --secondary: 30 15% 92%;
+    --secondary-foreground: 20 10% 12%;
+
+    /* Warm muted */
+    --muted: 30 10% 93%;
+    --muted-foreground: 20 8% 46%;
+
+    /* Amber accent */
+    --accent: 32 90% 48%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Destructive */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Border / input */
+    --border: 30 12% 86%;
+    --input: 30 12% 86%;
+    --ring: 32 90% 48%;
+
+    /* Radius */
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  h1, h2, h3, h4 {
+    @apply font-serif;
+  }
+}
+
+@layer components {
+  /* Status badge base */
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium font-mono;
+  }
+
+  .status-draft {
+    @apply status-badge bg-stone-100 text-stone-600;
+  }
+
+  .status-open {
+    @apply status-badge bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200;
+  }
+
+  .status-claimed {
+    @apply status-badge bg-blue-50 text-blue-700 ring-1 ring-blue-200;
+  }
+
+  .status-in-review {
+    @apply status-badge bg-amber-50 text-amber-700 ring-1 ring-amber-200;
+  }
+
+  .status-completed {
+    @apply status-badge bg-green-50 text-green-700 ring-1 ring-green-200;
+  }
+
+  .status-archived {
+    @apply status-badge bg-stone-100 text-stone-500;
+  }
+
+  /* Form field styles */
+  .field-label {
+    @apply block text-sm font-medium text-foreground mb-1.5;
+  }
+
+  .field-input {
+    @apply w-full rounded-md border border-input bg-white px-3 py-2 text-sm
+      placeholder:text-muted-foreground
+      focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .field-error {
+    @apply text-xs text-destructive mt-1;
+  }
+
+  /* Card */
+  .card {
+    @apply bg-card rounded-lg border border-border shadow-sm;
+  }
+
+  .card-header {
+    @apply px-6 py-4 border-b border-border;
+  }
+
+  .card-body {
+    @apply px-6 py-5;
+  }
+}

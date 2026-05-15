@@ -1,0 +1,43 @@
+import { notFound } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import GigForm from '@/components/admin/GigForm'
+import type { GigRow, GigChecklistItemRow } from '@/types/database'
+
+interface Props {
+  params: { id: string }
+}
+
+export default async function EditGigPage({ params }: Props) {
+  const supabase = createClient()
+
+  const { data } = await supabase
+    .from('gigs')
+    .select('*')
+    .eq('id', params.id)
+    .single()
+
+  if (!data) notFound()
+
+  const gig = data as GigRow
+
+  const { data: checklistData } = await supabase
+    .from('gig_checklist_items')
+    .select('*')
+    .eq('gig_id', gig.id)
+    .order('sort_order')
+
+  const checklist = (checklistData ?? []) as GigChecklistItemRow[]
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <a href="/admin/gigs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          ← Back to gigs
+        </a>
+        <h1 className="text-3xl text-foreground mt-2">Edit Gig</h1>
+        <p className="text-muted-foreground text-sm mt-1 font-mono">{gig.slug}</p>
+      </div>
+      <GigForm gig={gig} checklist={checklist} mode="edit" />
+    </div>
+  )
+}
