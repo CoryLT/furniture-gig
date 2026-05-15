@@ -34,6 +34,29 @@ export default async function GigsPage() {
 
   const { data: gigs } = await query
 
+  // Load first image for each gig (thumbnail)
+  let gigsWithImages: any[] = []
+  if (gigs) {
+    for (const gig of gigs) {
+      const { data: images } = await supabase
+        .from('gig_images')
+        .select('*')
+        .eq('gig_id', gig.id)
+        .order('sort_order')
+        .limit(1)
+
+      const image = images?.[0]
+      const imageUrl = image
+        ? supabase.storage.from('gig-images').getPublicUrl(image.file_path).data.publicUrl
+        : null
+
+      gigsWithImages.push({
+        ...gig,
+        thumbnailUrl: imageUrl,
+      })
+    }
+  }
+
   // Load any claims this worker has so we can show "claimed by you" on cards
   const { data: myClaims } = await supabase
     .from('gig_claims')
@@ -49,8 +72,8 @@ export default async function GigsPage() {
           <h1 className="text-3xl text-foreground">Available Gigs</h1>
           <p className="text-muted-foreground mt-1">
             {hasLocation
-              ? `${gigs?.length ?? 0} open ${gigs?.length === 1 ? 'gig' : 'gigs'} in ${workerCity}, ${workerState}`
-              : `${gigs?.length ?? 0} open ${gigs?.length === 1 ? 'gig' : 'gigs'}`
+              ? `${gigsWithImages?.length ?? 0} open ${gigsWithImages?.length === 1 ? 'gig' : 'gigs'} in ${workerCity}, ${workerState}`
+              : `${gigsWithImages?.length ?? 0} open ${gigsWithImages?.length === 1 ? 'gig' : 'gigs'}`
             }
           </p>
         </div>
@@ -67,19 +90,30 @@ export default async function GigsPage() {
         </div>
       )}
 
-      {!gigs || gigs.length === 0 ? (
+      {!gigsWithImages || gigsWithImages.length === 0 ? (
         <div className="card card-body text-center py-16 space-y-2">
           <p className="text-lg text-muted-foreground">No gigs available in your area right now.</p>
           <p className="text-sm text-muted-foreground">Check back soon — new projects get posted regularly.</p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {gigs.map((gig) => (
+          {gigsWithImages.map((gig) => (
             <Link
               key={gig.id}
               href={`/gigs/${gig.slug}`}
-              className="card hover:shadow-md transition-shadow group block"
+              className="card hover:shadow-md transition-shadow group block overflow-hidden"
             >
+              {/* Thumbnail image */}
+              {gig.thumbnailUrl && (
+                <div className="w-full h-40 bg-muted overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={gig.thumbnailUrl}
+                    alt={gig.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                  />
+                </div>
+              )}
               <div className="card-body space-y-4">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3">
