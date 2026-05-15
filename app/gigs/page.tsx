@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
+import GigListingCard from '@/components/worker/GigListingCard'
+import { AlertCircle } from 'lucide-react'
 import Link from 'next/link'
-import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel } from '@/lib/utils'
-import { MapPin, Calendar, Wrench, ArrowRight, AlertCircle } from 'lucide-react'
 
 export default async function GigsPage() {
   const supabase = createClient()
@@ -34,29 +34,6 @@ export default async function GigsPage() {
 
   const { data: gigs } = await query
 
-  // Load first image for each gig (thumbnail)
-  let gigsWithImages: any[] = []
-  if (gigs) {
-    for (const gig of gigs) {
-      const { data: images } = await supabase
-        .from('gig_images')
-        .select('*')
-        .eq('gig_id', gig.id)
-        .order('sort_order')
-        .limit(1)
-
-      const image = images?.[0]
-      const imageUrl = image
-        ? supabase.storage.from('gig-images').getPublicUrl(image.file_path).data.publicUrl
-        : null
-
-      gigsWithImages.push({
-        ...gig,
-        thumbnailUrl: imageUrl,
-      })
-    }
-  }
-
   // Load any claims this worker has so we can show "claimed by you" on cards
   const { data: myClaims } = await supabase
     .from('gig_claims')
@@ -72,8 +49,8 @@ export default async function GigsPage() {
           <h1 className="text-3xl text-foreground">Available Gigs</h1>
           <p className="text-muted-foreground mt-1">
             {hasLocation
-              ? `${gigsWithImages?.length ?? 0} open ${gigsWithImages?.length === 1 ? 'gig' : 'gigs'} in ${workerCity}, ${workerState}`
-              : `${gigsWithImages?.length ?? 0} open ${gigsWithImages?.length === 1 ? 'gig' : 'gigs'}`
+              ? `${gigs?.length ?? 0} open ${gigs?.length === 1 ? 'gig' : 'gigs'} in ${workerCity}, ${workerState}`
+              : `${gigs?.length ?? 0} open ${gigs?.length === 1 ? 'gig' : 'gigs'}`
             }
           </p>
         </div>
@@ -90,83 +67,19 @@ export default async function GigsPage() {
         </div>
       )}
 
-      {!gigsWithImages || gigsWithImages.length === 0 ? (
+      {!gigs || gigs.length === 0 ? (
         <div className="card card-body text-center py-16 space-y-2">
           <p className="text-lg text-muted-foreground">No gigs available in your area right now.</p>
           <p className="text-sm text-muted-foreground">Check back soon — new projects get posted regularly.</p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {gigsWithImages.map((gig) => (
-            <Link
+          {gigs.map((gig) => (
+            <GigListingCard
               key={gig.id}
-              href={`/gigs/${gig.slug}`}
-              className="card hover:shadow-md transition-shadow group block overflow-hidden"
-            >
-              {/* Thumbnail image */}
-              {gig.thumbnailUrl && (
-                <div className="w-full h-40 bg-muted overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={gig.thumbnailUrl}
-                    alt={gig.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  />
-                </div>
-              )}
-              <div className="card-body space-y-4">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <h2 className="font-sans font-semibold text-base text-foreground group-hover:text-accent transition-colors leading-snug">
-                      {gig.title}
-                    </h2>
-                    <p className="text-xs text-muted-foreground mt-0.5 font-mono capitalize">
-                      {gig.furniture_type}
-                    </p>
-                  </div>
-                  <span className={gigStatusClass(gig.status)}>{gigStatusLabel(gig.status)}</span>
-                </div>
-
-                {/* Summary */}
-                {gig.summary && (
-                  <p className="text-sm text-muted-foreground line-clamp-2">{gig.summary}</p>
-                )}
-
-                {/* Meta */}
-                <div className="space-y-1.5 text-xs text-muted-foreground">
-                  {(gig.city || gig.location_text) && (
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 shrink-0" />
-                      {gig.city && gig.state ? `${gig.city}, ${gig.state}` : gig.location_text}
-                    </div>
-                  )}
-                  {gig.due_date && (
-                    <div className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 shrink-0" />
-                      Due {formatDate(gig.due_date)}
-                    </div>
-                  )}
-                  {gig.required_skills.length > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <Wrench className="w-3.5 h-3.5 shrink-0" />
-                      {gig.required_skills.join(', ')}
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between pt-1 border-t border-border">
-                  <span className="font-mono font-semibold text-foreground">
-                    {formatCurrency(gig.pay_amount)}
-                  </span>
-                  <span className="text-xs text-accent flex items-center gap-1 group-hover:gap-1.5 transition-all">
-                    {myClaimedIds.has(gig.id) ? 'View your claim' : 'View gig'}
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </div>
-            </Link>
+              gig={gig}
+              isClaimed={myClaimedIds.has(gig.id)}
+            />
           ))}
         </div>
       )}
