@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { MapPin, Calendar } from 'lucide-react'
 import ReviewActions from './ReviewActions'
+import type { GigImageRow } from '@/types/database'
 
 interface Props {
   params: { claimId: string }
@@ -35,13 +36,20 @@ export default async function AdminReviewPage({ params }: Props) {
     .eq('worker_user_id', claim.worker_user_id)
     .in('checklist_item_id', checklist?.map((c: any) => c.id) ?? [])
 
-  // Load photos
+  // Load worker proof photos
   const { data: photos } = await supabase
     .from('gig_photo_uploads')
     .select('*')
     .eq('gig_id', gig.id)
     .eq('worker_user_id', claim.worker_user_id)
     .order('uploaded_at')
+
+  // Load admin reference images
+  const { data: referenceImages } = await supabase
+    .from('gig_images')
+    .select('*')
+    .eq('gig_id', gig.id)
+    .order('sort_order')
 
   const completionMap = new Map(completions?.map((c: any) => [c.checklist_item_id, c]) ?? [])
 
@@ -50,6 +58,12 @@ export default async function AdminReviewPage({ params }: Props) {
     ...p,
     url: supabase.storage.from('gig-photos').getPublicUrl(p.file_path).data.publicUrl,
   })) ?? []
+
+  // Get public URLs for reference images
+  const referenceImagesWithUrls = (referenceImages ?? []).map((img: GigImageRow) => ({
+    ...img,
+    url: supabase.storage.from('gig-images').getPublicUrl(img.file_path).data.publicUrl,
+  }))
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -113,7 +127,29 @@ export default async function AdminReviewPage({ params }: Props) {
         </div>
       )}
 
-      {/* Photos */}
+      {/* Reference images from admin */}
+      {referenceImagesWithUrls.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <h2 className="font-sans font-semibold text-foreground">Reference Images</h2>
+          </div>
+          <div className="card-body">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {referenceImagesWithUrls.map((image: any) => (
+                <div key={image.id} className="space-y-1">
+                  <a href={image.url} target="_blank" rel="noopener noreferrer" className="block aspect-square rounded-md overflow-hidden bg-muted border border-border hover:opacity-90 transition-opacity">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={image.url} alt={image.caption || 'Reference image'} className="w-full h-full object-cover" />
+                  </a>
+                  {image.caption && <p className="text-xs text-muted-foreground">{image.caption}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Worker proof photos */}
       {photosWithUrls.length > 0 && (
         <div className="card">
           <div className="card-header">

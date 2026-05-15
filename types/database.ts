@@ -382,6 +382,35 @@ export type Database = {
           uploaded_at?: string
         }
       }
+      gig_images: {
+        Row: {
+          id: string
+          gig_id: string
+          file_path: string
+          caption: string
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          gig_id: string
+          file_path: string
+          caption?: string
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          gig_id?: string
+          file_path?: string
+          caption?: string
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
       payout_records: {
         Row: {
           id: string
@@ -439,6 +468,7 @@ export type GigChecklistItemRow = Database['public']['Tables']['gig_checklist_it
 export type GigClaimRow = Database['public']['Tables']['gig_claims']['Row']
 export type GigTaskCompletionRow = Database['public']['Tables']['gig_task_completions']['Row']
 export type GigPhotoUploadRow = Database['public']['Tables']['gig_photo_uploads']['Row']
+export type GigImageRow = Database['public']['Tables']['gig_images']['Row']
 export type PayoutRecordRow = Database['public']['Tables']['payout_records']['Row']
 
 // Status types

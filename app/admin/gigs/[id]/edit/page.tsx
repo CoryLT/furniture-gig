@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import GigForm from '@/components/admin/GigForm'
-import type { GigRow, GigChecklistItemRow } from '@/types/database'
+import type { GigRow, GigChecklistItemRow, GigImageRow } from '@/types/database'
 
 interface Props {
   params: { id: string }
@@ -28,6 +28,14 @@ export default async function EditGigPage({ params }: Props) {
 
   const checklist = (checklistData ?? []) as GigChecklistItemRow[]
 
+  const { data: imagesData } = await supabase
+    .from('gig_images')
+    .select('*')
+    .eq('gig_id', gig.id)
+    .order('sort_order')
+
+  const images = (imagesData ?? []) as GigImageRow[]
+
   return (
     <div className="space-y-6">
       <div>
@@ -37,7 +45,7 @@ export default async function EditGigPage({ params }: Props) {
         <h1 className="text-3xl text-foreground mt-2">Edit Gig</h1>
         <p className="text-muted-foreground text-sm mt-1 font-mono">{gig.slug}</p>
       </div>
-      <GigForm gig={gig} checklist={checklist} mode="edit" />
+      <GigForm gig={gig} checklist={checklist} images={images} mode="edit" />
     </div>
   )
 }

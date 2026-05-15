@@ -4,13 +4,15 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import GigImageUploader from './GigImageUploader'
 import { slugify } from '@/lib/utils'
 import { Plus, X } from 'lucide-react'
-import type { GigRow, GigChecklistItemRow } from '@/types/database'
+import type { GigRow, GigChecklistItemRow, GigImageRow } from '@/types/database'
 
 interface Props {
   gig?: GigRow
   checklist?: GigChecklistItemRow[]
+  images?: GigImageRow[]
   mode: 'create' | 'edit'
 }
 
@@ -22,7 +24,7 @@ interface ChecklistItem {
   sort_order: number
 }
 
-export default function GigForm({ gig, checklist: initialChecklist, mode }: Props) {
+export default function GigForm({ gig, checklist: initialChecklist, images: initialImages, mode }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -47,6 +49,8 @@ export default function GigForm({ gig, checklist: initialChecklist, mode }: Prop
       sort_order: i.sort_order,
     })) ?? []
   )
+
+  const [images, setImages] = useState<GigImageRow[]>(initialImages ?? [])
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -222,6 +226,11 @@ export default function GigForm({ gig, checklist: initialChecklist, mode }: Prop
           </div>
         </div>
       </div>
+
+      {/* Image uploader */}
+      {mode === 'edit' && gig && (
+        <GigImageUploader gigId={gig.id} images={images} onImagesChange={setImages} />
+      )}
 
       {/* Checklist builder */}
       <div className="card">

@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel } from '@/lib/utils'
 import { MapPin, Calendar, Wrench, DollarSign } from 'lucide-react'
 import ClaimButton from './ClaimButton'
+import GigReferenceImages from '@/components/shared/GigReferenceImages'
+import type { GigImageRow } from '@/types/database'
 
 interface Props {
   params: { slug: string }
@@ -31,6 +33,15 @@ export default async function GigDetailPage({ params }: Props) {
     .select('*')
     .eq('gig_id', gig.id)
     .order('sort_order')
+
+  // Load reference images
+  const { data: imagesData } = await supabase
+    .from('gig_images')
+    .select('*')
+    .eq('gig_id', gig.id)
+    .order('sort_order')
+
+  const images = (imagesData ?? []) as GigImageRow[]
 
   // Load any existing claim
   const { data: claim } = await supabase
@@ -114,6 +125,9 @@ export default async function GigDetailPage({ params }: Props) {
           )}
         </div>
       </div>
+
+      {/* Reference images */}
+      <GigReferenceImages images={images} />
 
       {/* Checklist preview */}
       {checklist && checklist.length > 0 && (
