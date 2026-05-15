@@ -84,12 +84,11 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
 
   async function handleNextFromDetails() {
     if (mode === 'edit') {
-      // In edit mode, just go to images
       setStep('images')
       return
     }
 
-    // In create mode, save gig first
+    // Create mode: save gig then go to images
     setLoading(true)
     setError('')
 
@@ -137,7 +136,7 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
       .map((s) => s.trim())
       .filter(Boolean)
 
-    let gigId = savedGigId
+    let gigId = savedGigId || gig?.id
 
     const gigData = {
       title: form.title,
@@ -163,7 +162,6 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
         setLoading(false)
         return
       }
-      gigId = gig.id
     }
 
     // Sync checklist
@@ -201,6 +199,7 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
   }
 
   const GIG_STATUSES: GigRow['status'][] = ['draft', 'open', 'claimed', 'in_review', 'completed', 'archived']
+  const gigIdForImages = mode === 'edit' ? gig?.id : savedGigId
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -363,9 +362,9 @@ export default function GigFormMultiStep({ gig, checklist: initialChecklist, ima
       )}
 
       {/* Step 2: Images */}
-      {step === 'images' && (savedGigId || (mode === 'edit' && gig)) && (
+      {step === 'images' && gigIdForImages && (
         <div className="space-y-6">
-          <GigImageUploader gigId={mode === 'edit' && gig ? gig.id : savedGigId!} images={images} onImagesChange={setImages} />
+          <GigImageUploader gigId={gigIdForImages} images={images} onImagesChange={setImages} />
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
