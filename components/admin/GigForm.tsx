@@ -54,6 +54,8 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [currentGigId, setCurrentGigId] = useState<string | null>(gig?.id ?? null)
+  const [showImageUploader, setShowImageUploader] = useState(mode === 'edit')
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
@@ -116,6 +118,11 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
         return
       }
       gigId = newGig.id
+      setCurrentGigId(gigId)
+      // Show image uploader for new gig
+      setShowImageUploader(true)
+      setLoading(false)
+      return
     } else {
       const { error: updateError } = await supabase
         .from('gigs')
@@ -159,6 +166,55 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
       }
     }
 
+    router.push('/admin/gigs')
+    router.refresh()
+  }
+
+  async function handleFinishCreating() {
+    setLoading(true)
+    
+    const skills = form.required_skills
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+
+    if (!currentGigId) return
+
+    const gigData = {
+      title: form.title,
+      slug: slugify(form.title),
+      summary: form.summary,
+      description: form.description,
+      furniture_type: form.furniture_type,
+      location_text: form.location_text,
+      pay_amount: parseFloat(form.pay_amount) || 0,
+      due_date: form.due_date || null,
+      status: form.status as GigRow['status'],
+      required_skills: skills,
+    }
+
+    // Update the gig with final data
+    await supabase
+      .from('gigs')
+      .update(gigData)
+      .eq('id', currentGigId)
+
+    // Sync checklist
+    for (let i = 0; i < checklist.length; i++) {
+      const item = checklist[i]
+      if (item.id) {
+        await supabase
+          .from('gig_checklist_items')
+          .update({ title: item.title, description: item.description, required: item.required, sort_order: i })
+          .eq('id', item.id)
+      } else {
+        await supabase
+          .from('gig_checklist_items')
+          .insert({ gig_id: currentGigId, title: item.title, description: item.description, required: item.required, sort_order: i })
+      }
+    }
+
+    setLoading(false)
     router.push('/admin/gigs')
     router.refresh()
   }
@@ -228,8 +284,8 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
       </div>
 
       {/* Image uploader */}
-      {mode === 'edit' && gig && (
-        <GigImageUploader gigId={gig.id} images={images} onImagesChange={setImages} />
+      {showImageUploader && currentGigId && (
+        <GigImageUploader gigId={currentGigId} images={images} onImagesChange={setImages} />
       )}
 
       {/* Checklist builder */}
@@ -293,12 +349,25 @@ export default function GigForm({ gig, checklist: initialChecklist, images: init
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex gap-3">
-        <Button type="submit" variant="accent" loading={loading}>
-          {mode === 'create' ? 'Create gig' : 'Save changes'}
-        </Button>
-        <Button type="button" variant="outline" onClick={() => router.push('/admin/gigs')}>
-          Cancel
-        </Button>
+        {showImageUploader && mode === 'create' ? (
+          <>
+            <Button type="button" variant="accent" onClick={handleFinishCreating} loading={loading}>
+              Finish creating gig
+            </Button>
+            <Button type="button" variant="outline" onClick={() => router.push('/admin/gigs')}>
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button type="submit" variant="accent" loading={loading}>
+              {mode === 'create' ? 'Create gig' : 'Save changes'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => router.push('/admin/gigs')}>
+              Cancel
+            </Button>
+          </>
+        )}
       </div>
     </form>
   )
