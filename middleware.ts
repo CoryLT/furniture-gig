@@ -10,15 +10,15 @@ export async function middleware(request: NextRequest) {
   )
 
   // Routes that require the user to be logged in
-  const protectedPrefixes = [
-    '/gigs',
-    '/my-gigs',
-    '/admin',
-    '/flipper',
-    '/auth/onboarding',
-    '/auth/flipper-onboarding',
-    '/auth/agreements',
-  ]
+ const protectedPrefixes = [
+  '/gigs',
+  '/my-gigs',
+  '/admin',
+  '/flipper',
+  // '/auth/onboarding',  // REMOVE THIS
+  // '/auth/flipper-onboarding',  // REMOVE THIS
+  '/auth/agreements',
+]
   const needsAuth = protectedPrefixes.some((p) => pathname.startsWith(p))
 
   if (!hasSession && needsAuth) {
