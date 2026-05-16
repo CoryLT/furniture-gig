@@ -26,13 +26,13 @@ export default function GigImageUploader({ gigId, images: initialImages, onImage
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [images, setImages] = useState<LocalImage[]>(
-    initialImages.map((img) => ({
+  initialImages && Array.isArray(initialImages) ? initialImages.map((img) => ({
       id: img.id,
       url: supabase.storage.from('gig-images').getPublicUrl(img.file_path).data.publicUrl,
       caption: img.caption,
       sort_order: img.sort_order,
       file_path: img.file_path,
-    }))
+    })) : []
   )
 
   const [uploading, setUploading] = useState(false)

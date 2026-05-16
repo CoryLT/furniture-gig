@@ -37,7 +37,7 @@ export default function GigFormMultiStep({
   const [selectedState, setSelectedState] = useState(gig?.location_text?.split(', ')[1] ?? '')
   const [selectedCity, setSelectedCity] = useState(gig?.location_text?.split(', ')[0] ?? '')
   const [payAmount, setPayAmount] = useState(gig?.pay_amount ?? '')
-  const [requiredSkills, setRequiredSkills] = useState(gig?.required_skills ?? '')
+  const [requiredSkills, setRequiredSkills] = useState(Array.isArray(gig?.required_skills) ? gig.required_skills.join(', ') : gig?.required_skills ?? '')
   const [dueDate, setDueDate] = useState(gig?.due_date ?? '')
   const [status, setStatus] = useState(gig?.status ?? 'draft')
 
@@ -92,7 +92,7 @@ export default function GigFormMultiStep({
           furniture_type: furnitureType,
           location_text: `${selectedCity}, ${selectedState}`,
           pay_amount: parseFloat(payAmount),
-          required_skills: requiredSkills,
+          required_skills: requiredSkills ? requiredSkills.split(',').map(s => s.trim()) : [],
           due_date: dueDate,
           status: mode === 'create' ? 'draft' : status,
         })
@@ -133,7 +133,7 @@ export default function GigFormMultiStep({
           furniture_type: furnitureType,
           location_text: `${selectedCity}, ${selectedState}`,
           pay_amount: parseFloat(payAmount),
-          required_skills: requiredSkills,
+          required_skills: requiredSkills ? requiredSkills.split(',').map(s => s.trim()) : [],
           due_date: dueDate,
           status,
         })
@@ -290,7 +290,7 @@ export default function GigFormMultiStep({
       {step === 'images' && savedGigId && (
         <div className="space-y-4">
           <h2 className="text-lg font-medium">Gig Photos</h2>
-          <GigImageUploader gigId={savedGigId} initialImages={initialImages} mode={mode} />
+          <GigImageUploader gigId={savedGigId} initialImages={initialImages ?? []} onImagesChange={() => {}} />
 
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setStep('details')} className="flex-1">Back</Button>

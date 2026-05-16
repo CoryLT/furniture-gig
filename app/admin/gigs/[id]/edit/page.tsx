@@ -18,7 +18,11 @@ export default async function EditGigPage({ params }: Props) {
 
   if (!data) notFound()
 
-  const gig = data as GigRow
+  // Ensure required_skills is always an array, never null/undefined
+  const gig = {
+    ...data,
+    required_skills: Array.isArray(data.required_skills) ? data.required_skills : (data.required_skills ? [data.required_skills] : [])
+  } as GigRow
 
   const { data: checklistData } = await supabase
     .from('gig_checklist_items')
