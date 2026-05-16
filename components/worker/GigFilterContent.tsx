@@ -38,18 +38,19 @@ export default function GigFilterContent({
 
   // Filter gigs based on selected city + nearby cities
   const filteredGigs = useMemo(() => {
-    if (!selectedCity) {
-      return initialGigs
-    }
+  if (!selectedCity) {
+    return initialGigs
+  }
 
-    const nearbyCities = getNearbyCity(selectedCity)
-    return initialGigs.filter((gig) => {
-     // Extract city from location_text or use gig.city
-return initialGigs.filter((gig) => {
-  if (!gig.city) return false
-  return nearbyCities.some((city) => city.toLowerCase() === gig.city.toLowerCase())
-})
+  const nearbyCities = getNearbyCity(selectedCity)
+  return initialGigs.filter((gig) => {
+    if (!gig.city) return false
+    return nearbyCities.some((city) => city.toLowerCase() === gig.city.toLowerCase())
+  })
 }, [selectedCity, initialGigs])
+
+return (
+  })
 
   return (
     <div className="space-y-6">
