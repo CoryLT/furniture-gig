@@ -49,7 +49,7 @@ return initialGigs.filter((gig) => {
   if (!gig.city) return false
   return nearbyCities.some((city) => city.toLowerCase() === gig.city.toLowerCase())
 })
-  }, [selectedCity, initialGigs])
+}, [selectedCity, initialGigs])
 
   return (
     <div className="space-y-6">
