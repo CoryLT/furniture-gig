@@ -45,8 +45,10 @@ export default function GigFilterContent({
     const nearbyCities = getNearbyCity(selectedCity)
     return initialGigs.filter((gig) => {
      // Extract city from location_text or use gig.city
-const gigCity = (gig.location_text?.split(',')[0]?.trim() || gig.city || '').toLowerCase()
-return nearbyCities.some((city) => city.toLowerCase() === gigCity)
+return initialGigs.filter((gig) => {
+  if (!gig.city) return false
+  return nearbyCities.some((city) => city.toLowerCase() === gig.city.toLowerCase())
+})
   }, [selectedCity, initialGigs])
 
   return (
