@@ -33,24 +33,19 @@ export default function GigFilterContent({
   myClaimedIds,
   hasLocation,
 }: GigFilterContentProps) {
-  // Default to worker's home city if they have one
   const [selectedCity, setSelectedCity] = useState<string | null>(workerCity)
 
-  // Filter gigs based on selected city + nearby cities
   const filteredGigs = useMemo(() => {
-  if (!selectedCity) {
-    return initialGigs
-  }
+    if (!selectedCity) {
+      return initialGigs
+    }
 
-  const nearbyCities = getNearbyCity(selectedCity)
-  return initialGigs.filter((gig) => {
-    if (!gig.city) return false
-    return nearbyCities.some((city) => city.toLowerCase() === gig.city.toLowerCase())
-  })
-}, [selectedCity, initialGigs])
-
-return (
-  })
+    const nearbyCities = getNearbyCity(selectedCity)
+    return initialGigs.filter((gig) => {
+      if (!gig.city) return false
+      return nearbyCities.some((city) => city.toLowerCase() === gig.city.toLowerCase())
+    })
+  }, [selectedCity, initialGigs])
 
   return (
     <div className="space-y-6">
@@ -66,7 +61,6 @@ return (
         </div>
       </div>
 
-      {/* City filter */}
       {hasLocation && (
         <GigCityFilter
           currentCity={selectedCity}
@@ -76,7 +70,6 @@ return (
         />
       )}
 
-      {/* No location set banner */}
       {!hasLocation && (
         <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -90,7 +83,6 @@ return (
         </div>
       )}
 
-      {/* Empty state */}
       {(!filteredGigs || filteredGigs.length === 0) && (
         <div className="card card-body text-center py-16 space-y-2">
           <p className="text-lg text-muted-foreground">
@@ -100,7 +92,6 @@ return (
         </div>
       )}
 
-      {/* Gig grid */}
       {filteredGigs && filteredGigs.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredGigs.map((gig) => (
