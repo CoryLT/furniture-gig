@@ -63,7 +63,8 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
     if (role === 'flipper' && userUsername) {
       return `/flippers/${userUsername}`
     }
-    return '/'
+    // If no username, don't render the link at all
+    return null
   }
 
   return (
@@ -106,13 +107,15 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
 
             {dropdownOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white border border-stone-200 rounded-lg shadow-lg py-1 z-50">
-                <Link
-                  href={getPublicProfileUrl()}
-                  className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
-                  onClick={() => setDropdownOpen(false)}
-                >
-                  View Profile
-                </Link>
+                {getPublicProfileUrl() && (
+                  <Link
+                    href={getPublicProfileUrl()!}
+                    className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    View Profile
+                  </Link>
+                )}
                 <Link
                   href="/account"
                   className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
@@ -168,13 +171,15 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
               </Link>
             ))}
             <hr className="my-2" />
-            <Link
-              href={getPublicProfileUrl()}
-              className="block py-2 text-sm font-medium text-foreground"
-              onClick={() => setMenuOpen(false)}
-            >
-              View Profile
-            </Link>
+            {getPublicProfileUrl() && (
+              <Link
+                href={getPublicProfileUrl()!}
+                className="block py-2 text-sm font-medium text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                View Profile
+              </Link>
+            )}
             <Link
               href="/account"
               className="block py-2 text-sm font-medium text-foreground"
