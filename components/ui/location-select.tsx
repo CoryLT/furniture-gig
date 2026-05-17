@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 interface LocationSelectProps {
   selectedState: string;
@@ -16,56 +17,19 @@ interface Option {
 }
 
 const stateMap: Record<string, string> = {
-  'AL': 'Alabama',
-  'AK': 'Alaska',
-  'AZ': 'Arizona',
-  'AR': 'Arkansas',
-  'CA': 'California',
-  'CO': 'Colorado',
-  'CT': 'Connecticut',
-  'DE': 'Delaware',
-  'FL': 'Florida',
-  'GA': 'Georgia',
-  'HI': 'Hawaii',
-  'ID': 'Idaho',
-  'IL': 'Illinois',
-  'IN': 'Indiana',
-  'IA': 'Iowa',
-  'KS': 'Kansas',
-  'KY': 'Kentucky',
-  'LA': 'Louisiana',
-  'ME': 'Maine',
-  'MD': 'Maryland',
-  'MA': 'Massachusetts',
-  'MI': 'Michigan',
-  'MN': 'Minnesota',
-  'MS': 'Mississippi',
-  'MO': 'Missouri',
-  'MT': 'Montana',
-  'NE': 'Nebraska',
-  'NV': 'Nevada',
-  'NH': 'New Hampshire',
-  'NJ': 'New Jersey',
-  'NM': 'New Mexico',
-  'NY': 'New York',
-  'NC': 'North Carolina',
-  'ND': 'North Dakota',
-  'OH': 'Ohio',
-  'OK': 'Oklahoma',
-  'OR': 'Oregon',
-  'PA': 'Pennsylvania',
-  'RI': 'Rhode Island',
-  'SC': 'South Carolina',
-  'SD': 'South Dakota',
-  'TN': 'Tennessee',
-  'TX': 'Texas',
-  'UT': 'Utah',
-  'VT': 'Vermont',
-  'VA': 'Virginia',
-  'WA': 'Washington',
-  'WV': 'West Virginia',
-  'WI': 'Wisconsin',
-  'WY': 'Wyoming',
+  'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas',
+  'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware',
+  'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii', 'ID': 'Idaho',
+  'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa', 'KS': 'Kansas',
+  'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland',
+  'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi',
+  'MO': 'Missouri', 'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada',
+  'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 'NY': 'New York',
+  'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio', 'OK': 'Oklahoma',
+  'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
+  'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah',
+  'VT': 'Vermont', 'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia',
+  'WI': 'Wisconsin', 'WY': 'Wyoming',
 };
 
 export function LocationSelect({
@@ -77,24 +41,39 @@ export function LocationSelect({
 }: LocationSelectProps) {
   const [states, setStates] = useState<Option[]>([]);
   const [cities, setCities] = useState<Option[]>([]);
-  const [loadingStates, setLoadingStates] = useState(true);
-  const [loadingCities, setLoadingCities] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
 
-  // Load states on mount
+  // Load states and cities on mount
   useEffect(() => {
-    async function loadStates() {
+    async function loadData() {
       try {
-        const response = await fetch('/api/locations/states');
-        const data = await response.json();
-        setStates(data);
+        const { data, error } = await supabase
+          .from('supported_locations')
+          .select('state, city')
+          .order('state', { ascending: true });
+
+        if (error || !data) {
+          console.error('Failed to load locations:', error);
+          setLoading(false);
+          return;
+        }
+
+        // Get unique states
+        const uniqueStates = Array.from(new Set(data.map((row) => row.state)));
+        const statesOptions = uniqueStates.map((state) => ({
+          value: state,
+          label: stateMap[state] || state,
+        }));
+        setStates(statesOptions);
       } catch (error) {
-        console.error('Failed to load states:', error);
+        console.error('Error loading locations:', error);
       } finally {
-        setLoadingStates(false);
+        setLoading(false);
       }
     }
-    loadStates();
-  }, []);
+    loadData();
+  }, [supabase]);
 
   // Load cities when state changes
   useEffect(() => {
@@ -104,28 +83,38 @@ export function LocationSelect({
     }
 
     async function loadCities() {
-      setLoadingCities(true);
       try {
-        const response = await fetch(`/api/locations/cities?state=${selectedState}`);
-        const data = await response.json();
-        setCities(data);
-        // Reset city selection if it's no longer valid for the new state
-        if (selectedCity && !data.find((c: Option) => c.value === selectedCity)) {
+        const { data, error } = await supabase
+          .from('supported_locations')
+          .select('city')
+          .eq('state', selectedState)
+          .order('city', { ascending: true });
+
+        if (error || !data) {
+          console.error('Failed to load cities:', error);
+          return;
+        }
+
+        const citiesOptions = data.map((row) => ({
+          value: row.city,
+          label: row.city,
+        }));
+        setCities(citiesOptions);
+
+        // Reset city if no longer valid
+        if (selectedCity && !citiesOptions.find((c) => c.value === selectedCity)) {
           onCityChange('');
         }
       } catch (error) {
-        console.error('Failed to load cities:', error);
-      } finally {
-        setLoadingCities(false);
+        console.error('Error loading cities:', error);
       }
     }
 
     loadCities();
-  }, [selectedState, selectedCity, onCityChange]);
+  }, [selectedState, selectedCity, onCityChange, supabase]);
 
   return (
     <div className="space-y-4">
-      {/* State Select */}
       <div>
         <label htmlFor="state" className="block text-sm font-medium text-slate-700 mb-2">
           State
@@ -135,9 +124,9 @@ export function LocationSelect({
           value={selectedState}
           onChange={(e) => {
             onStateChange(e.target.value);
-            onCityChange(''); // Reset city when state changes
+            onCityChange('');
           }}
-          disabled={disabled || loadingStates}
+          disabled={disabled || loading}
           className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
         >
           <option value="">Select a state...</option>
@@ -149,7 +138,6 @@ export function LocationSelect({
         </select>
       </div>
 
-      {/* City Select */}
       <div>
         <label htmlFor="city" className="block text-sm font-medium text-slate-700 mb-2">
           City
@@ -158,12 +146,10 @@ export function LocationSelect({
           id="city"
           value={selectedCity}
           onChange={(e) => onCityChange(e.target.value)}
-          disabled={disabled || !selectedState || loadingCities}
+          disabled={disabled || !selectedState}
           className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
         >
-          <option value="">
-            {loadingCities ? 'Loading cities...' : 'Select a city...'}
-          </option>
+          <option value="">Select a city...</option>
           {cities.map((city) => (
             <option key={city.value} value={city.value}>
               {city.label}
