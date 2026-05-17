@@ -36,8 +36,28 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const [currentUserUsername, setCurrentUserUsername] = useState<string | null>(null)
 
   const links = role === 'worker' ? workerLinks : role === 'admin' ? adminLinks : flipperLinks
+
+  // Load current user's username on mount
+  useEffect(() => {
+    async function loadCurrentUser() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('worker_profiles')
+          .select('username')
+          .eq('user_id', user.id)
+          .single()
+        
+        if (profile?.username) {
+          setCurrentUserUsername(profile.username)
+        }
+      }
+    }
+    loadCurrentUser()
+  }, [supabase])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -57,13 +77,14 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   }
 
   const getPublicProfileUrl = () => {
-    if (role === 'worker' && userUsername) {
-      return `/workers/${userUsername}`
+    // Use the passed-in userUsername, fallback to currentUserUsername
+    const username = userUsername || currentUserUsername
+    if (role === 'worker' && username) {
+      return `/workers/${username}`
     }
-    if (role === 'flipper' && userUsername) {
-      return `/flippers/${userUsername}`
+    if (role === 'flipper' && username) {
+      return `/flippers/${username}`
     }
-    // If no username, don't render the link at all
     return null
   }
 
@@ -113,7 +134,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
                     className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
                     onClick={() => setDropdownOpen(false)}
                   >
-                    View Profile
+                    My Profile
                   </Link>
                 )}
                 <Link
@@ -177,7 +198,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
                 className="block py-2 text-sm font-medium text-foreground"
                 onClick={() => setMenuOpen(false)}
               >
-                View Profile
+                My Profile
               </Link>
             )}
             <Link
