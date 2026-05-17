@@ -101,24 +101,28 @@ export default function WorkerProfilePage() {
     setUploading(true)
     setError('')
 
-    const ext = file.name.split('.').pop()
-    const path = `worker-avatars/${user.id}/${Date.now()}.${ext}`
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
 
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(path, file, { upsert: true })
+      const response = await fetch('/api/upload-avatar', {
+        method: 'POST',
+        body: formData,
+      })
 
-    if (uploadError) {
-      setError('Upload failed: ' + uploadError.message)
-      setUploading(false)
-      return
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError('Upload failed: ' + (data.error || 'Unknown error'))
+        return
+      }
+
+      setForm({ ...form, avatar_url: data.url })
+      setSuccess('Avatar uploaded!')
+    } catch (err) {
+      setError('Upload error: ' + (err instanceof Error ? err.message : 'Unknown error'))
     }
 
-    const { data: urlData } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(path)
-
-    setForm({ ...form, avatar_url: urlData.publicUrl })
     setUploading(false)
   }
 
