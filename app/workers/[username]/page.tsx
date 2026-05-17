@@ -1,219 +1,74 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Nav from '@/components/shared/Nav'
-import { Button } from '@/components/ui/button'
-import { PhotoUploadForm } from '@/components/ui/PhotoUploadForm'
-import { PhotoGallery, type GalleryPhoto } from '@/components/ui/PhotoGallery'
-import { ArrowLeft, Upload } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 
-export default function WorkerProfilePage() {
-  const router = useRouter()
+export default function PublicWorkerProfilePage() {
+  const params = useParams()
+  const username = params.username as string
   const supabase = createClient()
   
-  const [loading, setLoading] = useState(false)
-  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
-  const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [photos, setPhotos] = useState<GalleryPhoto[]>([])
-
-  const [form, setForm] = useState({
-    first_name: '',
-    last_name: '',
-    username: '',
-    phone: '',
-    city: '',
-    state: '',
-    bio: '',
-    skills: [] as string[],
-    paypal_email: '',
-    avatar_url: '',
-  })
-
-  const [skillInput, setSkillInput] = useState('')
+  const [isOwnProfile, setIsOwnProfile] = useState(false)
 
   useEffect(() => {
     loadProfile()
-  }, [])
+  }, [username])
 
   async function loadProfile() {
     setLoading(true)
+
+    // Get the currently logged-in user
     const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      router.push('/auth/login')
-      return
-    }
+    setCurrentUser(user)
 
-    setUser(user)
-
+    // Load the profile for the username in the URL
     const { data: profileData } = await supabase
       .from('worker_profiles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('username', username)
       .single()
 
     if (profileData) {
       setProfile(profileData)
-      setForm({
-        first_name: profileData.first_name || '',
-        last_name: profileData.last_name || '',
-        username: profileData.username || '',
-        phone: profileData.phone || '',
-        city: profileData.city || '',
-        state: profileData.state || '',
-        bio: profileData.bio || '',
-        skills: profileData.skills || [],
-        paypal_email: profileData.paypal_email || '',
-        avatar_url: profileData.avatar_url || '',
-      })
-    }
-
-    // Load gallery photos
-    const { data: photosData } = await supabase
-      .from('worker_photo_galleries')
-      .select('*')
-      .eq('worker_user_id', user.id)
-      .order('created_at', { ascending: false })
-
-    if (photosData) {
-      const photosWithUrls = photosData.map((photo) => ({
-        ...photo,
-        publicUrl: supabase.storage
-          .from('photo-galleries')
-          .getPublicUrl(photo.file_path).data.publicUrl,
-      }))
-      setPhotos(photosWithUrls)
+      // Check if this is the current user's own profile
+      if (user && user.id === profileData.user_id) {
+        setIsOwnProfile(true)
+      }
     }
 
     setLoading(false)
   }
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
-
-  function addSkill(skill: string) {
-    const trimmed = skill.trim()
-    if (trimmed && !form.skills.includes(trimmed)) {
-      setForm({ ...form, skills: [...form.skills, trimmed] })
-    }
-    setSkillInput('')
-  }
-
-  function removeSkill(skill: string) {
-    setForm({ ...form, skills: form.skills.filter(s => s !== skill) })
-  }
-
-  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be under 5MB')
-      return
-    }
-
-    setUploading(true)
-    setError('')
-
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const response = await fetch('/api/upload-avatar', {
-        method: 'POST',
-        body: formData,
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError('Upload failed: ' + (data.error || 'Unknown error'))
-        return
-      }
-
-      setForm({ ...form, avatar_url: data.url })
-      setSuccess('Avatar uploaded!')
-    } catch (err) {
-      setError('Upload error: ' + (err instanceof Error ? err.message : 'Unknown error'))
-    }
-
-    setUploading(false)
-  }
-
-  async function handlePhotoDeleted(photoId: string, type: "worker" | "flipper") {
-    try {
-      const response = await fetch('/api/delete-gallery-photo', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoId, type }),
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to delete photo')
-      }
-
-      setPhotos(prev => prev.filter(photo => photo.id !== photoId))
-      setSuccess('Photo deleted successfully!')
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to delete photo'
-      throw new Error(errorMessage)
-    }
-  }
-
-  function handlePhotoUploaded() {
-    loadProfile()
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setSuccess('')
-
-    if (!form.first_name || !form.last_name || !form.username) {
-      setError('First name, last name, and username are required')
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const response = await fetch('/api/profile/save', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError('Failed to save profile: ' + (data.error || 'Unknown error'))
-      } else {
-        setSuccess('Profile saved successfully!')
-      }
-    } catch (err) {
-      setError('Network error: ' + (err instanceof Error ? err.message : 'Unknown error'))
-    }
-
-    setLoading(false)
-  }
-
-  if (loading && !profile) {
+  if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Nav role="worker" userName={currentUser?.user_metadata?.name} userUsername={username} />
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <Link href="/gigs" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+            <ArrowLeft className="w-4 h-4" />
+            Back to gigs
+          </Link>
+          <p className="text-center text-muted-foreground">Worker not found</p>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-background">
-      {profile && <Nav role="worker" userName={profile.first_name} userUsername={profile.username} />}
+      {currentUser && <Nav role="worker" userName={currentUser?.user_metadata?.name} userUsername={currentUser?.user_metadata?.username} />}
       
       <div className="max-w-2xl mx-auto px-4 py-8">
         <Link href="/gigs" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
@@ -222,233 +77,66 @@ export default function WorkerProfilePage() {
         </Link>
 
         <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-serif text-foreground">Your Profile</h1>
-            <p className="text-muted-foreground mt-1">Edit your worker profile</p>
-          </div>
-
           <div className="card">
             <div className="card-body space-y-6">
-              {/* Avatar upload */}
-              <div>
-                <label className="field-label">Profile Picture</label>
-                <div className="flex items-end gap-4">
-                  {form.avatar_url && (
-                    <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-stone-200">
-                      <Image
-                        src={form.avatar_url}
-                        alt="Avatar"
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  )}
-                  <div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarUpload}
-                      disabled={uploading}
-                      className="hidden"
-                      id="avatar-upload"
+              {/* Avatar */}
+              {profile.avatar_url && (
+                <div className="flex justify-center">
+                  <div className="relative w-32 h-32 rounded-lg overflow-hidden bg-stone-200">
+                    <Image
+                      src={profile.avatar_url}
+                      alt={profile.first_name}
+                      fill
+                      className="object-cover"
                     />
-                    <label htmlFor="avatar-upload">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        loading={uploading}
-                        onClick={() => document.getElementById('avatar-upload')?.click()}
-                        className="gap-2 cursor-pointer"
-                      >
-                        <Upload className="w-4 h-4" />
-                        Upload photo
-                      </Button>
-                    </label>
-                    <p className="text-xs text-muted-foreground mt-2">Max 5MB</p>
                   </div>
                 </div>
+              )}
+
+              {/* Profile Info */}
+              <div className="text-center">
+                <h1 className="text-3xl font-serif text-foreground">
+                  {profile.first_name} {profile.last_name}
+                </h1>
+                <p className="text-muted-foreground mt-2">@{profile.username}</p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="first_name" className="field-label">First name</label>
-                    <input
-                      id="first_name"
-                      name="first_name"
-                      type="text"
-                      value={form.first_name}
-                      onChange={handleChange}
-                      className="field-input"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="last_name" className="field-label">Last name</label>
-                    <input
-                      id="last_name"
-                      name="last_name"
-                      type="text"
-                      value={form.last_name}
-                      onChange={handleChange}
-                      className="field-input"
-                      required
-                    />
+              {/* Bio */}
+              {profile.bio && (
+                <p className="text-foreground text-center">{profile.bio}</p>
+              )}
+
+              {/* Skills */}
+              {profile.skills && profile.skills.length > 0 && (
+                <div>
+                  <h3 className="font-medium text-foreground mb-2">Skills</h3>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {profile.skills.map((skill: string) => (
+                      <span key={skill} className="inline-flex text-xs px-2 py-1 rounded-full bg-accent/10 text-accent border border-accent/20">
+                        {skill}
+                      </span>
+                    ))}
                   </div>
                 </div>
+              )}
 
-                <div>
-                  <label htmlFor="username" className="field-label">Username</label>
-                  <input
-                    id="username"
-                    name="username"
-                    type="text"
-                    value={form.username}
-                    onChange={handleChange}
-                    className="field-input"
-                    placeholder="your-username"
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Your public profile URL: flipwork.com/workers/{form.username}</p>
+              {/* Location */}
+              {(profile.city || profile.state) && (
+                <div className="text-center text-muted-foreground">
+                  {profile.city && profile.state && `${profile.city}, ${profile.state}`}
+                  {profile.city && !profile.state && profile.city}
+                  {!profile.city && profile.state && profile.state}
                 </div>
+              )}
 
-                <div>
-                  <label htmlFor="phone" className="field-label">Phone</label>
-                  <input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    value={form.phone}
-                    onChange={handleChange}
-                    className="field-input"
-                  />
+              {/* Edit link - only show if it's their own profile */}
+              {isOwnProfile && (
+                <div className="pt-4 border-t border-stone-200">
+                  <Link href="/profile/worker" className="text-sm text-accent hover:underline text-center block">
+                    Edit your profile
+                  </Link>
                 </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-2">
-                    <label htmlFor="city" className="field-label">City</label>
-                    <input
-                      id="city"
-                      name="city"
-                      type="text"
-                      value={form.city}
-                      onChange={handleChange}
-                      className="field-input"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="state" className="field-label">State</label>
-                    <input
-                      id="state"
-                      name="state"
-                      type="text"
-                      value={form.state}
-                      onChange={handleChange}
-                      className="field-input"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="bio" className="field-label">Bio</label>
-                  <textarea
-                    id="bio"
-                    name="bio"
-                    value={form.bio}
-                    onChange={handleChange}
-                    className="field-input min-h-[100px] resize-none"
-                    placeholder="Tell flippers about yourself..."
-                  />
-                </div>
-
-                <div>
-                  <label className="field-label">Skills</label>
-                  {form.skills.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {form.skills.map(skill => (
-                        <span key={skill} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-accent/10 text-accent border border-accent/20">
-                          {skill}
-                          <button
-                            type="button"
-                            onClick={() => removeSkill(skill)}
-                            className="hover:text-destructive"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={skillInput}
-                      onChange={e => setSkillInput(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSkill(skillInput))}
-                      className="field-input flex-1"
-                      placeholder="Add a skill (press Enter)"
-                    />
-                    <Button
-                      type="button"
-                      onClick={() => addSkill(skillInput)}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Add
-                    </Button>
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="paypal_email" className="field-label">PayPal Email</label>
-                  <input
-                    id="paypal_email"
-                    name="paypal_email"
-                    type="email"
-                    value={form.paypal_email}
-                    onChange={handleChange}
-                    className="field-input"
-                  />
-                </div>
-
-                {error && <p className="text-sm text-destructive">{error}</p>}
-                {success && <p className="text-sm text-green-600">{success}</p>}
-
-                <Button type="submit" className="w-full" loading={loading}>
-                  Save Profile
-                </Button>
-              </form>
-            </div>
-          </div>
-
-          <div>
-            <Link href={`/workers/${form.username}`} className="text-sm text-accent hover:underline">
-              View your public profile →
-            </Link>
-          </div>
-
-          {/* Photo Gallery Section */}
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-2xl font-serif text-foreground">Work Samples</h2>
-              <p className="text-muted-foreground mt-1">Showcase your best work</p>
-            </div>
-
-            <div className="card">
-              <div className="card-body space-y-6">
-                <PhotoUploadForm onPhotoUploaded={handlePhotoUploaded} userType="worker" />
-                
-                <div>
-                  <h3 className="text-lg font-medium text-foreground mb-4">Your Gallery</h3>
-                  <PhotoGallery
-                    photos={photos}
-                    isEditable={true}
-                    onDeletePhoto={handlePhotoDeleted}
-                    userType="worker"
-                  />
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
