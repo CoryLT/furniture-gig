@@ -7,12 +7,6 @@ import { Button } from '@/components/ui/button'
 import { AlertTriangle, X } from 'lucide-react'
 import type { GigRow } from '@/types/database'
 
-const US_STATES = [
-  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
-  'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
-  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
-  'VA','WA','WV','WI','WY',
-]
 
 const FURNITURE_TYPES = [
   'Chair', 'Sofa / Couch', 'Dresser', 'Table', 'Desk', 'Bookcase',
@@ -194,9 +188,7 @@ export default function EditGigForm({ gig, hasActiveClaim }: Props) {
                 <select id="state" name="state" value={form.state}
                   onChange={handleChange} className="field-input" required>
                   <option value="">—</option>
-                  {US_STATES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
+                  
                 </select>
               </div>
             </div>

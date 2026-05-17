@@ -220,9 +220,7 @@ export default function GigFormMultiStep({
             <label className="block text-sm font-medium text-stone-700">State</label>
             <select value={selectedState} onChange={(e) => handleStateChange(e.target.value)} className="mt-1 block w-full rounded border border-stone-300 px-3 py-2 text-stone-900">
               <option value="">Select a state</option>
-              {US_STATES.map((state) => (
-                <option key={state} value={state}>{state}</option>
-              ))}
+              
             </select>
           </div>
 

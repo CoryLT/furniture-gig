@@ -5,13 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Armchair } from 'lucide-react'
 
-const US_STATES = [
-  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
-  'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
-  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
-  'VA','WA','WV','WI','WY',
-]
-
 export default function FlipperOnboardingPage() {
   const router = useRouter()
 
@@ -185,9 +178,7 @@ export default function FlipperOnboardingPage() {
                     required
                   >
                     <option value="">—</option>
-                    {US_STATES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
+                    
                   </select>
                 </div>
               </div>
