@@ -43,17 +43,27 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   // Load current user's username on mount
   useEffect(() => {
     async function loadCurrentUser() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
-          .from('worker_profiles')
-          .select('username')
-          .eq('user_id', user.id)
-          .single()
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        console.log('Current user:', user?.id)
         
-        if (profile?.username) {
-          setCurrentUserUsername(profile.username)
+        if (user) {
+          const { data: profile, error } = await supabase
+            .from('worker_profiles')
+            .select('username')
+            .eq('user_id', user.id)
+            .single()
+          
+          console.log('Profile query result:', profile)
+          console.log('Profile query error:', error)
+          
+          if (profile?.username) {
+            console.log('Setting currentUserUsername to:', profile.username)
+            setCurrentUserUsername(profile.username)
+          }
         }
+      } catch (err) {
+        console.error('Error loading current user:', err)
       }
     }
     loadCurrentUser()
@@ -79,6 +89,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   const getPublicProfileUrl = () => {
     // Use the passed-in userUsername, fallback to currentUserUsername
     const username = userUsername || currentUserUsername
+    console.log('getPublicProfileUrl - userUsername:', userUsername, 'currentUserUsername:', currentUserUsername, 'final username:', username)
     if (role === 'worker' && username) {
       return `/workers/${username}`
     }
