@@ -449,6 +449,64 @@ export type Database = {
           updated_at?: string
         }
       }
+      worker_photo_galleries: {
+        Row: {
+          id: string
+          worker_user_id: string
+          file_path: string
+          caption: string | null
+          display_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          worker_user_id: string
+          file_path: string
+          caption?: string | null
+          display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          worker_user_id?: string
+          file_path?: string
+          caption?: string | null
+          display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      flipper_photo_galleries: {
+        Row: {
+          id: string
+          flipper_user_id: string
+          file_path: string
+          caption: string | null
+          display_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          flipper_user_id: string
+          file_path: string
+          caption?: string | null
+          display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          flipper_user_id?: string
+          file_path?: string
+          caption?: string | null
+          display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -470,6 +528,8 @@ export type GigTaskCompletionRow = Database['public']['Tables']['gig_task_comple
 export type GigPhotoUploadRow = Database['public']['Tables']['gig_photo_uploads']['Row']
 export type GigImageRow = Database['public']['Tables']['gig_images']['Row']
 export type PayoutRecordRow = Database['public']['Tables']['payout_records']['Row']
+export type WorkerPhotoGalleryRow = Database['public']['Tables']['worker_photo_galleries']['Row']
+export type FlipperPhotoGalleryRow = Database['public']['Tables']['flipper_photo_galleries']['Row']
 
 // Status types
 export type GigStatus = GigRow['status']

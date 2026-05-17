@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { PhotoUploadForm } from '@/components/ui/PhotoUploadForm'
+import { PhotoGallery, type GalleryPhoto } from '@/components/ui/PhotoGallery'
 import { ArrowLeft, Upload } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -18,6 +20,7 @@ export default function WorkerProfilePage() {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [photos, setPhotos] = useState<GalleryPhoto[]>([])
 
   const [form, setForm] = useState({
     first_name: '',
@@ -70,6 +73,24 @@ export default function WorkerProfilePage() {
         avatar_url: profileData.avatar_url || '',
       })
     }
+
+    // Load gallery photos
+    const { data: photosData } = await supabase
+      .from('worker_photo_galleries')
+      .select('*')
+      .eq('worker_user_id', user.id)
+      .order('created_at', { ascending: false })
+
+    if (photosData) {
+      const photosWithUrls = photosData.map((photo) => ({
+        ...photo,
+        publicUrl: supabase.storage
+          .from('photo-galleries')
+          .getPublicUrl(photo.file_path).data.publicUrl,
+      }))
+      setPhotos(photosWithUrls)
+    }
+
     setLoading(false)
   }
 
@@ -124,6 +145,32 @@ export default function WorkerProfilePage() {
     }
 
     setUploading(false)
+  }
+
+  async function handlePhotoDeleted(photoId: string, type: "worker" | "flipper") {
+    try {
+      const response = await fetch('/api/delete-gallery-photo', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoId, type }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete photo')
+      }
+
+      setPhotos(prev => prev.filter(photo => photo.id !== photoId))
+      setSuccess('Photo deleted successfully!')
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to delete photo'
+      throw new Error(errorMessage)
+    }
+  }
+
+  function handlePhotoUploaded() {
+    loadProfile()
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -376,6 +423,30 @@ export default function WorkerProfilePage() {
             <Link href={`/workers/${form.username}`} className="text-sm text-accent hover:underline">
               View your public profile →
             </Link>
+          </div>
+
+          {/* Photo Gallery Section */}
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-2xl font-serif text-foreground">Work Samples</h2>
+              <p className="text-muted-foreground mt-1">Showcase your best work</p>
+            </div>
+
+            <div className="card">
+              <div className="card-body space-y-6">
+                <PhotoUploadForm onPhotoUploaded={handlePhotoUploaded} userType="worker" />
+                
+                <div>
+                  <h3 className="text-lg font-medium text-foreground mb-4">Your Gallery</h3>
+                  <PhotoGallery
+                    photos={photos}
+                    isEditable={true}
+                    onDeletePhoto={handlePhotoDeleted}
+                    userType="worker"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

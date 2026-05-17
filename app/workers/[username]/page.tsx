@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { PublicWorkerProfileClient } from '@/components/worker/PublicWorkerProfileClient'
 
 interface WorkerProfilePageProps {
   params: Promise<{ username: string }>
@@ -22,111 +23,11 @@ export default async function WorkerProfilePage({ params }: WorkerProfilePagePro
     notFound()
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <Link href="/gigs" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-          <ArrowLeft className="w-4 h-4" />
-          Back to gigs
-        </Link>
+  const { data: photos } = await supabase
+    .from('worker_photo_galleries')
+    .select('*')
+    .eq('worker_user_id', profile.user_id)
+    .order('created_at', { ascending: false })
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <div className="card">
-              <div className="card-body space-y-4">
-                {/* Avatar */}
-                {profile.avatar_url && (
-                  <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-stone-200">
-                    <Image
-                      src={profile.avatar_url}
-                      alt={`${profile.first_name} ${profile.last_name}`}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                )}
-
-                {/* Name */}
-                <div>
-                  <h1 className="text-2xl font-serif text-foreground">
-                    {profile.first_name} {profile.last_name}
-                  </h1>
-                  <p className="text-muted-foreground text-sm">@{profile.username}</p>
-                </div>
-
-                {/* Location */}
-                {(profile.city || profile.state) && (
-                  <div className="text-sm text-muted-foreground">
-                    {profile.city && profile.state ? `${profile.city}, ${profile.state}` : profile.city || profile.state}
-                  </div>
-                )}
-
-                {/* Skills */}
-                {profile.skills && profile.skills.length > 0 && (
-                  <div>
-                    <h3 className="text-xs font-semibold uppercase text-foreground mb-2">Skills</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.skills.map((skill: string) => (
-                        <span key={skill} className="inline-block text-xs px-2 py-1 rounded-full bg-accent/10 text-accent border border-accent/20">
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Main content */}
-          <div className="md:col-span-2 space-y-6">
-            {/* Bio */}
-            {profile.bio && (
-              <div className="card">
-                <div className="card-body">
-                  <h2 className="text-lg font-serif text-foreground mb-2">About</h2>
-                  <p className="text-foreground whitespace-pre-line">{profile.bio}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Contact Info (if shared) */}
-            {(profile.phone || profile.paypal_email) && (
-              <div className="card">
-                <div className="card-body">
-                  <h2 className="text-lg font-serif text-foreground mb-3">Contact</h2>
-                  <div className="space-y-2 text-sm">
-                    {profile.phone && (
-                      <div>
-                        <span className="text-muted-foreground">Phone: </span>
-                        <a href={`tel:${profile.phone}`} className="text-accent hover:underline">
-                          {profile.phone}
-                        </a>
-                      </div>
-                    )}
-                    {profile.paypal_email && (
-                      <div>
-                        <span className="text-muted-foreground">PayPal: </span>
-                        <a href={`mailto:${profile.paypal_email}`} className="text-accent hover:underline">
-                          {profile.paypal_email}
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Feedback placeholder */}
-            <div className="card">
-              <div className="card-body text-center py-8">
-                <p className="text-muted-foreground">Feedback coming soon in Phase C</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  return <PublicWorkerProfileClient profile={profile} photos={photos || []} />
 }
