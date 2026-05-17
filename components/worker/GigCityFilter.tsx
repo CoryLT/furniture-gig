@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CITIES_BY_STATE, getNearbyCity } from '@/lib/locationData'
+
 import { ChevronDown } from 'lucide-react'
 
 interface GigCityFilterProps {

@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import GigListingCard from '@/components/worker/GigListingCard'
 import GigCityFilter from '@/components/worker/GigCityFilter'
-import { getNearbyCity } from '@/lib/locationData'
+
 import { AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 

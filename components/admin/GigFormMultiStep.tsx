@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import GigImageUploader from './GigImageUploader'
 import { slugify } from '@/lib/utils'
 import { Plus, X, ChevronRight } from 'lucide-react'
-import { CITIES_BY_STATE, US_STATES } from '@/lib/locationData'
+
 import type { GigRow, GigChecklistItemRow, GigImageRow } from '@/types/database'
 
 interface Props {
