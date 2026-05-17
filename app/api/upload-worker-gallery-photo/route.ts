@@ -22,28 +22,6 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Check if user is authenticated
-    // Get the authorization header
-const authHeader = request.headers.get('authorization');
-if (!authHeader?.startsWith('Bearer ')) {
-  return NextResponse.json(
-    { error: "Unauthorized" },
-    { status: 401 }
-  );
-}
-
-const token = authHeader.substring(7);
-
-// Verify token with Supabase
-const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-if (userError || !user) {
-  return NextResponse.json(
-    { error: "Unauthorized" },
-    { status: 401 }
-  );
-}
-
     // Get form data
     const formData = await request.formData();
     const file = formData.get("file") as File;
@@ -69,6 +47,18 @@ if (userError || !user) {
       return NextResponse.json(
         { error: "File size must be less than 5MB" },
         { status: 400 }
+      );
+    }
+
+    // Get current user from session
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
       );
     }
 
@@ -113,7 +103,6 @@ if (userError || !user) {
 
     if (dbError) {
       console.error("Database error:", dbError);
-      // Clean up uploaded file if DB insert fails
       await supabase.storage
         .from("photo-galleries")
         .remove([filename]);

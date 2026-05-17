@@ -22,18 +22,6 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Check if user is authenticated
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
     // Get form data
     const formData = await request.formData();
     const file = formData.get("file") as File;
@@ -59,6 +47,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "File size must be less than 5MB" },
         { status: 400 }
+      );
+    }
+
+    // Get current user from session
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
       );
     }
 
@@ -103,7 +103,6 @@ export async function POST(request: NextRequest) {
 
     if (dbError) {
       console.error("Database error:", dbError);
-      // Clean up uploaded file if DB insert fails
       await supabase.storage
         .from("photo-galleries")
         .remove([filename]);
