@@ -44,8 +44,7 @@ export default function GigFormMultiStep({
   const [checklist, setChecklist] = useState<Array<GigChecklistItemRow & { _isNew?: boolean }>>(initialChecklist ?? [])
   const [newChecklistItem, setNewChecklistItem] = useState('')
 
-  const availableCities = selectedState ? CITIES_BY_STATE[selectedState as keyof typeof CITIES_BY_STATE] || [] : []
-
+ const availableCities = [];
   const handleStateChange = (newState: string) => {
     setSelectedState(newState)
     setSelectedCity('')

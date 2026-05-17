@@ -22,7 +22,7 @@ export default function GigCityFilter({
   const [nearbyCount, setNearbyCount] = useState(0)
 
   // Get the list of cities for the worker's state
-  const stateCities = currentState ? CITIES_BY_STATE[currentState] ?? [] : []
+  const stateCities = [];
 
   // When selected city changes, update nearby count
   useEffect(() => {
