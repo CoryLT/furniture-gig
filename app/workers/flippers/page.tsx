@@ -4,16 +4,16 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
-interface WorkerProfilePageProps {
+interface FlipperProfilePageProps {
   params: Promise<{ username: string }>
 }
 
-export default async function WorkerProfilePage({ params }: WorkerProfilePageProps) {
+export default async function FlipperProfilePage({ params }: FlipperProfilePageProps) {
   const { username } = await params
   const supabase = await createClient()
 
   const { data: profile } = await supabase
-    .from('worker_profiles')
+    .from('flipper_profiles')
     .select('*')
     .eq('username', username)
     .single()
@@ -40,7 +40,7 @@ export default async function WorkerProfilePage({ params }: WorkerProfilePagePro
                   <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-stone-200">
                     <Image
                       src={profile.avatar_url}
-                      alt={`${profile.first_name} ${profile.last_name}`}
+                      alt={profile.business_name || profile.username}
                       fill
                       className="object-cover"
                     />
@@ -50,7 +50,7 @@ export default async function WorkerProfilePage({ params }: WorkerProfilePagePro
                 {/* Name */}
                 <div>
                   <h1 className="text-2xl font-serif text-foreground">
-                    {profile.first_name} {profile.last_name}
+                    {profile.business_name || profile.username}
                   </h1>
                   <p className="text-muted-foreground text-sm">@{profile.username}</p>
                 </div>
@@ -62,18 +62,16 @@ export default async function WorkerProfilePage({ params }: WorkerProfilePagePro
                   </div>
                 )}
 
-                {/* Skills */}
-                {profile.skills && profile.skills.length > 0 && (
-                  <div>
-                    <h3 className="text-xs font-semibold uppercase text-foreground mb-2">Skills</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.skills.map((skill: string) => (
-                        <span key={skill} className="inline-block text-xs px-2 py-1 rounded-full bg-accent/10 text-accent border border-accent/20">
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                {/* Website */}
+                {profile.website && (
+                  
+                    href={profile.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block text-sm text-accent hover:underline"
+                  >
+                    Visit website →
+                  </a>
                 )}
               </div>
             </div>
@@ -91,32 +89,15 @@ export default async function WorkerProfilePage({ params }: WorkerProfilePagePro
               </div>
             )}
 
-            {/* Contact Info (if shared) */}
-            {(profile.phone || profile.paypal_email) && (
-              <div className="card">
-                <div className="card-body">
-                  <h2 className="text-lg font-serif text-foreground mb-3">Contact</h2>
-                  <div className="space-y-2 text-sm">
-                    {profile.phone && (
-                      <div>
-                        <span className="text-muted-foreground">Phone: </span>
-                        <a href={`tel:${profile.phone}`} className="text-accent hover:underline">
-                          {profile.phone}
-                        </a>
-                      </div>
-                    )}
-                    {profile.paypal_email && (
-                      <div>
-                        <span className="text-muted-foreground">PayPal: </span>
-                        <a href={`mailto:${profile.paypal_email}`} className="text-accent hover:underline">
-                          {profile.paypal_email}
-                        </a>
-                      </div>
-                    )}
-                  </div>
+            {/* Gallery placeholder */}
+            <div className="card">
+              <div className="card-body">
+                <h2 className="text-lg font-serif text-foreground mb-4">Gallery</h2>
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>Gallery coming soon in Phase B</p>
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Feedback placeholder */}
             <div className="card">

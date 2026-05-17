@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest) {
   const body = await request.json()
 
   const { error } = await supabase
-    .from('worker_profiles')
+    .from('flipper_profiles')
     .update(body)
     .eq('user_id', user.id)
 
