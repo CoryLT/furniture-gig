@@ -1,458 +1,235 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import Nav from '@/components/shared/Nav'
-import { Button } from '@/components/ui/button'
-import { PhotoUploadForm } from '@/components/ui/PhotoUploadForm'
-import { PhotoGallery, type GalleryPhoto } from '@/components/ui/PhotoGallery'
-import { ArrowLeft, Upload } from 'lucide-react'
-import Link from 'next/link'
-import Image from 'next/image'
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import { Button } from '@/components/ui/button';
+import { LocationSelect } from '@/components/ui/location-select';
 
 export default function WorkerProfilePage() {
-  const router = useRouter()
-  const supabase = createClient()
-  
-  const [loading, setLoading] = useState(false)
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
-  const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [photos, setPhotos] = useState<GalleryPhoto[]>([])
-
-  const [form, setForm] = useState({
-    first_name: '',
-    last_name: '',
-    username: '',
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    fullName: '',
     phone: '',
-    city: '',
     state: '',
-    bio: '',
-    skills: [] as string[],
-    paypal_email: '',
-    avatar_url: '',
-  })
+    city: '',
+    paypalEmail: '',
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const supabase = createClient();
 
-  const [skillInput, setSkillInput] = useState('')
-
+  // Load current profile on mount
   useEffect(() => {
-    loadProfile()
-  }, [])
+    async function loadProfile() {
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-  async function loadProfile() {
-    setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      router.push('/auth/login')
-      return
+        if (userError || !user) {
+          router.push('/auth/login');
+          return;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from('worker_profiles')
+          .select('full_name, phone, state, city, paypal_email')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profileError) {
+          throw profileError;
+        }
+
+        if (profile) {
+          setFormData({
+            fullName: profile.full_name || '',
+            phone: profile.phone || '',
+            state: profile.state || '',
+            city: profile.city || '',
+            paypalEmail: profile.paypal_email || '',
+          });
+        }
+      } catch (err: any) {
+        setError('Failed to load profile');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     }
 
-    setUser(user)
+    loadProfile();
+  }, [supabase, router]);
 
-    const { data: profileData } = await supabase
-      .from('worker_profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
+  const handleStateChange = (state: string) => {
+    setFormData((prev) => ({ ...prev, state, city: '' }));
+  };
 
-    if (profileData) {
-      setProfile(profileData)
-      setForm({
-        first_name: profileData.first_name || '',
-        last_name: profileData.last_name || '',
-        username: profileData.username || '',
-        phone: profileData.phone || '',
-        city: profileData.city || '',
-        state: profileData.state || '',
-        bio: profileData.bio || '',
-        skills: profileData.skills || [],
-        paypal_email: profileData.paypal_email || '',
-        avatar_url: profileData.avatar_url || '',
-      })
-    }
+  const handleCityChange = (city: string) => {
+    setFormData((prev) => ({ ...prev, city }));
+  };
 
-    // Load gallery photos
-    const { data: photosData } = await supabase
-      .from('worker_photo_galleries')
-      .select('*')
-      .eq('worker_user_id', user.id)
-      .order('created_at', { ascending: false })
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
-    if (photosData) {
-      const photosWithUrls = photosData.map((photo) => ({
-        ...photo,
-        publicUrl: supabase.storage
-          .from('photo-galleries')
-          .getPublicUrl(photo.file_path).data.publicUrl,
-      }))
-      setPhotos(photosWithUrls)
-    }
-
-    setLoading(false)
-  }
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
-
-  function addSkill(skill: string) {
-    const trimmed = skill.trim()
-    if (trimmed && !form.skills.includes(trimmed)) {
-      setForm({ ...form, skills: [...form.skills, trimmed] })
-    }
-    setSkillInput('')
-  }
-
-  function removeSkill(skill: string) {
-    setForm({ ...form, skills: form.skills.filter(s => s !== skill) })
-  }
-
-  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be under 5MB')
-      return
-    }
-
-    setUploading(true)
-    setError('')
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setSaving(true);
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-      const response = await fetch('/api/upload-avatar', {
-        method: 'POST',
-        body: formData,
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError('Upload failed: ' + (data.error || 'Unknown error'))
-        return
+      if (userError || !user) {
+        throw new Error('Not authenticated');
       }
 
-      setForm({ ...form, avatar_url: data.url })
-      setSuccess('Avatar uploaded!')
-    } catch (err) {
-      setError('Upload error: ' + (err instanceof Error ? err.message : 'Unknown error'))
-    }
-
-    setUploading(false)
-  }
-
-  async function handlePhotoDeleted(photoId: string, type: "worker" | "flipper") {
-    try {
-      const response = await fetch('/api/delete-gallery-photo', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoId, type }),
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to delete photo')
+      // Validate required fields
+      if (!formData.fullName.trim()) {
+        throw new Error('Name is required');
+      }
+      if (!formData.phone.trim()) {
+        throw new Error('Phone is required');
+      }
+      if (!formData.state) {
+        throw new Error('Please select a state');
+      }
+      if (!formData.city) {
+        throw new Error('Please select a city');
+      }
+      if (!formData.paypalEmail.trim()) {
+        throw new Error('PayPal email is required');
       }
 
-      setPhotos(prev => prev.filter(photo => photo.id !== photoId))
-      setSuccess('Photo deleted successfully!')
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to delete photo'
-      throw new Error(errorMessage)
-    }
-  }
+      // Update worker profile
+      const { error: updateError } = await supabase
+        .from('worker_profiles')
+        .update({
+          full_name: formData.fullName,
+          phone: formData.phone,
+          state: formData.state,
+          city: formData.city,
+          paypal_email: formData.paypalEmail,
+        })
+        .eq('user_id', user.id);
 
-  function handlePhotoUploaded() {
-    loadProfile()
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setSuccess('')
-
-    if (!form.first_name || !form.last_name || !form.username) {
-      setError('First name, last name, and username are required')
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const response = await fetch('/api/profile/save', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError('Failed to save profile: ' + (data.error || 'Unknown error'))
-      } else {
-        setSuccess('Profile saved successfully!')
+      if (updateError) {
+        throw updateError;
       }
-    } catch (err) {
-      setError('Network error: ' + (err instanceof Error ? err.message : 'Unknown error'))
+
+      setSuccess('Profile updated successfully!');
+    } catch (err: any) {
+      setError(err.message || 'Failed to save profile');
+    } finally {
+      setSaving(false);
     }
+  };
 
-    setLoading(false)
-  }
-
-  if (loading && !profile) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <p className="text-slate-600">Loading profile...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {profile && <Nav role="worker" userName={form.first_name} userUsername={form.username} />}
-      
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <Link href="/gigs" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-          <ArrowLeft className="w-4 h-4" />
-          Back to gigs
-        </Link>
+    <div className="min-h-screen bg-stone-50 py-12 px-4">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-lg shadow p-8">
+          <h1 className="text-3xl font-serif font-bold text-slate-900 mb-6">
+            My Profile
+          </h1>
 
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-serif text-foreground">Your Profile</h1>
-            <p className="text-muted-foreground mt-1">Edit your worker profile</p>
-          </div>
-
-          <div className="card">
-            <div className="card-body space-y-6">
-              {/* Avatar upload */}
-              <div>
-                <label className="field-label">Profile Picture</label>
-                <div className="flex items-end gap-4">
-                  {form.avatar_url && (
-                    <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-stone-200">
-                      <Image
-                        src={form.avatar_url}
-                        alt="Avatar"
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  )}
-                  <div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarUpload}
-                      disabled={uploading}
-                      className="hidden"
-                      id="avatar-upload"
-                    />
-                    <label htmlFor="avatar-upload">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        loading={uploading}
-                        onClick={() => document.getElementById('avatar-upload')?.click()}
-                        className="gap-2 cursor-pointer"
-                      >
-                        <Upload className="w-4 h-4" />
-                        Upload photo
-                      </Button>
-                    </label>
-                    <p className="text-xs text-muted-foreground mt-2">Max 5MB</p>
-                  </div>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="first_name" className="field-label">First name</label>
-                    <input
-                      id="first_name"
-                      name="first_name"
-                      type="text"
-                      value={form.first_name}
-                      onChange={handleChange}
-                      className="field-input"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="last_name" className="field-label">Last name</label>
-                    <input
-                      id="last_name"
-                      name="last_name"
-                      type="text"
-                      value={form.last_name}
-                      onChange={handleChange}
-                      className="field-input"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="username" className="field-label">Username</label>
-                  <input
-                    id="username"
-                    name="username"
-                    type="text"
-                    value={form.username}
-                    onChange={handleChange}
-                    className="field-input"
-                    placeholder="your-username"
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Your public profile URL: flipwork.com/workers/{form.username}</p>
-                </div>
-
-                <div>
-                  <label htmlFor="phone" className="field-label">Phone</label>
-                  <input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    value={form.phone}
-                    onChange={handleChange}
-                    className="field-input"
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-2">
-                    <label htmlFor="city" className="field-label">City</label>
-                    <input
-                      id="city"
-                      name="city"
-                      type="text"
-                      value={form.city}
-                      onChange={handleChange}
-                      className="field-input"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="state" className="field-label">State</label>
-                    <input
-                      id="state"
-                      name="state"
-                      type="text"
-                      value={form.state}
-                      onChange={handleChange}
-                      className="field-input"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="bio" className="field-label">Bio</label>
-                  <textarea
-                    id="bio"
-                    name="bio"
-                    value={form.bio}
-                    onChange={handleChange}
-                    className="field-input min-h-[100px] resize-none"
-                    placeholder="Tell flippers about yourself..."
-                  />
-                </div>
-
-                <div>
-                  <label className="field-label">Skills</label>
-                  {form.skills.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {form.skills.map(skill => (
-                        <span key={skill} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-accent/10 text-accent border border-accent/20">
-                          {skill}
-                          <button
-                            type="button"
-                            onClick={() => removeSkill(skill)}
-                            className="hover:text-destructive"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={skillInput}
-                      onChange={e => setSkillInput(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSkill(skillInput))}
-                      className="field-input flex-1"
-                      placeholder="Add a skill (press Enter)"
-                    />
-                    <Button
-                      type="button"
-                      onClick={() => addSkill(skillInput)}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Add
-                    </Button>
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="paypal_email" className="field-label">PayPal Email</label>
-                  <input
-                    id="paypal_email"
-                    name="paypal_email"
-                    type="email"
-                    value={form.paypal_email}
-                    onChange={handleChange}
-                    className="field-input"
-                  />
-                </div>
-
-                {error && <p className="text-sm text-destructive">{error}</p>}
-                {success && <p className="text-sm text-green-600">{success}</p>}
-
-                <Button type="submit" className="w-full" loading={loading}>
-                  Save Profile
-                </Button>
-              </form>
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-700">{error}</p>
             </div>
-          </div>
+          )}
 
-          <div>
-            <Link href={`/workers/${form.username}`} className="text-sm text-accent hover:underline">
-              View your public profile →
-            </Link>
-          </div>
+          {success && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+              <p className="text-sm text-green-700">{success}</p>
+            </div>
+          )}
 
-          {/* Photo Gallery Section */}
-          <div className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Full Name */}
             <div>
-              <h2 className="text-2xl font-serif text-foreground">Work Samples</h2>
-              <p className="text-muted-foreground mt-1">Showcase your best work</p>
+              <label htmlFor="fullName" className="block text-sm font-medium text-slate-700 mb-1">
+                Full Name
+              </label>
+              <input
+                id="fullName"
+                type="text"
+                name="fullName"
+                value={formData.fullName}
+                onChange={handleChange}
+                disabled={saving}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
+                placeholder="John Doe"
+              />
             </div>
 
-            <div className="card">
-              <div className="card-body space-y-6">
-                <PhotoUploadForm onPhotoUploaded={handlePhotoUploaded} userType="worker" />
-                
-                <div>
-                  <h3 className="text-lg font-medium text-foreground mb-4">Your Gallery</h3>
-                  <PhotoGallery
-                    photos={photos}
-                    isEditable={true}
-                    onDeletePhoto={handlePhotoDeleted}
-                    userType="worker"
-                  />
-                </div>
-              </div>
+            {/* Phone */}
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-1">
+                Phone
+              </label>
+              <input
+                id="phone"
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                disabled={saving}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
+                placeholder="(555) 123-4567"
+              />
             </div>
-          </div>
+
+            {/* Location Select Component */}
+            <LocationSelect
+              selectedState={formData.state}
+              selectedCity={formData.city}
+              onStateChange={handleStateChange}
+              onCityChange={handleCityChange}
+              disabled={saving}
+            />
+
+            {/* PayPal Email */}
+            <div>
+              <label htmlFor="paypalEmail" className="block text-sm font-medium text-slate-700 mb-1">
+                PayPal Email
+              </label>
+              <input
+                id="paypalEmail"
+                type="email"
+                name="paypalEmail"
+                value={formData.paypalEmail}
+                onChange={handleChange}
+                disabled={saving}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
+                placeholder="your@paypal.email"
+              />
+            </div>
+
+            <Button type="submit" disabled={saving} className="w-full">
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </form>
         </div>
       </div>
     </div>
-  )
+  );
 }
