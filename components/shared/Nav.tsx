@@ -63,7 +63,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
     if (role === 'flipper' && userUsername) {
       return `/flippers/${userUsername}`
     }
-    return '/profile/worker'
+    return '/'
   }
 
   return (
