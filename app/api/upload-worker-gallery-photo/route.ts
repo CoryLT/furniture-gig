@@ -23,16 +23,15 @@ export async function POST(request: NextRequest) {
     );
 
     // Check if user is authenticated
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    // Try to get the session directly
+const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+if (sessionError || !session || !session.user) {
+  return NextResponse.json(
+    { error: "Unauthorized" },
+    { status: 401 }
+  );
+}
 
     // Get form data
     const formData = await request.formData();
