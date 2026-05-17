@@ -4,15 +4,15 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Armchair, LogOut, Menu, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 interface NavProps {
   role: 'worker' | 'admin' | 'flipper'
   userName?: string
+  userUsername?: string
 }
 
 const workerLinks = [
-  { href: '/profile/worker', label: 'Profile' },
   { href: '/gigs', label: 'Browse Gigs' },
   { href: '/my-gigs', label: 'My Gigs' },
   { href: '/my-gigs/payouts', label: 'Payouts' },
@@ -29,21 +29,45 @@ const flipperLinks = [
   { href: '/flipper/post-gig', label: 'Post a Gig' },
 ]
 
-export default function Nav({ role, userName }: NavProps) {
+export default function Nav({ role, userName, userUsername }: NavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const links = role === 'worker' ? workerLinks : role === 'admin' ? adminLinks : flipperLinks
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push('/')
   }
 
+  const getPublicProfileUrl = () => {
+    if (role === 'worker' && userUsername) {
+      return `/workers/${userUsername}`
+    }
+    if (role === 'flipper' && userUsername) {
+      return `/flippers/${userUsername}`
+    }
+    return '/profile/worker'
+  }
+
   return (
-    <nav className="border-b border-stone-200 bg-white">
+    <nav className="border-b border-stone-200 bg-white sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-serif text-xl font-bold text-foreground">
@@ -68,16 +92,54 @@ export default function Nav({ role, userName }: NavProps) {
           ))}
         </div>
 
-        {/* Right side - User info + Logout */}
+        {/* Right side - Hamburger menu */}
         <div className="flex items-center gap-4">
-          {userName && <span className="hidden md:inline text-sm text-muted-foreground">{userName}</span>}
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-sm text-foreground hover:text-accent transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden md:inline">Sign out</span>
-          </button>
+          {/* Desktop hamburger dropdown */}
+          <div className="hidden md:block relative" ref={dropdownRef}>
+            <button
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="p-2 hover:bg-stone-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-amber-600"
+              aria-label="Menu"
+            >
+              <Menu className="w-5 h-5 text-foreground" />
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white border border-stone-200 rounded-lg shadow-lg py-1 z-50">
+                <Link
+                  href={getPublicProfileUrl()}
+                  className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
+                  onClick={() => setDropdownOpen(false)}
+                >
+                  View Profile
+                </Link>
+                <Link
+                  href="/account"
+                  className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
+                  onClick={() => setDropdownOpen(false)}
+                >
+                  Account Settings
+                </Link>
+                <Link
+                  href="/support"
+                  className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
+                  onClick={() => setDropdownOpen(false)}
+                >
+                  Support
+                </Link>
+                <hr className="my-1" />
+                <button
+                  onClick={() => {
+                    handleLogout()
+                    setDropdownOpen(false)
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-stone-50 transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Mobile menu button */}
           <button
@@ -105,7 +167,38 @@ export default function Nav({ role, userName }: NavProps) {
                 {link.label}
               </Link>
             ))}
-            {userName && <p className="text-xs text-muted-foreground py-2">Logged in as {userName}</p>}
+            <hr className="my-2" />
+            <Link
+              href={getPublicProfileUrl()}
+              className="block py-2 text-sm font-medium text-foreground"
+              onClick={() => setMenuOpen(false)}
+            >
+              View Profile
+            </Link>
+            <Link
+              href="/account"
+              className="block py-2 text-sm font-medium text-foreground"
+              onClick={() => setMenuOpen(false)}
+            >
+              Account Settings
+            </Link>
+            <Link
+              href="/support"
+              className="block py-2 text-sm font-medium text-foreground"
+              onClick={() => setMenuOpen(false)}
+            >
+              Support
+            </Link>
+            <hr className="my-2" />
+            <button
+              onClick={() => {
+                handleLogout()
+                setMenuOpen(false)
+              }}
+              className="w-full text-left py-2 text-sm font-medium text-red-600"
+            >
+              Logout
+            </button>
           </div>
         </div>
       )}

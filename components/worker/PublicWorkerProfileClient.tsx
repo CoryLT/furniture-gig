@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import Nav from '@/components/shared/Nav'
 import { PhotoGallery, type GalleryPhoto } from '@/components/ui/PhotoGallery'
 import { WorkerProfileRow } from '@/types/database'
 import { useEffect, useState } from 'react'
@@ -11,11 +12,15 @@ import { useEffect, useState } from 'react'
 interface PublicWorkerProfileClientProps {
   profile: WorkerProfileRow
   photos: any[]
+  isOwnProfile: boolean
+  userRole?: 'worker' | 'admin' | 'flipper'
 }
 
 export function PublicWorkerProfileClient({
   profile,
   photos: initialPhotos,
+  isOwnProfile,
+  userRole = 'worker',
 }: PublicWorkerProfileClientProps) {
   const supabase = createClient()
   const [photos, setPhotos] = useState<GalleryPhoto[]>([])
@@ -33,6 +38,8 @@ export function PublicWorkerProfileClient({
 
   return (
     <div className="min-h-screen bg-background">
+      {isOwnProfile && <Nav role={userRole} userName={profile.first_name} userUsername={profile.username} />}
+      
       <div className="max-w-4xl mx-auto px-4 py-8">
         <Link href="/gigs" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
           <ArrowLeft className="w-4 h-4" />
@@ -63,6 +70,16 @@ export function PublicWorkerProfileClient({
                   </h1>
                   <p className="text-muted-foreground text-sm">@{profile.username}</p>
                 </div>
+
+                {/* Edit Profile Link - only show if own profile */}
+                {isOwnProfile && (
+                  <Link
+                    href="/profile/worker"
+                    className="text-sm text-accent hover:underline font-medium"
+                  >
+                    ✎ Edit Profile
+                  </Link>
+                )}
 
                 {/* Location */}
                 {(profile.city || profile.state) && (

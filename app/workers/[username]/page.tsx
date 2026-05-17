@@ -13,6 +13,11 @@ export default async function WorkerProfilePage({ params }: WorkerProfilePagePro
   const { username } = await params
   const supabase = await createClient()
 
+  // Get the current user
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser()
+
   const { data: profile } = await supabase
     .from('worker_profiles')
     .select('*')
@@ -29,5 +34,14 @@ export default async function WorkerProfilePage({ params }: WorkerProfilePagePro
     .eq('worker_user_id', profile.user_id)
     .order('created_at', { ascending: false })
 
-  return <PublicWorkerProfileClient profile={profile} photos={photos || []} />
+  const isOwnProfile = currentUser?.id === profile.user_id
+
+  return (
+    <PublicWorkerProfileClient
+      profile={profile}
+      photos={photos || []}
+      isOwnProfile={isOwnProfile}
+      userRole="worker"
+    />
+  )
 }
