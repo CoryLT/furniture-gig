@@ -3,9 +3,8 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { cn } from '@/lib/utils'
 import { Armchair, LogOut, Menu, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 interface NavProps {
   role: 'worker' | 'admin' | 'flipper'
@@ -13,6 +12,7 @@ interface NavProps {
 }
 
 const workerLinks = [
+  { href: '/profile/worker', label: 'Profile' },
   { href: '/gigs', label: 'Browse Gigs' },
   { href: '/my-gigs', label: 'My Gigs' },
   { href: '/my-gigs/payouts', label: 'Payouts' },
@@ -35,109 +35,80 @@ export default function Nav({ role, userName }: NavProps) {
   const supabase = createClient()
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const links =
-    role === 'admin' ? adminLinks :
-    role === 'flipper' ? flipperLinks :
-    workerLinks
+  const links = role === 'worker' ? workerLinks : role === 'admin' ? adminLinks : flipperLinks
 
-  async function handleSignOut() {
+  async function handleLogout() {
     await supabase.auth.signOut()
-    router.push('/auth/login')
-    router.refresh()
+    router.push('/')
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-card border-b border-border">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+    <nav className="border-b border-stone-200 bg-white">
+      <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
         {/* Logo */}
-        <Link
-          href={role === 'admin' ? '/admin' : role === 'flipper' ? '/flipper/dashboard' : '/gigs'}
-          className="flex items-center gap-2 font-serif text-xl text-foreground hover:text-accent transition-colors"
-        >
-          <Armchair className="w-5 h-5 text-accent" strokeWidth={1.5} />
+        <Link href="/" className="flex items-center gap-2 font-serif text-xl font-bold text-foreground">
+          <Armchair className="w-5 h-5" />
           FlipWork
-          {role === 'admin' && (
-            <span className="text-xs font-mono font-medium text-muted-foreground ml-1">admin</span>
-          )}
-          {role === 'flipper' && (
-            <span className="text-xs font-mono font-medium text-muted-foreground ml-1">flipper</span>
-          )}
         </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden sm:flex items-center gap-1">
+        {/* Desktop links */}
+        <div className="hidden md:flex items-center gap-6">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className={cn(
-                'px-3 py-1.5 rounded-md text-sm transition-colors',
-                pathname === link.href || pathname.startsWith(link.href + '/')
-                  ? 'bg-secondary text-foreground font-medium'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-              )}
+              className={`text-sm font-medium transition-colors ${
+                pathname === link.href
+                  ? 'text-accent'
+                  : 'text-foreground hover:text-accent'
+              }`}
             >
               {link.label}
             </Link>
           ))}
-        </nav>
-
-        {/* Right side */}
-        <div className="hidden sm:flex items-center gap-3">
-          {userName && (
-            <span className="text-sm text-muted-foreground">{userName}</span>
-          )}
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign out
-          </button>
         </div>
 
-        {/* Mobile menu button */}
-        <button
-          className="sm:hidden p-1.5 text-muted-foreground hover:text-foreground"
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-label="Toggle menu"
-        >
-          {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        {/* Right side - User info + Logout */}
+        <div className="flex items-center gap-4">
+          {userName && <span className="hidden md:inline text-sm text-muted-foreground">{userName}</span>}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-sm text-foreground hover:text-accent transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="hidden md:inline">Sign out</span>
+          </button>
+
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="md:hidden p-2 hover:bg-stone-100 rounded-lg"
+          >
+            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
-      {/* Mobile dropdown */}
+      {/* Mobile menu */}
       {menuOpen && (
-        <div className="sm:hidden border-t border-border bg-card px-4 py-3 space-y-1">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setMenuOpen(false)}
-              className={cn(
-                'block px-3 py-2 rounded-md text-sm transition-colors',
-                pathname === link.href || pathname.startsWith(link.href + '/')
-                  ? 'bg-secondary text-foreground font-medium'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
-          <div className="pt-2 border-t border-border mt-2">
-            {userName && (
-              <p className="px-3 py-1 text-xs text-muted-foreground">{userName}</p>
-            )}
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
-            >
-              <LogOut className="w-4 h-4" />
-              Sign out
-            </button>
+        <div className="md:hidden border-t border-stone-200 bg-stone-50">
+          <div className="px-4 py-4 space-y-3">
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`block py-2 text-sm font-medium ${
+                  pathname === link.href ? 'text-accent' : 'text-foreground'
+                }`}
+                onClick={() => setMenuOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ))}
+            {userName && <p className="text-xs text-muted-foreground py-2">Logged in as {userName}</p>}
           </div>
         </div>
       )}
-    </header>
+    </nav>
   )
 }
