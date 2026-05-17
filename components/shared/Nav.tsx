@@ -138,7 +138,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
                   </Link>
                 )}
                 <Link
-                  href="/account"
+                  href="/profile/worker"
                   className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
                   onClick={() => setDropdownOpen(false)}
                 >
@@ -202,7 +202,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
               </Link>
             )}
             <Link
-              href="/account"
+              href="/profile/worker"
               className="block py-2 text-sm font-medium text-foreground"
               onClick={() => setMenuOpen(false)}
             >
