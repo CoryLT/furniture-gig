@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-      import Nav from '@/components/shared/Nav'
 import { createClient } from '@/lib/supabase/client'
+import Nav from '@/components/shared/Nav'
 import { Button } from '@/components/ui/button'
 import { PhotoUploadForm } from '@/components/ui/PhotoUploadForm'
 import { PhotoGallery, type GalleryPhoto } from '@/components/ui/PhotoGallery'
@@ -211,11 +211,11 @@ export default function WorkerProfilePage() {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
 
- return (
-        <div className="min-h-screen bg-background">
-          <Nav role="worker" userName={form.first_name} userUsername={form.username} />
-          
-          <div className="max-w-2xl mx-auto px-4 py-8"> 
+  return (
+    <div className="min-h-screen bg-background">
+      {profile && <Nav role="worker" userName={form.first_name} userUsername={form.username} />}
+      
+      <div className="max-w-2xl mx-auto px-4 py-8">
         <Link href="/gigs" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
           <ArrowLeft className="w-4 h-4" />
           Back to gigs
