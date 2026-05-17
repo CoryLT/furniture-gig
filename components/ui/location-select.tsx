@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { fetchStates, fetchCitiesByState } from '@/lib/locations';
 
 interface LocationSelectProps {
   selectedState: string;
@@ -15,6 +14,59 @@ interface Option {
   value: string;
   label: string;
 }
+
+const stateMap: Record<string, string> = {
+  'AL': 'Alabama',
+  'AK': 'Alaska',
+  'AZ': 'Arizona',
+  'AR': 'Arkansas',
+  'CA': 'California',
+  'CO': 'Colorado',
+  'CT': 'Connecticut',
+  'DE': 'Delaware',
+  'FL': 'Florida',
+  'GA': 'Georgia',
+  'HI': 'Hawaii',
+  'ID': 'Idaho',
+  'IL': 'Illinois',
+  'IN': 'Indiana',
+  'IA': 'Iowa',
+  'KS': 'Kansas',
+  'KY': 'Kentucky',
+  'LA': 'Louisiana',
+  'ME': 'Maine',
+  'MD': 'Maryland',
+  'MA': 'Massachusetts',
+  'MI': 'Michigan',
+  'MN': 'Minnesota',
+  'MS': 'Mississippi',
+  'MO': 'Missouri',
+  'MT': 'Montana',
+  'NE': 'Nebraska',
+  'NV': 'Nevada',
+  'NH': 'New Hampshire',
+  'NJ': 'New Jersey',
+  'NM': 'New Mexico',
+  'NY': 'New York',
+  'NC': 'North Carolina',
+  'ND': 'North Dakota',
+  'OH': 'Ohio',
+  'OK': 'Oklahoma',
+  'OR': 'Oregon',
+  'PA': 'Pennsylvania',
+  'RI': 'Rhode Island',
+  'SC': 'South Carolina',
+  'SD': 'South Dakota',
+  'TN': 'Tennessee',
+  'TX': 'Texas',
+  'UT': 'Utah',
+  'VT': 'Vermont',
+  'VA': 'Virginia',
+  'WA': 'Washington',
+  'WV': 'West Virginia',
+  'WI': 'Wisconsin',
+  'WY': 'Wyoming',
+};
 
 export function LocationSelect({
   selectedState,
@@ -32,8 +84,9 @@ export function LocationSelect({
   useEffect(() => {
     async function loadStates() {
       try {
-        const statesData = await fetchStates();
-        setStates(statesData);
+        const response = await fetch('/api/locations/states');
+        const data = await response.json();
+        setStates(data);
       } catch (error) {
         console.error('Failed to load states:', error);
       } finally {
@@ -53,10 +106,11 @@ export function LocationSelect({
     async function loadCities() {
       setLoadingCities(true);
       try {
-        const citiesData = await fetchCitiesByState(selectedState);
-        setCities(citiesData);
+        const response = await fetch(`/api/locations/cities?state=${selectedState}`);
+        const data = await response.json();
+        setCities(data);
         // Reset city selection if it's no longer valid for the new state
-        if (selectedCity && !citiesData.find((c) => c.value === selectedCity)) {
+        if (selectedCity && !data.find((c: Option) => c.value === selectedCity)) {
           onCityChange('');
         }
       } catch (error) {
