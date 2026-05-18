@@ -1,103 +1,95 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import GigListingCard from '@/components/worker/GigListingCard'
-import GigCityFilter from '@/components/worker/GigCityFilter'
+import { useState, useEffect } from 'react'
 
-import { AlertCircle } from 'lucide-react'
-import Link from 'next/link'
+import { ChevronDown } from 'lucide-react'
 
-interface Gig {
-  id: string
-  slug: string
-  title: string
-  city: string
-  state: string
-  pay_amount: number
-  due_date: string | null
-  [key: string]: unknown
+interface GigCityFilterProps {
+  currentCity: string | null
+  currentState: string | null
+  onCityChange: (city: string) => void
+  totalGigs: number
 }
 
-interface GigFilterContentProps {
-  initialGigs: Gig[]
-  workerCity: string | null
-  workerState: string | null
-  myClaimedIds: Set<string>
-  hasLocation: boolean
-}
+export default function GigCityFilter({
+  currentCity,
+  currentState,
+  onCityChange,
+  totalGigs,
+}: GigCityFilterProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [selectedCity, setSelectedCity] = useState<string | null>(currentCity)
+  const [nearbyCount, setNearbyCount] = useState(0)
 
-export default function GigFilterContent({
-  initialGigs,
-  workerCity,
-  workerState,
-  myClaimedIds,
-  hasLocation,
-}: GigFilterContentProps) {
-  const [selectedCity, setSelectedCity] = useState<string | null>(workerCity)
+  // Get the list of cities for the worker's state
+  const stateCities = [];
 
-  const filteredGigs = useMemo(() => {
-    if (!selectedCity) {
-      return initialGigs
+  // When selected city changes, update nearby count
+  useEffect(() => {
+    if (selectedCity) {
+      const nearbyMap: Record<string, string[]> = {
+        'Raleigh': ['Raleigh', 'Durham', 'Chapel Hill', 'Cary', 'Apex', 'Morrisville'],
+        'Durham': ['Durham', 'Raleigh', 'Chapel Hill', 'Cary', 'Morrisville'],
+        'Chapel Hill': ['Chapel Hill', 'Raleigh', 'Durham', 'Cary'],
+        'Charlotte': ['Charlotte', 'Concord', 'Kannapolis', 'Matthews', 'Pineville'],
+        'Greensboro': ['Greensboro', 'High Point', 'Asheboro', 'Summerfield'],
+        'Winston-Salem': ['Winston-Salem', 'Greensboro', 'High Point'],
+      }
+      const nearby = nearbyMap[selectedCity] ?? [selectedCity]
+      setNearbyCount(nearby.length)
     }
+  }, [selectedCity])
 
-    const nearbyCities = nearbyMap[selectedCity] ?? [selectedCity]
-    return initialGigs.filter((gig) => {
-      if (!gig.city) return false
-      return nearbyCities.some((city) => city.toLowerCase() === gig.city.toLowerCase())
-    })
-  }, [selectedCity, initialGigs])
+  const handleCitySelect = (city: string) => {
+    setSelectedCity(city)
+    onCityChange(city)
+    setIsOpen(false)
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl text-foreground">Available Gigs</h1>
-          <p className="text-muted-foreground mt-1">
-            {selectedCity
-              ? `${filteredGigs.length} open ${filteredGigs.length === 1 ? 'gig' : 'gigs'} near ${selectedCity}`
-              : `${filteredGigs.length} open ${filteredGigs.length === 1 ? 'gig' : 'gigs'}`
-            }
-          </p>
+    <div className="mb-6">
+      <div className="flex items-center gap-3">
+        <div className="relative w-full max-w-xs">
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="w-full px-4 py-2 text-left bg-white border border-stone-200 rounded-lg hover:border-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-500 flex items-center justify-between"
+          >
+            <span className="font-medium text-foreground">
+              {selectedCity || 'Select a city'}
+            </span>
+            <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isOpen && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-stone-200 rounded-lg shadow-lg z-10 max-h-64 overflow-y-auto">
+              {stateCities.length > 0 ? (
+                stateCities.map((city) => (
+                  <button
+                    key={city}
+                    onClick={() => handleCitySelect(city)}
+                    className={`w-full px-4 py-2 text-left hover:bg-stone-100 transition-colors ${
+                      selectedCity === city ? 'bg-amber-50 border-l-2 border-amber-500 font-medium' : ''
+                    }`}
+                  >
+                    {city}
+                  </button>
+                ))
+              ) : (
+                <div className="px-4 py-2 text-muted-foreground">No cities available</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{totalGigs}</span> gig{totalGigs !== 1 ? 's' : ''}
         </div>
       </div>
 
-      {hasLocation && (
-        <GigCityFilter
-          currentCity={selectedCity}
-          currentState={workerState}
-          onCityChange={setSelectedCity}
-          totalGigs={filteredGigs.length}
-        />
-      )}
-
-      {!hasLocation && (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>
-            Your profile doesn&apos;t have a city and state set yet, so you&apos;re seeing all gigs.{' '}
-            <Link href="/auth/onboarding" className="underline font-medium">
-              Update your profile
-            </Link>{' '}
-            to see only local gigs.
-          </span>
-        </div>
-      )}
-
-      {(!filteredGigs || filteredGigs.length === 0) && (
-        <div className="card card-body text-center py-16 space-y-2">
-          <p className="text-lg text-muted-foreground">
-            No gigs available{selectedCity ? ` near ${selectedCity}` : ''} right now.
-          </p>
-          <p className="text-sm text-muted-foreground">Check back soon — new projects get posted regularly.</p>
-        </div>
-      )}
-
-      {filteredGigs && filteredGigs.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredGigs.map((gig) => (
-            <GigListingCard key={gig.id} gig={gig} isClaimed={myClaimedIds.has(gig.id)} />
-          ))}
-        </div>
+      {selectedCity && nearbyCount > 1 && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Showing gigs in {selectedCity} and {nearbyCount - 1} nearby {nearbyCount - 1 === 1 ? 'city' : 'cities'}
+        </p>
       )}
     </div>
   )
