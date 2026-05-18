@@ -30,6 +30,10 @@ const THRESHOLDS = {
   gore: 0.4,
   violence: 0.5,
   offensive: 0.5,
+  // Minor detection — 0.6 is a balanced default. People near 18 sit
+  // around 0.5; we want to clearly flag kids while letting young adults
+  // through. The Sightengine docs explicitly note ambiguity here.
+  minor: 0.6,
 }
 
 export type ModerationResult =
@@ -44,6 +48,7 @@ export type ModerationReason =
   | 'gore'
   | 'violence'
   | 'offensive'
+  | 'minor'
   | 'service_error'
 
 /**
@@ -72,7 +77,7 @@ export async function moderateImage(file: File): Promise<ModerationResult> {
   formData.append('media', file)
   formData.append(
     'models',
-    'nudity-2.1,weapon,recreational_drug,gore-2.0,violence,offensive-2.0'
+    'nudity-2.1,weapon,recreational_drug,gore-2.0,violence,offensive-2.0,face-attributes'
   )
   formData.append('api_user', apiUser)
   formData.append('api_secret', apiSecret)
@@ -196,6 +201,21 @@ export async function moderateImage(file: File): Promise<ModerationResult> {
         (offensive?.classes ? Math.max(...Object.values(offensive.classes)) : 0)
   if (offensiveScore > THRESHOLDS.offensive) {
     return { ok: false, reason: 'offensive', rawScores: data }
+  }
+
+  // Minor detection — check the "minor" attribute on each detected face.
+  // Sightengine returns a `faces` array where each face has attributes
+  // including a `minor` score from 0 to 1.
+  const faces = data['faces'] as
+    | Array<{ attributes?: { minor?: number } }>
+    | undefined
+  if (Array.isArray(faces)) {
+    for (const face of faces) {
+      const minorScore = face?.attributes?.minor
+      if (typeof minorScore === 'number' && minorScore > THRESHOLDS.minor) {
+        return { ok: false, reason: 'minor', rawScores: data }
+      }
+    }
   }
 
   return { ok: true, rawScores: data }
