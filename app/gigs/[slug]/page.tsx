@@ -53,6 +53,7 @@ export default async function GigDetailPage({ params }: Props) {
   const myClaimId = claim?.worker_user_id === user.id ? claim : null
   const isClaimed = !!claim
   const isMyGig = claim?.worker_user_id === user.id
+  const isOwnPostedGig = gig.poster_user_id === user.id || gig.created_by === user.id
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -161,6 +162,7 @@ export default async function GigDetailPage({ params }: Props) {
         gig={gig}
         isClaimed={isClaimed}
         isMyGig={isMyGig}
+        isOwnPostedGig={isOwnPostedGig}
         existingClaim={myClaimId}
         userId={user.id}
       />

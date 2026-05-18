@@ -10,15 +10,29 @@ interface Props {
   gig: GigRow
   isClaimed: boolean
   isMyGig: boolean
+  isOwnPostedGig: boolean
   existingClaim: GigClaimRow | null
   userId: string
 }
 
-export default function ClaimButton({ gig, isClaimed, isMyGig, existingClaim, userId }: Props) {
+export default function ClaimButton({ gig, isClaimed, isMyGig, isOwnPostedGig, existingClaim, userId }: Props) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // The viewer posted this gig — they can't claim their own gig
+  if (isOwnPostedGig) {
+    return (
+      <div className="card card-body space-y-3">
+        <p className="text-sm font-medium text-foreground">You posted this gig.</p>
+        <p className="text-sm text-muted-foreground">You can&apos;t claim your own gig. Manage it from your dashboard.</p>
+        <Button variant="accent" onClick={() => router.push(`/flipper/gigs/${gig.id}`)}>
+          Go to gig dashboard
+        </Button>
+      </div>
+    )
+  }
 
   // Gig is closed to claims
   if (gig.status !== 'open') {
@@ -80,6 +94,8 @@ export default function ClaimButton({ gig, isClaimed, isMyGig, existingClaim, us
     if (claimError) {
       if (claimError.code === '23505') {
         setError('Sorry, someone just claimed this gig before you.')
+      } else if (claimError.code === '23514' || /cannot claim a gig you posted/i.test(claimError.message ?? '')) {
+        setError('You cannot claim a gig you posted.')
       } else {
         setError('Failed to claim gig. Please try again.')
       }

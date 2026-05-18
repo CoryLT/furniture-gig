@@ -18,11 +18,18 @@ export default async function GigsPage() {
   const hasLocation = !!(workerCity && workerState)
 
   // Load ALL open gigs (we'll filter client-side by location)
+  // Exclude gigs the user posted themselves.
   const { data: gigs } = await supabase
     .from('gigs')
     .select('*')
     .eq('status', 'open')
+    .or(`poster_user_id.neq.${user!.id},poster_user_id.is.null`)
     .order('created_at', { ascending: false })
+
+  // Extra safety filter (handles edge case where poster_user_id is null but created_by isn't)
+  const filteredGigs = (gigs ?? []).filter((g: { poster_user_id: string | null; created_by: string | null }) =>
+    g.poster_user_id !== user!.id && g.created_by !== user!.id
+  )
 
   // Load any claims this worker has
   const { data: myClaims } = await supabase
@@ -34,7 +41,7 @@ export default async function GigsPage() {
 
   return (
     <GigFilterContent
-      initialGigs={gigs ?? []}
+      initialGigs={filteredGigs}
       workerCity={workerCity}
       workerState={workerState}
       myClaimedIds={myClaimedIds}
