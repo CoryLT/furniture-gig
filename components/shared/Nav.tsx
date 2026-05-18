@@ -12,9 +12,12 @@ interface NavProps {
   userUsername?: string
 }
 
-const workerLinks = [
+// Unified nav: any non-admin user sees all of these
+const userLinks = [
   { href: '/gigs', label: 'Browse Gigs' },
   { href: '/my-gigs', label: 'My Gigs' },
+  { href: '/flipper/post-gig', label: 'Post a Gig' },
+  { href: '/flipper/dashboard', label: 'My Posted Gigs' },
   { href: '/my-gigs/payouts', label: 'Payouts' },
 ]
 
@@ -22,11 +25,6 @@ const adminLinks = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/gigs', label: 'Gigs' },
   { href: '/admin/payouts', label: 'Payouts' },
-]
-
-const flipperLinks = [
-  { href: '/flipper/dashboard', label: 'Dashboard' },
-  { href: '/flipper/post-gig', label: 'Post a Gig' },
 ]
 
 export default function Nav({ role, userName, userUsername }: NavProps) {
@@ -38,7 +36,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [currentUserUsername, setCurrentUserUsername] = useState<string | null>(null)
 
-  const links = role === 'worker' ? workerLinks : role === 'admin' ? adminLinks : flipperLinks
+  const links = role === 'admin' ? adminLinks : userLinks
 
   // Load current user's username on mount (fallback if not passed in as prop)
   useEffect(() => {

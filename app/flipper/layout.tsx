@@ -14,7 +14,8 @@ export default async function FlipperLayout({ children }: { children: React.Reac
     .eq('id', user.id)
     .single()
 
-  if (userRow?.role !== 'flipper') redirect('/gigs')
+  // Only admins get bounced. Workers can post gigs too.
+  if (userRow?.role === 'admin') redirect('/admin')
 
   const { data: profile } = await supabase
     .from('flipper_profiles')

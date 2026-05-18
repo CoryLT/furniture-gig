@@ -8,7 +8,8 @@ export default async function GigsLayout({ children }: { children: React.ReactNo
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  // Only workers belong here — send other roles to their own home
+  // Only kick admins to their dashboard. Everyone else (worker or flipper)
+  // is allowed to browse gigs.
   const { data: userRow } = await supabase
     .from('users')
     .select('role')
@@ -16,7 +17,6 @@ export default async function GigsLayout({ children }: { children: React.ReactNo
     .single()
 
   if (userRow?.role === 'admin') redirect('/admin')
-  if (userRow?.role === 'flipper') redirect('/flipper/dashboard')
 
   const { data: profile } = await supabase
     .from('worker_profiles')
