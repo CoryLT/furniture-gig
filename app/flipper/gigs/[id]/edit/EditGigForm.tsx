@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { AlertTriangle, X } from 'lucide-react'
 import type { GigRow, GigImageRow } from '@/types/database'
 import GigImageUploader from '@/components/admin/GigImageUploader'
+import { LocationSelect } from '@/components/ui/location-select'
 
 
 const FURNITURE_TYPES = [
@@ -49,6 +50,15 @@ export default function EditGigForm({ gig, hasActiveClaim, images }: Props) {
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  function handleStateChange(state: string) {
+    // When the state changes, reset the city (the city list depends on the state).
+    setForm((prev) => ({ ...prev, state, city: '' }))
+  }
+
+  function handleCityChange(city: string) {
+    setForm((prev) => ({ ...prev, city }))
   }
 
   function addSkill(skill: string) {
@@ -179,21 +189,13 @@ export default function EditGigForm({ gig, hasActiveClaim, images }: Props) {
                 required />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2">
-                <label htmlFor="city" className="field-label">City</label>
-                <input id="city" name="city" type="text" value={form.city}
-                  onChange={handleChange} className="field-input" placeholder="Nashville" required />
-              </div>
-              <div>
-                <label htmlFor="state" className="field-label">State</label>
-                <select id="state" name="state" value={form.state}
-                  onChange={handleChange} className="field-input" required>
-                  <option value="">—</option>
-                  
-                </select>
-              </div>
-            </div>
+            <LocationSelect
+              selectedState={form.state}
+              selectedCity={form.city}
+              onStateChange={handleStateChange}
+              onCityChange={handleCityChange}
+              disabled={loading}
+            />
 
             <div className="grid grid-cols-2 gap-4">
               <div>
