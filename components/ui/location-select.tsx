@@ -16,22 +16,6 @@ interface Option {
   label: string;
 }
 
-const stateMap: Record<string, string> = {
-  'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas',
-  'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware',
-  'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii', 'ID': 'Idaho',
-  'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa', 'KS': 'Kansas',
-  'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland',
-  'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi',
-  'MO': 'Missouri', 'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada',
-  'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 'NY': 'New York',
-  'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio', 'OK': 'Oklahoma',
-  'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
-  'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah',
-  'VT': 'Vermont', 'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia',
-  'WI': 'Wisconsin', 'WY': 'Wyoming',
-};
-
 export function LocationSelect({
   selectedState,
   selectedCity,
@@ -47,6 +31,23 @@ export function LocationSelect({
   // Load states and cities on mount
   useEffect(() => {
     async function loadData() {
+      // Defined inside the hook to avoid Next.js production minification
+      // stripping module-level constants. See handoff notes.
+      const stateMap: Record<string, string> = {
+        'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas',
+        'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware',
+        'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii', 'ID': 'Idaho',
+        'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa', 'KS': 'Kansas',
+        'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland',
+        'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi',
+        'MO': 'Missouri', 'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada',
+        'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 'NY': 'New York',
+        'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio', 'OK': 'Oklahoma',
+        'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
+        'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah',
+        'VT': 'Vermont', 'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia',
+        'WI': 'Wisconsin', 'WY': 'Wyoming',
+      };
       try {
         const { data, error } = await supabase
           .from('supported_locations')
@@ -114,11 +115,27 @@ export function LocationSelect({
   }, [selectedState, selectedCity, onCityChange, supabase]);
 
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-3 gap-4">
+      <div className="col-span-2">
+        <label htmlFor="city" className="field-label">City</label>
+        <select
+          id="city"
+          value={selectedCity}
+          onChange={(e) => onCityChange(e.target.value)}
+          disabled={disabled || !selectedState}
+          className="field-input"
+          required
+        >
+          <option value="">{selectedState ? 'Select a city...' : 'Pick a state first'}</option>
+          {cities.map((city) => (
+            <option key={city.value} value={city.value}>
+              {city.label}
+            </option>
+          ))}
+        </select>
+      </div>
       <div>
-        <label htmlFor="state" className="block text-sm font-medium text-slate-700 mb-2">
-          State
-        </label>
+        <label htmlFor="state" className="field-label">State</label>
         <select
           id="state"
           value={selectedState}
@@ -127,32 +144,13 @@ export function LocationSelect({
             onCityChange('');
           }}
           disabled={disabled || loading}
-          className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+          className="field-input"
+          required
         >
-          <option value="">Select a state...</option>
+          <option value="">—</option>
           {states.map((state) => (
             <option key={state.value} value={state.value}>
               {state.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label htmlFor="city" className="block text-sm font-medium text-slate-700 mb-2">
-          City
-        </label>
-        <select
-          id="city"
-          value={selectedCity}
-          onChange={(e) => onCityChange(e.target.value)}
-          disabled={disabled || !selectedState}
-          className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
-        >
-          <option value="">Select a city...</option>
-          {cities.map((city) => (
-            <option key={city.value} value={city.value}>
-              {city.label}
             </option>
           ))}
         </select>

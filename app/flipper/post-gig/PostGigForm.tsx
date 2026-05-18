@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { slugify } from '@/lib/utils'
 import { X } from 'lucide-react'
-import { US_STATES } from '@/lib/us-states'
+import { LocationSelect } from '@/components/ui/location-select'
 
 
 
@@ -43,6 +43,14 @@ export default function PostGigForm() {
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  function handleStateChange(state: string) {
+    setForm((prev) => ({ ...prev, state, city: '' }))
+  }
+
+  function handleCityChange(city: string) {
+    setForm((prev) => ({ ...prev, city }))
   }
 
   function addSkill(skill: string) {
@@ -144,23 +152,13 @@ export default function PostGigForm() {
                 required />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2">
-                <label htmlFor="city" className="field-label">City</label>
-                <input id="city" name="city" type="text" value={form.city}
-                  onChange={handleChange} className="field-input" placeholder="Nashville" required />
-              </div>
-              <div>
-                <label htmlFor="state" className="field-label">State</label>
-                <select id="state" name="state" value={form.state}
-                  onChange={handleChange} className="field-input" required>
-                  <option value="">—</option>
-                  {US_STATES.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <LocationSelect
+              selectedState={form.state}
+              selectedCity={form.city}
+              onStateChange={handleStateChange}
+              onCityChange={handleCityChange}
+              disabled={loading}
+            />
 
             <div className="grid grid-cols-2 gap-4">
               <div>
