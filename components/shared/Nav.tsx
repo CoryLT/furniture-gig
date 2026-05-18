@@ -40,34 +40,31 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
 
   const links = role === 'worker' ? workerLinks : role === 'admin' ? adminLinks : flipperLinks
 
-  // Load current user's username on mount
+  // Load current user's username on mount (fallback if not passed in as prop)
   useEffect(() => {
     async function loadCurrentUser() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        console.log('Current user:', user?.id)
-        
-        if (user) {
-          const { data: profile, error } = await supabase
-            .from('worker_profiles')
-            .select('username')
-            .eq('user_id', user.id)
-            .single()
-          
-          console.log('Profile query result:', profile)
-          console.log('Profile query error:', error)
-          
-          if (profile?.username) {
-            console.log('Setting currentUserUsername to:', profile.username)
-            setCurrentUserUsername(profile.username)
-          }
+        if (!user) return
+
+        const tableName = role === 'flipper' ? 'flipper_profiles' : 'worker_profiles'
+        const { data: profile } = await supabase
+          .from(tableName)
+          .select('username')
+          .eq('user_id', user.id)
+          .single<{ username: string | null }>()
+
+        if (profile?.username) {
+          setCurrentUserUsername(profile.username)
         }
-      } catch (err) {
-        console.error('Error loading current user:', err)
+      } catch {
+        // No profile yet — that's fine, link will route to setup page
       }
     }
     loadCurrentUser()
-  }, [supabase])
+  }, [supabase, role])
+
+
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -89,12 +86,12 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   const getPublicProfileUrl = () => {
     // Use the passed-in userUsername, fallback to currentUserUsername
     const username = userUsername || currentUserUsername
-    console.log('getPublicProfileUrl - userUsername:', userUsername, 'currentUserUsername:', currentUserUsername, 'final username:', username)
-    if (role === 'worker' && username) {
-      return `/workers/${username}`
+
+    if (role === 'worker') {
+      return username ? `/workers/${username}` : '/profile/worker'
     }
-    if (role === 'flipper' && username) {
-      return `/flippers/${username}`
+    if (role === 'flipper') {
+      return username ? `/flippers/${username}` : '/profile/flipper'
     }
     return null
   }
