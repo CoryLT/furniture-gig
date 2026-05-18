@@ -20,6 +20,17 @@ export default async function PublicFlipperProfilePage({ params }: { params: { u
 
   const userId = (profile.users as { id: string } | null)?.id
 
+  // Also load worker_profiles to get full_name (most users have both since we unified)
+  const { data: workerProfile } = userId
+    ? await supabase
+        .from('worker_profiles')
+        .select('full_name')
+        .eq('user_id', userId)
+        .maybeSingle()
+    : { data: null }
+
+  const fullName = workerProfile?.full_name || ''
+
   // Load their active open gigs
   const { data: gigs } = userId
     ? await supabase
@@ -49,5 +60,5 @@ export default async function PublicFlipperProfilePage({ params }: { params: { u
         .order('created_at', { ascending: false })
     : { data: [] }
 
-  return <PublicFlipperProfileClient profile={profile} gigs={gigs || []} completedCount={completedCount || 0} photos={photos || []} />
+  return <PublicFlipperProfileClient profile={profile} gigs={gigs || []} completedCount={completedCount || 0} photos={photos || []} fullName={fullName} />
 }
