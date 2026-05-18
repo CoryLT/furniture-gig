@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { LocationSelect } from '@/components/ui/location-select'
 import GigImageUploader from './GigImageUploader'
 import { slugify } from '@/lib/utils'
 import { Plus, X, ChevronRight } from 'lucide-react'
@@ -44,7 +45,6 @@ export default function GigFormMultiStep({
   const [checklist, setChecklist] = useState<Array<GigChecklistItemRow & { _isNew?: boolean }>>(initialChecklist ?? [])
   const [newChecklistItem, setNewChecklistItem] = useState('')
 
- const availableCities = [];
   const handleStateChange = (newState: string) => {
     setSelectedState(newState)
     setSelectedCity('')
@@ -216,23 +216,13 @@ export default function GigFormMultiStep({
             <input type="text" value={furnitureType} onChange={(e) => setFurnitureType(e.target.value)} className="mt-1 block w-full rounded border border-stone-300 px-3 py-2 text-stone-900" placeholder="e.g., Dresser, Couch, Table" />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-stone-700">State</label>
-            <select value={selectedState} onChange={(e) => handleStateChange(e.target.value)} className="mt-1 block w-full rounded border border-stone-300 px-3 py-2 text-stone-900">
-              <option value="">Select a state</option>
-              
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-stone-700">City</label>
-            <select value={selectedCity} onChange={(e) => setSelectedCity(e.target.value)} disabled={!selectedState} className="mt-1 block w-full rounded border border-stone-300 px-3 py-2 text-stone-900 disabled:bg-stone-100 disabled:text-stone-500">
-              <option value="">{selectedState ? 'Select a city' : 'Select a state first'}</option>
-              {availableCities.map((city) => (
-                <option key={city} value={city}>{city}</option>
-              ))}
-            </select>
-          </div>
+          <LocationSelect
+            selectedState={selectedState}
+            selectedCity={selectedCity}
+            onStateChange={handleStateChange}
+            onCityChange={setSelectedCity}
+            disabled={false}
+          />
 
           <div>
             <label className="block text-sm font-medium text-stone-700">Pay Amount ($)</label>
