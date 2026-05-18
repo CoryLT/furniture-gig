@@ -88,23 +88,17 @@ alter table public.gigs
 -- ============================================================
 -- 5. UPDATE GIGS RLS — flippers can manage their own gigs
 -- ============================================================
-create policy "Flippers can insert their own gigs"
+create policy "Users can insert their own gigs"
   on public.gigs for insert
   with check (
-    exists (
-      select 1 from public.users u
-      where u.id = auth.uid() and u.role = 'flipper'
-    )
+    auth.uid() is not null
     and poster_user_id = auth.uid()
   );
 
-create policy "Flippers can update their own gigs"
+create policy "Users can update their own gigs"
   on public.gigs for update
   using (
-    exists (
-      select 1 from public.users u
-      where u.id = auth.uid() and u.role = 'flipper'
-    )
+    auth.uid() is not null
     and poster_user_id = auth.uid()
   );
 
