@@ -18,6 +18,7 @@ const userLinks = [
   { href: '/my-gigs', label: 'My Gigs' },
   { href: '/flipper/post-gig', label: 'Post a Gig' },
   { href: '/flipper/dashboard', label: 'My Posted Gigs' },
+  { href: '/messages', label: 'Messages' },
   { href: '/my-gigs/payouts', label: 'Payouts' },
 ]
 
