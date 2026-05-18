@@ -52,37 +52,24 @@ export default function PhotoSection({ gigId, userId, photos: initialPhotos, rea
         continue
       }
 
-      const ext = file.name.split('.').pop()
-      const path = `${userId}/${gigId}/${Date.now()}.${ext}`
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('gigId', gigId)
 
-      const { error: uploadError } = await supabase.storage
-        .from('gig-photos')
-        .upload(path, file)
+      const res = await fetch('/api/upload-gig-photo', {
+        method: 'POST',
+        body: fd,
+      })
+      const json = await res.json()
 
-      if (uploadError) {
-        setError('Upload failed. Please try again.')
+      if (!res.ok || !json.photo) {
+        setError(json.error || 'Upload failed. Please try a different image.')
         continue
       }
 
-      // Record in DB
-      const { data: record, error: dbError } = await supabase
-        .from('gig_photo_uploads')
-        .insert({
-          gig_id: gigId,
-          worker_user_id: userId,
-          file_path: path,
-          caption: '',
-        })
-        .select()
-        .single()
-
-      if (dbError || !record) continue
-
-      const { data: urlData } = supabase.storage.from('gig-photos').getPublicUrl(path)
-
       setPhotos((prev) => [
         ...prev,
-        { id: record.id, url: urlData.publicUrl, caption: '', isNew: true },
+        { id: json.photo.id, url: json.photo.url, caption: '', isNew: true },
       ])
     }
 

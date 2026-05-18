@@ -1,5 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { moderateImage, logModerationCheck } from '@/lib/moderation'
+
+const UPLOAD_FAILED_GENERIC = 'Upload failed. Please try a different image.'
 
 export async function POST(request: NextRequest) {
   const supabase = createClient()
@@ -27,6 +30,21 @@ export async function POST(request: NextRequest) {
   // Validate file size (max 10MB)
   if (file.size > 10 * 1024 * 1024) {
     return NextResponse.json({ error: 'File size must be less than 10MB' }, { status: 400 })
+  }
+
+  // --- Moderation gate ---
+  const moderationResult = await moderateImage(file)
+  if (!moderationResult.ok) {
+    await logModerationCheck({
+      supabase: supabase as never,
+      userId: user.id,
+      uploadSource: 'flipper_gallery',
+      filePath: null,
+      passed: false,
+      blockReason: moderationResult.reason,
+      rawScores: moderationResult.rawScores,
+    })
+    return NextResponse.json({ error: UPLOAD_FAILED_GENERIC }, { status: 400 })
   }
 
   // Generate unique filename
@@ -68,6 +86,17 @@ export async function POST(request: NextRequest) {
     await supabase.storage.from('photo-galleries').remove([filename])
     return NextResponse.json({ error: 'Failed to save photo record' }, { status: 500 })
   }
+
+  // Log the pass
+  await logModerationCheck({
+    supabase: supabase as never,
+    userId: user.id,
+    uploadSource: 'flipper_gallery',
+    filePath: filename,
+    passed: true,
+    blockReason: null,
+    rawScores: moderationResult.rawScores,
+  })
 
   return NextResponse.json({
     success: true,

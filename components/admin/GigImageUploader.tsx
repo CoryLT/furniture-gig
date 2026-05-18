@@ -56,46 +56,30 @@ export default function GigImageUploader({ gigId, images: initialImages, onImage
         continue
       }
 
-      const ext = file.name.split('.').pop()
-      const path = `gig-images/${gigId}/${Date.now()}.${ext}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('gig-images')
-        .upload(path, file, { cacheControl: '3600' })
-
-      if (uploadError) {
-        setError('Upload failed. Please try again.')
-        console.error('Upload error:', uploadError)
-        continue
-      }
-
-      // Record in DB
       const newSortOrder = images.length
-      const { data: record, error: dbError } = await supabase
-        .from('gig_images')
-        .insert({
-          gig_id: gigId,
-          file_path: path,
-          caption: '',
-          sort_order: newSortOrder,
-        })
-        .select()
-        .single()
 
-      if (dbError || !record) {
-        setError('Failed to save image. Please try again.')
-        console.error('DB error:', dbError)
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('gigId', gigId)
+      fd.append('sortOrder', String(newSortOrder))
+
+      const res = await fetch('/api/upload-gig-image', {
+        method: 'POST',
+        body: fd,
+      })
+      const json = await res.json()
+
+      if (!res.ok || !json.image) {
+        setError(json.error || 'Upload failed. Please try a different image.')
         continue
       }
-
-      const { data: urlData } = supabase.storage.from('gig-images').getPublicUrl(path)
 
       const newImage: LocalImage = {
-        id: record.id,
-        url: urlData.publicUrl,
+        id: json.image.id,
+        url: json.image.url,
         caption: '',
         sort_order: newSortOrder,
-        file_path: path,
+        file_path: json.image.file_path,
         isNew: true,
       }
 
