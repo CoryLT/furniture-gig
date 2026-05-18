@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { LocationSelect } from '@/components/ui/location-select';
-import { ArrowLeft, Upload } from 'lucide-react';
+import { ArrowLeft, Upload, Camera } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { PhotoUploadForm } from '@/components/ui/PhotoUploadForm';
+import { PhotoGallery, type GalleryPhoto } from '@/components/ui/PhotoGallery';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -33,6 +35,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -50,8 +54,10 @@ export default function ProfilePage() {
           return;
         }
 
+        setUserId(user.id);
+
         // Pull from both tables in parallel
-        const [workerResult, flipperResult] = await Promise.all([
+        const [workerResult, flipperResult, workerPhotosResult, flipperPhotosResult] = await Promise.all([
           supabase
             .from('worker_profiles')
             .select('full_name, username, phone, state, city, paypal_email, avatar_url')
@@ -62,6 +68,16 @@ export default function ProfilePage() {
             .select('username, business_name, bio, city, state, website, avatar_url, profile_public')
             .eq('user_id', user.id)
             .maybeSingle(),
+          supabase
+            .from('worker_photo_galleries')
+            .select('*')
+            .eq('worker_user_id', user.id)
+            .order('display_order', { ascending: true }),
+          supabase
+            .from('flipper_photo_galleries')
+            .select('*')
+            .eq('flipper_user_id', user.id)
+            .order('display_order', { ascending: true }),
         ]);
 
         const worker = workerResult.data;
@@ -82,6 +98,20 @@ export default function ProfilePage() {
           website: flipper?.website || '',
           profilePublic: flipper?.profile_public ?? true,
         });
+
+        // Build photo gallery: combine worker + flipper photos with public URLs.
+        // Tag each photo with its source so we know which table to delete from.
+        const workerPhotos: any[] = (workerPhotosResult.data || []).map((p: any) => ({
+          ...p,
+          _source: 'worker' as const,
+          publicUrl: supabase.storage.from('photo-galleries').getPublicUrl(p.file_path).data.publicUrl,
+        }));
+        const flipperPhotos: any[] = (flipperPhotosResult.data || []).map((p: any) => ({
+          ...p,
+          _source: 'flipper' as const,
+          publicUrl: supabase.storage.from('photo-galleries').getPublicUrl(p.file_path).data.publicUrl,
+        }));
+        setPhotos([...workerPhotos, ...flipperPhotos]);
       } catch (err: any) {
         setError('Failed to load profile');
         console.error(err);
@@ -147,6 +177,60 @@ export default function ProfilePage() {
     }
 
     setUploading(false);
+  };
+
+  // Refresh photos from the database (called after a new upload)
+  const reloadPhotos = async () => {
+    if (!userId) return;
+
+    const [workerPhotosResult, flipperPhotosResult] = await Promise.all([
+      supabase
+        .from('worker_photo_galleries')
+        .select('*')
+        .eq('worker_user_id', userId)
+        .order('display_order', { ascending: true }),
+      supabase
+        .from('flipper_photo_galleries')
+        .select('*')
+        .eq('flipper_user_id', userId)
+        .order('display_order', { ascending: true }),
+    ]);
+
+    const workerPhotos: any[] = (workerPhotosResult.data || []).map((p: any) => ({
+      ...p,
+      _source: 'worker' as const,
+      publicUrl: supabase.storage.from('photo-galleries').getPublicUrl(p.file_path).data.publicUrl,
+    }));
+    const flipperPhotos: any[] = (flipperPhotosResult.data || []).map((p: any) => ({
+      ...p,
+      _source: 'flipper' as const,
+      publicUrl: supabase.storage.from('photo-galleries').getPublicUrl(p.file_path).data.publicUrl,
+    }));
+    setPhotos([...workerPhotos, ...flipperPhotos]);
+  };
+
+  // Delete a photo. We figure out which table to delete from based on the photo's _source tag.
+  // The PhotoGallery component passes a 'type' arg, but we ignore it and use _source instead
+  // since some photos live in the worker table and some in the flipper table.
+  const handleDeletePhoto = async (photoId: string, _type: 'worker' | 'flipper') => {
+    // Find the photo to know which source table it came from
+    const photo = photos.find((p) => p.id === photoId) as any;
+    if (!photo) throw new Error('Photo not found');
+
+    const type = photo._source as 'worker' | 'flipper';
+
+    const response = await fetch('/api/delete-gallery-photo', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photoId, type }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to delete photo');
+    }
+
+    setPhotos((prev) => prev.filter((p) => p.id !== photoId));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -463,6 +547,35 @@ export default function ProfilePage() {
               </Link>
             </div>
           </form>
+        </div>
+
+        {/* Work Samples Gallery — separate card so it has its own context */}
+        <div className="bg-white rounded-lg shadow p-8 mt-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Camera className="w-5 h-5 text-slate-700" />
+            <h2 className="text-2xl font-serif font-bold text-slate-900">
+              Work Samples
+            </h2>
+          </div>
+          <p className="text-sm text-slate-600 mb-6">
+            Photos of your work. These show up on your public profile in an Instagram-style grid.
+          </p>
+
+          <div className="space-y-6">
+            <PhotoUploadForm onPhotoUploaded={reloadPhotos} userType="flipper" />
+
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 mb-3">
+                Your Photos {photos.length > 0 && `(${photos.length})`}
+              </h3>
+              <PhotoGallery
+                photos={photos}
+                isEditable={true}
+                onDeletePhoto={handleDeletePhoto}
+                userType="flipper"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
