@@ -36,8 +36,131 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [currentUserUsername, setCurrentUserUsername] = useState<string | null>(null)
+  const [unreadMessages, setUnreadMessages] = useState(0)
+  const currentUserIdRef = useRef<string | null>(null)
 
   const links = role === 'admin' ? adminLinks : userLinks
+
+  // --- Unread messages: initial fetch + realtime subscription ---
+  useEffect(() => {
+    if (role === 'admin') return // admins don't use the inbox
+
+    let cancelled = false
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
+    async function loadAndSubscribe() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+      currentUserIdRef.current = user.id
+
+      // 1) Initial unread count.
+      // Find conversations where I'm a participant, then count unread received msgs.
+      const { data: convs } = await supabase
+        .from('gig_conversations')
+        .select('id, flipper_user_id, worker_user_id')
+        .or(`flipper_user_id.eq.${user.id},worker_user_id.eq.${user.id}`)
+
+      const convIds = (convs ?? []).map((c: { id: string }) => c.id)
+
+      let initialCount = 0
+      if (convIds.length > 0) {
+        const { count } = await supabase
+          .from('gig_messages')
+          .select('id', { count: 'exact', head: true })
+          .in('conversation_id', convIds)
+          .neq('sender_user_id', user.id)
+          .is('read_at', null)
+        initialCount = count ?? 0
+      }
+      if (!cancelled) setUnreadMessages(initialCount)
+
+      // 2) Subscribe to NEW messages and read-receipt updates across the whole
+      //    gig_messages table — RLS will already restrict to messages we can see.
+      channel = supabase.channel(`nav-unread:${user.id}`)
+
+      channel.on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'gig_messages' },
+        (payload) => {
+          const m = payload.new as {
+            sender_user_id: string
+            read_at: string | null
+          }
+          // Only count messages sent BY someone else and not yet read
+          if (
+            m.sender_user_id !== currentUserIdRef.current &&
+            m.read_at === null
+          ) {
+            setUnreadMessages((n) => n + 1)
+          }
+        }
+      )
+
+      channel.on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'gig_messages' },
+        (payload) => {
+          const before = payload.old as {
+            sender_user_id?: string
+            read_at?: string | null
+          }
+          const after = payload.new as {
+            sender_user_id?: string
+            read_at?: string | null
+          }
+          // Catch "marked read" transitions on messages where I was the recipient
+          if (
+            after.sender_user_id !== currentUserIdRef.current &&
+            before.read_at === null &&
+            after.read_at !== null
+          ) {
+            setUnreadMessages((n) => Math.max(0, n - 1))
+          }
+        }
+      )
+
+      channel.subscribe()
+    }
+
+    loadAndSubscribe()
+
+    return () => {
+      cancelled = true
+      if (channel) supabase.removeChannel(channel)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role])
+
+  // When the user navigates to /messages or into a conversation, refresh the
+  // unread count once the page settles — read_at updates may be in flight.
+  useEffect(() => {
+    if (role === 'admin') return
+    if (!pathname?.startsWith('/messages')) return
+    if (!currentUserIdRef.current) return
+    const userId = currentUserIdRef.current
+
+    const t = setTimeout(async () => {
+      const { data: convs } = await supabase
+        .from('gig_conversations')
+        .select('id')
+        .or(`flipper_user_id.eq.${userId},worker_user_id.eq.${userId}`)
+      const convIds = (convs ?? []).map((c: { id: string }) => c.id)
+      if (convIds.length === 0) {
+        setUnreadMessages(0)
+        return
+      }
+      const { count } = await supabase
+        .from('gig_messages')
+        .select('id', { count: 'exact', head: true })
+        .in('conversation_id', convIds)
+        .neq('sender_user_id', userId)
+        .is('read_at', null)
+      setUnreadMessages(count ?? 0)
+    }, 1200)
+
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, role])
 
   // Load current user's username on mount (fallback if not passed in as prop)
   useEffect(() => {
@@ -107,13 +230,18 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
             <Link
               key={link.href}
               href={link.href}
-              className={`text-sm font-medium transition-colors ${
+              className={`text-sm font-medium transition-colors inline-flex items-center gap-1.5 ${
                 pathname === link.href
                   ? 'text-accent'
                   : 'text-foreground hover:text-accent'
               }`}
             >
               {link.label}
+              {link.href === '/messages' && unreadMessages > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-accent text-accent-foreground text-[10px] font-semibold leading-none">
+                  {unreadMessages > 99 ? '99+' : unreadMessages}
+                </span>
+              )}
             </Link>
           ))}
         </div>
@@ -187,12 +315,17 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`block py-2 text-sm font-medium ${
+                className={`py-2 text-sm font-medium inline-flex items-center gap-2 ${
                   pathname === link.href ? 'text-accent' : 'text-foreground'
                 }`}
                 onClick={() => setMenuOpen(false)}
               >
                 {link.label}
+                {link.href === '/messages' && unreadMessages > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-accent text-accent-foreground text-[10px] font-semibold leading-none">
+                    {unreadMessages > 99 ? '99+' : unreadMessages}
+                  </span>
+                )}
               </Link>
             ))}
             <hr className="my-2" />
