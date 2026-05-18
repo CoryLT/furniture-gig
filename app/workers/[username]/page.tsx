@@ -132,7 +132,7 @@ export default function PublicWorkerProfilePage() {
               {/* Edit link - only show if it's their own profile */}
               {isOwnProfile && (
                 <div className="pt-4 border-t border-stone-200">
-                  <Link href="/profile/worker" className="text-sm text-accent hover:underline text-center block">
+                  <Link href="/profile" className="text-sm text-accent hover:underline text-center block">
                     Edit your profile
                   </Link>
                 </div>

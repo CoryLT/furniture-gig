@@ -15,6 +15,7 @@ export async function middleware(request: NextRequest) {
   '/my-gigs',
   '/admin',
   '/flipper',
+  '/profile',
   // '/auth/onboarding',  // REMOVE THIS
   // '/auth/flipper-onboarding',  // REMOVE THIS
   '/auth/agreements',

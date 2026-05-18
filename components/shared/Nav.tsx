@@ -86,10 +86,10 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
     const username = userUsername || currentUserUsername
 
     if (role === 'worker') {
-      return username ? `/workers/${username}` : '/profile/worker'
+      return username ? `/workers/${username}` : '/profile'
     }
     if (role === 'flipper') {
-      return username ? `/flippers/${username}` : '/profile/flipper'
+      return username ? `/flippers/${username}` : '/profile'
     }
     return null
   }
@@ -144,7 +144,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
                   </Link>
                 )}
                 <Link
-                  href="/profile/worker"
+                  href="/profile"
                   className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
                   onClick={() => setDropdownOpen(false)}
                 >
@@ -208,7 +208,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
               </Link>
             )}
             <Link
-              href="/profile/worker"
+              href="/profile"
               className="block py-2 text-sm font-medium text-foreground"
               onClick={() => setMenuOpen(false)}
             >

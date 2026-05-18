@@ -74,7 +74,7 @@ export function PublicWorkerProfileClient({
                 {/* Edit Profile Link - only show if own profile */}
                 {isOwnProfile && (
                   <Link
-                    href="/profile/worker"
+                    href="/profile"
                     className="text-sm text-accent hover:underline font-medium"
                   >
                     ✎ Edit Profile
