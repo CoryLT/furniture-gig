@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel } from '@/lib/utils'
 import { MapPin, Calendar, Wrench, ArrowLeft, User, Pencil } from 'lucide-react'
+import OpenChatButton from '@/components/shared/OpenChatButton'
 
 export default async function FlipperGigDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -156,6 +157,12 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
                   <p className="text-xs text-muted-foreground">
                     Claimed {formatDate(claim.claimed_at)}
                   </p>
+
+                  {claim.status === 'active' && (
+                    <div className="pt-1">
+                      <OpenChatButton gigId={gig.id} label="Message Worker" />
+                    </div>
+                  )}
                 </div>
               )
             })}

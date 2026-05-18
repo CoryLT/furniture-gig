@@ -5,6 +5,7 @@ import { MapPin, Calendar } from 'lucide-react'
 import ChecklistSection from './ChecklistSection'
 import PhotoSection from './PhotoSection'
 import SubmitSection from './SubmitSection'
+import OpenChatButton from '@/components/shared/OpenChatButton'
 
 interface Props {
   params: { claimId: string }
@@ -56,10 +57,13 @@ export default async function MyGigDetailPage({ params }: Props) {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      {/* Back */}
-      <a href="/my-gigs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-        ← Back to My Gigs
-      </a>
+      {/* Back + Message */}
+      <div className="flex items-center justify-between gap-4">
+        <a href="/my-gigs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          ← Back to My Gigs
+        </a>
+        <OpenChatButton gigId={gig.id} label="Message Flipper" />
+      </div>
 
       {/* Header */}
       <div className="card">
