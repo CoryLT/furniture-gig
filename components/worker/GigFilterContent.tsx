@@ -40,7 +40,7 @@ export default function GigFilterContent({
       return initialGigs
     }
 
-    const nearbyCities = getNearbyCity(selectedCity)
+    const nearbyCities = nearbyMap[selectedCity] ?? [selectedCity]
     return initialGigs.filter((gig) => {
       if (!gig.city) return false
       return nearbyCities.some((city) => city.toLowerCase() === gig.city.toLowerCase())

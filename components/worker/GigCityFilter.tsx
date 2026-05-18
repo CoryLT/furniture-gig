@@ -27,7 +27,7 @@ export default function GigCityFilter({
   // When selected city changes, update nearby count
   useEffect(() => {
     if (selectedCity) {
-      const nearby = getNearbyCity(selectedCity)
+      const nearby = nearbyMap[selectedCity] ?? [selectedCity]
       setNearbyCount(nearby.length)
     }
   }, [selectedCity])
