@@ -129,7 +129,7 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
                       </span>
                       {wp?.username && (
                         <Link
-                          href={`/workers/${wp.username}`}
+                          href={`/u/${wp.username}`}
                           className="text-xs text-accent hover:underline"
                           target="_blank"
                         >

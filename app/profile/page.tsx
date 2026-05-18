@@ -446,7 +446,7 @@ export default function ProfilePage() {
                     Make my profile public
                   </label>
                   <p className="text-xs text-slate-500 mt-1">
-                    When checked, your profile appears at flipwork.com/flippers/{formData.username || 'your-username'}
+                    When checked, your profile appears at flipwork.com/u/{formData.username || 'your-username'}
                   </p>
                 </div>
               </div>

@@ -85,13 +85,10 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
     // Use the passed-in userUsername, fallback to currentUserUsername
     const username = userUsername || currentUserUsername
 
-    if (role === 'worker') {
-      return username ? `/workers/${username}` : '/profile'
+    if (username) {
+      return `/u/${username}`
     }
-    if (role === 'flipper') {
-      return username ? `/flippers/${username}` : '/profile'
-    }
-    return null
+    return '/profile'
   }
 
   return (
