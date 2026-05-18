@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Armchair } from 'lucide-react'
+import { US_STATES } from '@/lib/us-states'
 
 export default function FlipperOnboardingPage() {
   const router = useRouter()
@@ -187,7 +188,9 @@ export default function FlipperOnboardingPage() {
                     required
                   >
                     <option value="">—</option>
-                    
+                    {US_STATES.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>

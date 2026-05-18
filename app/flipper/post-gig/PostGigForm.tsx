@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { slugify } from '@/lib/utils'
 import { X } from 'lucide-react'
+import { US_STATES } from '@/lib/us-states'
 
 
 
@@ -154,7 +155,9 @@ export default function PostGigForm() {
                 <select id="state" name="state" value={form.state}
                   onChange={handleChange} className="field-input" required>
                   <option value="">—</option>
-                  
+                  {US_STATES.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
