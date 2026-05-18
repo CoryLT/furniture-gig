@@ -1,12 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Armchair } from 'lucide-react'
 
 export default function FlipperOnboardingPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // Allow callers to specify where to send the user after onboarding
+  // (e.g. ?next=/flipper/post-gig). We pass this through agreements too.
+  const nextUrl = searchParams.get('next') ?? ''
 
   const [form, setForm] = useState({
     username: '',
@@ -50,7 +54,12 @@ export default function FlipperOnboardingPage() {
         return
       }
 
-      router.push('/auth/agreements')
+      // Forward the ?next= param to agreements so it lands users at the
+      // page they originally wanted (e.g. /flipper/post-gig).
+      const agreementsUrl = nextUrl
+        ? `/auth/agreements?next=${encodeURIComponent(nextUrl)}`
+        : '/auth/agreements'
+      router.push(agreementsUrl)
       router.refresh()
     } catch (err) {
       console.error('Unexpected error:', err)

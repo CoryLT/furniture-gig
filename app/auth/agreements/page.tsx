@@ -8,7 +8,11 @@ function homeForRole(role: string | null | undefined): string {
   return '/gigs'
 }
 
-export default async function AgreementsPage() {
+export default async function AgreementsPage({
+  searchParams,
+}: {
+  searchParams: { next?: string }
+}) {
   const supabase = createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -21,7 +25,9 @@ export default async function AgreementsPage() {
     .eq('id', user.id)
     .single()
 
-  const home = homeForRole(userRow?.role)
+  // If a ?next= URL was supplied, send the user there after agreements.
+  // Otherwise fall back to the role-appropriate home.
+  const home = searchParams.next ?? homeForRole(userRow?.role)
 
   // Load all required active agreements
   const { data: agreements } = await supabase
