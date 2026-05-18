@@ -24,7 +24,7 @@ export default async function FlipperLayout({ children }: { children: React.Reac
 
   return (
     <div className="min-h-screen bg-background">
-      <Nav role="flipper" userName={profile?.business_name ?? user.email ?? ''} />
+      <Nav role="flipper" userName={profile?.business_name ?? user.email ?? ''} userUsername={profile?.username ?? undefined} />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         {children}
       </main>

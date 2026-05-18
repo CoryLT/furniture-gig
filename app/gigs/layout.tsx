@@ -20,7 +20,7 @@ export default async function GigsLayout({ children }: { children: React.ReactNo
 
   const { data: profile } = await supabase
     .from('worker_profiles')
-    .select('first_name, last_name')
+    .select('first_name, last_name, username')
     .eq('user_id', user.id)
     .single()
 
@@ -30,7 +30,7 @@ export default async function GigsLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav role="worker" userName={userName ?? undefined} />
+      <Nav role="worker" userName={userName ?? undefined} userUsername={profile?.username ?? undefined} />
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8">
         {children}
       </main>
