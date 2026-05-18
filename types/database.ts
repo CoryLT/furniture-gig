@@ -507,6 +507,58 @@ export type Database = {
           updated_at?: string
         }
       }
+      gig_conversations: {
+        Row: {
+          id: string
+          gig_id: string
+          flipper_user_id: string
+          worker_user_id: string
+          last_message_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          gig_id: string
+          flipper_user_id: string
+          worker_user_id: string
+          last_message_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          gig_id?: string
+          flipper_user_id?: string
+          worker_user_id?: string
+          last_message_at?: string | null
+          created_at?: string
+        }
+      }
+      gig_messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          sender_user_id: string
+          body: string
+          read_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          sender_user_id: string
+          body: string
+          read_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          sender_user_id?: string
+          body?: string
+          read_at?: string | null
+          created_at?: string
+        }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -530,6 +582,8 @@ export type GigImageRow = Database['public']['Tables']['gig_images']['Row']
 export type PayoutRecordRow = Database['public']['Tables']['payout_records']['Row']
 export type WorkerPhotoGalleryRow = Database['public']['Tables']['worker_photo_galleries']['Row']
 export type FlipperPhotoGalleryRow = Database['public']['Tables']['flipper_photo_galleries']['Row']
+export type GigConversationRow = Database['public']['Tables']['gig_conversations']['Row']
+export type GigMessageRow = Database['public']['Tables']['gig_messages']['Row']
 
 // Status types
 export type GigStatus = GigRow['status']
