@@ -1,9 +1,30 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel } from '@/lib/utils'
+import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel, claimStatusLabel, claimStatusClass } from '@/lib/utils'
 import { MapPin, Calendar, Wrench, ArrowLeft, User, Pencil } from 'lucide-react'
 import OpenChatButton from '@/components/shared/OpenChatButton'
+import ApplicantActions from './ApplicantActions'
+
+type WorkerProfile = {
+  first_name: string
+  last_name: string
+  city: string
+  state: string
+  username: string | null
+  bio: string
+  skills: string[]
+}
+
+type ClaimRow = {
+  id: string
+  gig_id: string
+  worker_user_id: string
+  status: string
+  claimed_at: string
+  updated_at: string
+  worker_profiles: WorkerProfile | null
+}
 
 export default async function FlipperGigDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -20,11 +41,83 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
   if (!gig) notFound()
 
   // Load claims with worker info
-  const { data: claims } = await supabase
+  const { data: claimsRaw } = await supabase
     .from('gig_claims')
     .select('*, worker_profiles(first_name, last_name, city, state, username, bio, skills)')
     .eq('gig_id', gig.id)
     .order('claimed_at', { ascending: false })
+
+  const claims = (claimsRaw ?? []) as unknown as ClaimRow[]
+
+  // Split by status
+  const pendingClaims = claims.filter((c) => c.status === 'pending')
+  const activeClaim = claims.find((c) => c.status === 'active') ?? null
+  const otherClaims = claims.filter(
+    (c) => !['pending', 'active'].includes(c.status)
+  )
+
+  const renderApplicantCard = (claim: ClaimRow, showActions: boolean) => {
+    const wp = claim.worker_profiles
+    const workerName = wp ? `${wp.first_name} ${wp.last_name}`.trim() || 'Worker' : 'Worker'
+
+    return (
+      <div key={claim.id} className="card card-body space-y-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center shrink-0">
+              <User className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">{workerName}</p>
+              {wp?.city && wp?.state && (
+                <p className="text-xs text-muted-foreground">{wp.city}, {wp.state}</p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={claimStatusClass(claim.status as 'pending' | 'active' | 'submitted_for_review' | 'approved' | 'rejected' | 'cancelled')}>
+              {claimStatusLabel(claim.status as 'pending' | 'active' | 'submitted_for_review' | 'approved' | 'rejected' | 'cancelled')}
+            </span>
+            {wp?.username && (
+              <Link
+                href={`/u/${wp.username}`}
+                className="text-xs text-accent hover:underline"
+                target="_blank"
+              >
+                View profile
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {wp?.bio && (
+          <p className="text-sm text-muted-foreground line-clamp-2">{wp.bio}</p>
+        )}
+
+        {wp?.skills && wp.skills.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {wp.skills.map((s) => (
+              <span key={s} className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                {s}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <p className="text-xs text-muted-foreground">
+          {claim.status === 'pending' ? 'Applied' : claim.status === 'active' ? 'Picked' : 'Updated'}{' '}
+          {formatDate(claim.updated_at || claim.claimed_at)}
+        </p>
+
+        <div className="pt-1 flex flex-wrap items-center gap-2">
+          <OpenChatButton gigId={gig.id} otherUserId={claim.worker_user_id} label="Message" />
+          {showActions && (
+            <ApplicantActions claimId={claim.id} workerName={workerName} />
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -86,89 +179,48 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
         )}
       </div>
 
-      {/* Claims */}
-      <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">
-          {claims?.length ?? 0} {claims?.length === 1 ? 'Claim' : 'Claims'}
-        </h2>
+      {/* Picked worker (if any) */}
+      {activeClaim && (
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Picked worker</h2>
+          {renderApplicantCard(activeClaim, false)}
+        </div>
+      )}
 
-        {!claims || claims.length === 0 ? (
-          <div className="card card-body text-center py-12">
-            <p className="text-muted-foreground">No workers have claimed this gig yet.</p>
+      {/* Pending applicants (only show when no worker is picked yet) */}
+      {!activeClaim && (
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-1">
+            {pendingClaims.length} {pendingClaims.length === 1 ? 'Applicant' : 'Applicants'}
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Review applicants below. You can message them before picking one. Once you pick someone,
+            the rest are automatically rejected.
+          </p>
+
+          {pendingClaims.length === 0 ? (
+            <div className="card card-body text-center py-12">
+              <p className="text-muted-foreground">No workers have applied to this gig yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingClaims.map((claim) => renderApplicantCard(claim, true))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Past applicants (rejected/cancelled) */}
+      {otherClaims.length > 0 && (
+        <details className="card card-body">
+          <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
+            Past applicants ({otherClaims.length})
+          </summary>
+          <div className="space-y-3 mt-4">
+            {otherClaims.map((claim) => renderApplicantCard(claim, false))}
           </div>
-        ) : (
-          <div className="space-y-3">
-            {claims.map((claim) => {
-              const wp = claim.worker_profiles as {
-                first_name: string; last_name: string; city: string;
-                state: string; username: string | null; bio: string; skills: string[]
-              } | null
-
-              return (
-                <div key={claim.id} className="card card-body space-y-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                        <User className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">
-                          {wp ? `${wp.first_name} ${wp.last_name}` : 'Worker'}
-                        </p>
-                        {wp?.city && wp?.state && (
-                          <p className="text-xs text-muted-foreground">{wp.city}, {wp.state}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`status-badge ${
-                        claim.status === 'active' ? 'status-open' :
-                        claim.status === 'submitted_for_review' ? 'status-in-review' :
-                        claim.status === 'approved' ? 'status-completed' : 'status-draft'
-                      }`}>
-                        {claim.status.replace(/_/g, ' ')}
-                      </span>
-                      {wp?.username && (
-                        <Link
-                          href={`/u/${wp.username}`}
-                          className="text-xs text-accent hover:underline"
-                          target="_blank"
-                        >
-                          View profile
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-
-                  {wp?.bio && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">{wp.bio}</p>
-                  )}
-
-                  {wp?.skills && wp.skills.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {wp.skills.map((s) => (
-                        <span key={s} className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <p className="text-xs text-muted-foreground">
-                    Claimed {formatDate(claim.claimed_at)}
-                  </p>
-
-                  {claim.status === 'active' && (
-                    <div className="pt-1">
-                      <OpenChatButton gigId={gig.id} label="Message Worker" />
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+        </details>
+      )}
     </div>
   )
 }

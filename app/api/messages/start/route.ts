@@ -2,14 +2,16 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 // POST /api/messages/start
-// Body: { gigId: string }
+// Body: { gigId: string, workerUserId?: string }
 // Returns: { conversationId: string }
 //
 // Behavior:
-//  - If a conversation already exists for this gig, return it (after verifying
-//    the current user is one of the two participants).
-//  - If not, look up the gig's poster (flipper) and the active claim's worker,
-//    and create the conversation. Both sides can hit this endpoint.
+//  - Determine the (gig, worker) pair:
+//      • If caller is the flipper, workerUserId MUST be provided.
+//      • If caller is a worker, workerUserId defaults to the caller.
+//  - If a conversation exists for that (gig, worker), return it.
+//  - Otherwise, create it (the DB trigger usually handles this on apply,
+//    but we still create it here as a fallback).
 export async function POST(req: Request) {
   const supabase = createClient()
 
@@ -19,9 +21,11 @@ export async function POST(req: Request) {
   }
 
   let gigId: string | null = null
+  let workerUserIdFromBody: string | null = null
   try {
     const body = await req.json()
     gigId = body?.gigId ?? null
+    workerUserIdFromBody = body?.workerUserId ?? null
   } catch {
     // ignore
   }
@@ -29,21 +33,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing gigId' }, { status: 400 })
   }
 
-  // 1) Does a conversation already exist for this gig?
-  const { data: existing } = await supabase
-    .from('gig_conversations')
-    .select('id, flipper_user_id, worker_user_id')
-    .eq('gig_id', gigId)
-    .maybeSingle<{ id: string; flipper_user_id: string; worker_user_id: string }>()
-
-  if (existing) {
-    if (existing.flipper_user_id !== user.id && existing.worker_user_id !== user.id) {
-      return NextResponse.json({ error: 'Not a participant' }, { status: 403 })
-    }
-    return NextResponse.json({ conversationId: existing.id })
-  }
-
-  // 2) Create one. Look up the gig poster and the active claim.
+  // Look up the gig poster
   const { data: gig } = await supabase
     .from('gigs')
     .select('id, poster_user_id, created_by')
@@ -59,29 +49,58 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Gig has no owner' }, { status: 400 })
   }
 
+  const isFlipper = user.id === flipperUserId
+
+  // Decide which worker this conversation is with
+  let workerUserId: string | null
+  if (isFlipper) {
+    if (!workerUserIdFromBody) {
+      return NextResponse.json({ error: 'Missing workerUserId' }, { status: 400 })
+    }
+    workerUserId = workerUserIdFromBody
+  } else {
+    workerUserId = user.id
+  }
+
+  // 1) Does a conversation already exist for this (gig, worker)?
+  const { data: existing } = await supabase
+    .from('gig_conversations')
+    .select('id, flipper_user_id, worker_user_id')
+    .eq('gig_id', gigId)
+    .eq('worker_user_id', workerUserId)
+    .maybeSingle<{ id: string; flipper_user_id: string; worker_user_id: string }>()
+
+  if (existing) {
+    if (existing.flipper_user_id !== user.id && existing.worker_user_id !== user.id) {
+      return NextResponse.json({ error: 'Not a participant' }, { status: 403 })
+    }
+    return NextResponse.json({ conversationId: existing.id })
+  }
+
+  // 2) Verify the worker has an application/claim on this gig before creating
   const { data: claim } = await supabase
     .from('gig_claims')
-    .select('worker_user_id')
+    .select('id, status')
     .eq('gig_id', gigId)
-    .eq('status', 'active')
-    .maybeSingle<{ worker_user_id: string }>()
+    .eq('worker_user_id', workerUserId)
+    .maybeSingle<{ id: string; status: string }>()
 
   if (!claim) {
-    return NextResponse.json({ error: 'Gig is not currently claimed' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'No application from this worker on this gig' },
+      { status: 400 }
+    )
   }
 
-  // Caller must be one of the two participants
-  if (user.id !== flipperUserId && user.id !== claim.worker_user_id) {
-    return NextResponse.json({ error: 'Not a participant' }, { status: 403 })
-  }
-
+  // 3) Create the conversation (fallback if the trigger didn't fire)
   const { data: created, error: insertError } = await supabase
     .from('gig_conversations')
-    // @ts-expect-error supabase insert generics
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore supabase insert generics
     .insert({
       gig_id: gigId,
       flipper_user_id: flipperUserId,
-      worker_user_id: claim.worker_user_id,
+      worker_user_id: workerUserId,
     })
     .select('id')
     .single<{ id: string }>()
@@ -92,6 +111,7 @@ export async function POST(req: Request) {
       .from('gig_conversations')
       .select('id')
       .eq('gig_id', gigId)
+      .eq('worker_user_id', workerUserId)
       .maybeSingle<{ id: string }>()
     if (retry) {
       return NextResponse.json({ conversationId: retry.id })

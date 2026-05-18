@@ -6,12 +6,16 @@ import { MessageCircle, Loader2 } from 'lucide-react'
 
 interface Props {
   gigId: string
+  // When the flipper opens chat, they must say which applicant.
+  // Workers can leave this undefined — the API will default to caller.
+  otherUserId?: string
   label?: string
   className?: string
 }
 
 export default function OpenChatButton({
   gigId,
+  otherUserId,
   label = 'Message',
   className = '',
 }: Props) {
@@ -26,7 +30,10 @@ export default function OpenChatButton({
       const res = await fetch('/api/messages/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gigId }),
+        body: JSON.stringify({
+          gigId,
+          ...(otherUserId ? { workerUserId: otherUserId } : {}),
+        }),
       })
       const data = await res.json()
       if (!res.ok || !data.conversationId) {
