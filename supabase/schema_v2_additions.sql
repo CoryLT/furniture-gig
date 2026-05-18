@@ -231,14 +231,11 @@ create policy "Admin can upload gig images"
     )
   );
 
-create policy "Flippers can upload gig images"
+create policy "Users can upload gig images"
   on storage.objects for insert
   with check (
     bucket_id = 'gig-images'
-    and exists (
-      select 1 from public.users u
-      where u.id = auth.uid() and u.role = 'flipper'
-    )
+    and auth.uid() is not null
   );
 
 create policy "Admin can delete gig images"
