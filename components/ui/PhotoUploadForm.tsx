@@ -29,9 +29,9 @@ export function PhotoUploadForm({
       return;
     }
 
-    // Validate file size (5MB)
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      setError("File must be less than 5MB");
+    // Validate file size (10MB)
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      setError("File must be less than 10MB");
       return;
     }
 
@@ -129,7 +129,7 @@ export function PhotoUploadForm({
           disabled={isUploading}
           className="block w-full text-sm text-stone-500 file:mr-4 file:rounded file:border-0 file:bg-amber-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-amber-700"
         />
-        <p className="text-xs text-stone-500">PNG, JPG, or WebP. Max 5MB.</p>
+        <p className="text-xs text-stone-500">PNG, JPG, or WebP. Max 10MB.</p>
       </div>
 
       {/* Preview */}
