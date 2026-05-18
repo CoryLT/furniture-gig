@@ -10,6 +10,7 @@ export default function WorkerProfilePage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     fullName: '',
+    username: '',
     phone: '',
     state: '',
     city: '',
@@ -37,7 +38,7 @@ export default function WorkerProfilePage() {
 
         const { data: profile, error: profileError } = await supabase
           .from('worker_profiles')
-          .select('full_name, phone, state, city, paypal_email')
+          .select('full_name, username, phone, state, city, paypal_email')
           .eq('user_id', user.id)
           .single();
 
@@ -48,6 +49,7 @@ export default function WorkerProfilePage() {
         if (profile) {
           setFormData({
             fullName: profile.full_name || '',
+            username: profile.username || '',
             phone: profile.phone || '',
             state: profile.state || '',
             city: profile.city || '',
@@ -98,6 +100,15 @@ export default function WorkerProfilePage() {
       if (!formData.fullName.trim()) {
         throw new Error('Name is required');
       }
+      if (!formData.username.trim()) {
+        throw new Error('Username is required');
+      }
+      if (formData.username.trim().length < 3) {
+        throw new Error('Username must be at least 3 characters');
+      }
+      if (!/^[a-zA-Z0-9_-]+$/.test(formData.username.trim())) {
+        throw new Error('Username can only contain letters, numbers, hyphens, and underscores');
+      }
       if (!formData.phone.trim()) {
         throw new Error('Phone is required');
       }
@@ -111,11 +122,12 @@ export default function WorkerProfilePage() {
         throw new Error('PayPal email is required');
       }
 
-      // Update worker profile
+      // Update worker profile (store username lowercase for consistency)
       const { error: updateError } = await supabase
         .from('worker_profiles')
         .update({
           full_name: formData.fullName,
+          username: formData.username.trim().toLowerCase(),
           phone: formData.phone,
           state: formData.state,
           city: formData.city,
@@ -124,6 +136,10 @@ export default function WorkerProfilePage() {
         .eq('user_id', user.id);
 
       if (updateError) {
+        // Postgres unique-violation code is 23505
+        if (updateError.code === '23505') {
+          throw new Error('That username is already taken. Pick a different one.');
+        }
         throw updateError;
       }
 
@@ -179,6 +195,29 @@ export default function WorkerProfilePage() {
                 className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
                 placeholder="John Doe"
               />
+            </div>
+
+            {/* Username */}
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-slate-700 mb-1">
+                Username
+              </label>
+              <input
+                id="username"
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                disabled={saving}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
+                placeholder="johndoe"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Letters, numbers, hyphens, and underscores only. This appears in your public profile URL.
+              </p>
             </div>
 
             {/* Phone */}
