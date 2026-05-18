@@ -3,22 +3,18 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency, gigStatusClass, gigStatusLabel } from '@/lib/utils'
 import {
   MapPin,
   Globe,
-  ArrowRight,
   ArrowLeft,
   Armchair,
   CheckCircle2,
-  Briefcase,
   User,
   Wrench,
   Image as ImageIcon,
 } from 'lucide-react'
-import { PhotoGallery, type GalleryPhoto } from '@/components/ui/PhotoGallery'
+import { type GalleryPhoto } from '@/components/ui/PhotoGallery'
 import Nav from '@/components/shared/Nav'
 
 interface MergedProfile {
@@ -50,7 +46,6 @@ export function PublicProfileClient({
   flipperPhotos: initialFlipperPhotos,
 }: PublicProfileClientProps) {
   const supabase = createClient()
-  const router = useRouter()
 
   const [workerPhotos, setWorkerPhotos] = useState<GalleryPhoto[]>([])
   const [flipperPhotos, setFlipperPhotos] = useState<GalleryPhoto[]>([])
@@ -207,18 +202,7 @@ export function PublicProfileClient({
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <div className="card">
-            <div className="card-body flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-                <Briefcase className="w-5 h-5 text-accent" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-semibold text-foreground leading-none">{openGigs.length}</p>
-                <p className="text-sm text-muted-foreground mt-1">Open gigs</p>
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-2 gap-4">
           <div className="card">
             <div className="card-body flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
@@ -226,11 +210,11 @@ export function PublicProfileClient({
               </div>
               <div className="min-w-0">
                 <p className="text-2xl font-semibold text-foreground leading-none">{completedCount}</p>
-                <p className="text-sm text-muted-foreground mt-1">Completed</p>
+                <p className="text-sm text-muted-foreground mt-1">Completed gigs</p>
               </div>
             </div>
           </div>
-          <div className="card col-span-2 sm:col-span-1">
+          <div className="card">
             <div className="card-body flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
                 <ImageIcon className="w-5 h-5 text-amber-700" />
@@ -281,61 +265,39 @@ export function PublicProfileClient({
           </div>
         )}
 
-        {/* Work Samples */}
-        {allPhotos.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-serif text-foreground">Work Samples</h2>
-            <div className="card">
-              <div className="card-body">
-                <PhotoGallery photos={allPhotos} isEditable={false} userType="flipper" />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Open Gigs */}
-        {openGigs.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-serif text-foreground">Open Gigs</h2>
-            <div className="space-y-3">
-              {openGigs.map((gig: any) => (
-                <Link
-                  key={gig.id}
-                  href={`/gigs/${gig.slug}`}
-                  className="card card-body flex-row items-start justify-between hover:bg-secondary/50 transition-colors gap-4"
+        {/* Work Samples — Instagram-style grid */}
+        <div className="space-y-4">
+          <h2 className="text-2xl font-serif text-foreground">Work Samples</h2>
+          {allPhotos.length > 0 ? (
+            <div className="grid grid-cols-3 gap-1 sm:gap-2">
+              {allPhotos.map((photo) => (
+                <div
+                  key={photo.id}
+                  className="relative aspect-square overflow-hidden bg-stone-100 group"
                 >
-                  <div className="flex-1 space-y-2 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-medium text-foreground">{gig.title}</h3>
-                      <span
-                        className={`inline-block px-2 py-1 rounded text-xs font-medium ${gigStatusClass(
-                          gig.status
-                        )}`}
-                      >
-                        {gigStatusLabel(gig.status)}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {gig.summary || gig.description}
-                    </p>
-                    <div className="flex items-center gap-4 text-sm flex-wrap">
-                      {gig.location_text && (
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                          <MapPin className="w-4 h-4" />
-                          {gig.location_text}
-                        </span>
-                      )}
-                      <span className="font-semibold text-foreground">
-                        {formatCurrency(gig.pay_amount)}
-                      </span>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-1" />
-                </Link>
+                  <Image
+                    src={photo.publicUrl}
+                    alt="Work sample"
+                    fill
+                    className="object-cover transition-transform duration-200 group-hover:scale-105"
+                    sizes="(max-width: 640px) 33vw, 25vw"
+                  />
+                </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="card">
+              <div className="card-body text-center py-12">
+                <ImageIcon className="w-10 h-10 mx-auto text-slate-300 mb-3" strokeWidth={1.5} />
+                <p className="text-sm text-muted-foreground">
+                  {isOwnProfile
+                    ? "No photos yet. Add work samples from your profile editor to showcase what you do."
+                    : `${primaryName} hasn't added any work samples yet.`}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* CTA — only for logged-out visitors */}
         {!loadingUser && !isLoggedIn && (
