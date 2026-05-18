@@ -111,7 +111,7 @@ export default function GigListingCard({ gig, isClaimed }: Props) {
             {formatCurrency(gig.pay_amount)}
           </span>
           <span className="text-xs text-accent flex items-center gap-1 group-hover:gap-1.5 transition-all">
-            {isClaimed ? 'View your claim' : 'View gig'}
+            {isClaimed ? 'View application' : 'View gig'}
             <ArrowRight className="w-3.5 h-3.5" />
           </span>
         </div>

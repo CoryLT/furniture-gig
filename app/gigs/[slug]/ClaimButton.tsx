@@ -8,25 +8,36 @@ import type { GigRow, GigClaimRow } from '@/types/database'
 
 interface Props {
   gig: GigRow
-  isClaimed: boolean
+  myClaim: GigClaimRow | null
   isMyGig: boolean
   isOwnPostedGig: boolean
-  existingClaim: GigClaimRow | null
+  hasActiveClaim: boolean
+  pendingApplicantCount: number
   userId: string
 }
 
-export default function ClaimButton({ gig, isClaimed, isMyGig, isOwnPostedGig, existingClaim, userId }: Props) {
+export default function ClaimButton({
+  gig,
+  myClaim,
+  isMyGig,
+  isOwnPostedGig,
+  hasActiveClaim,
+  pendingApplicantCount,
+  userId,
+}: Props) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // The viewer posted this gig — they can't claim their own gig
+  // The viewer posted this gig — they can't apply to their own gig
   if (isOwnPostedGig) {
     return (
       <div className="card card-body space-y-3">
         <p className="text-sm font-medium text-foreground">You posted this gig.</p>
-        <p className="text-sm text-muted-foreground">You can&apos;t claim your own gig. Manage it from your dashboard.</p>
+        <p className="text-sm text-muted-foreground">
+          You can&apos;t apply to your own gig. Manage applicants from your dashboard.
+        </p>
         <Button variant="accent" onClick={() => router.push(`/flipper/gigs/${gig.id}`)}>
           Go to gig dashboard
         </Button>
@@ -34,42 +45,11 @@ export default function ClaimButton({ gig, isClaimed, isMyGig, isOwnPostedGig, e
     )
   }
 
-  // Gig is closed to claims
-  if (gig.status !== 'open') {
-    if (isMyGig) {
-      return (
-        <div className="card card-body space-y-3">
-          <p className="text-sm font-medium text-foreground">You have claimed this gig.</p>
-          <Button
-            variant="accent"
-            onClick={() => router.push('/my-gigs')}
-          >
-            Go to My Gigs
-          </Button>
-        </div>
-      )
-    }
-    return (
-      <div className="card card-body">
-        <p className="text-sm text-muted-foreground">This gig is no longer available to claim.</p>
-      </div>
-    )
-  }
-
-  // Already claimed by someone else
-  if (isClaimed && !isMyGig) {
-    return (
-      <div className="card card-body">
-        <p className="text-sm text-muted-foreground">This gig has already been claimed by another worker.</p>
-      </div>
-    )
-  }
-
-  // Worker already claimed this
+  // Viewer is the approved worker for this gig
   if (isMyGig) {
     return (
       <div className="card card-body space-y-3">
-        <p className="text-sm font-medium text-foreground">✓ You have claimed this gig.</p>
+        <p className="text-sm font-medium text-foreground">✓ You were picked for this gig.</p>
         <Button variant="accent" onClick={() => router.push('/my-gigs')}>
           Go to My Gigs
         </Button>
@@ -77,55 +57,96 @@ export default function ClaimButton({ gig, isClaimed, isMyGig, isOwnPostedGig, e
     )
   }
 
-  // Available to claim
-  async function handleClaim() {
+  // Viewer already applied — show status
+  if (myClaim) {
+    if (myClaim.status === 'pending') {
+      return (
+        <div className="card card-body space-y-3">
+          <p className="text-sm font-medium text-foreground">⏳ Your application is pending.</p>
+          <p className="text-sm text-muted-foreground">
+            The flipper will review applicants and pick someone. You&apos;ll be notified either way.
+          </p>
+          <Button variant="outline" onClick={() => router.push('/my-gigs?tab=applications')}>
+            See My Applications
+          </Button>
+        </div>
+      )
+    }
+    if (myClaim.status === 'rejected') {
+      return (
+        <div className="card card-body">
+          <p className="text-sm text-muted-foreground">
+            This gig was assigned to another worker. Thanks for applying!
+          </p>
+        </div>
+      )
+    }
+    if (myClaim.status === 'cancelled') {
+      return (
+        <div className="card card-body">
+          <p className="text-sm text-muted-foreground">You cancelled your application to this gig.</p>
+        </div>
+      )
+    }
+  }
+
+  // Gig is no longer open to applications
+  if (gig.status !== 'open' || hasActiveClaim) {
+    return (
+      <div className="card card-body">
+        <p className="text-sm text-muted-foreground">
+          This gig is no longer accepting applications.
+        </p>
+      </div>
+    )
+  }
+
+  // Available — show Apply button
+  async function handleApply() {
     setLoading(true)
     setError('')
 
-    // Insert claim — UNIQUE constraint on gig_id prevents double-claim at DB level
-    const { error: claimError } = await supabase
-      .from('gig_claims')
-      .insert({
-        gig_id: gig.id,
-        worker_user_id: userId,
-        status: 'active',
-      })
+    const { error: applyError } = await supabase.from('gig_claims').insert({
+      gig_id: gig.id,
+      worker_user_id: userId,
+      status: 'pending',
+    })
 
-    if (claimError) {
-      if (claimError.code === '23505') {
-        setError('Sorry, someone just claimed this gig before you.')
-      } else if (claimError.code === '23514' || /cannot claim a gig you posted/i.test(claimError.message ?? '')) {
-        setError('You cannot claim a gig you posted.')
+    if (applyError) {
+      if (applyError.code === '23505') {
+        setError('You have already applied to this gig.')
+      } else if (/cannot claim a gig you posted/i.test(applyError.message ?? '')) {
+        setError('You cannot apply to a gig you posted.')
       } else {
-        setError('Failed to claim gig. Please try again.')
+        setError('Could not submit your application. Please try again.')
       }
       setLoading(false)
       return
     }
 
-    // Update gig status to claimed
-    await supabase
-      .from('gigs')
-      .update({ status: 'claimed' })
-      .eq('id', gig.id)
-
-    router.push('/my-gigs')
+    router.push('/my-gigs?tab=applications')
     router.refresh()
   }
 
   return (
     <div className="card card-body space-y-3">
       <div>
-        <h3 className="font-sans font-semibold text-foreground">Ready to take this on?</h3>
+        <h3 className="font-sans font-semibold text-foreground">Interested in this gig?</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Claiming is exclusive — once you claim it, no one else can. Make sure you can complete it before the due date.
+          Apply and the flipper will review applicants before picking someone. You can message the
+          flipper directly as soon as you apply.
         </p>
+        {pendingApplicantCount > 0 && (
+          <p className="text-xs font-mono text-muted-foreground mt-2">
+            {pendingApplicantCount} {pendingApplicantCount === 1 ? 'worker has' : 'workers have'} applied
+          </p>
+        )}
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <Button variant="accent" loading={loading} onClick={handleClaim} className="w-full sm:w-auto">
-        Claim this gig
+      <Button variant="accent" loading={loading} onClick={handleApply} className="w-full sm:w-auto">
+        Apply for this gig
       </Button>
     </div>
   )

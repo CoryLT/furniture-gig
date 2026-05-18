@@ -31,11 +31,12 @@ export default async function GigsPage() {
     g.poster_user_id !== user!.id && g.created_by !== user!.id
   )
 
-  // Load any claims this worker has
+  // Load any active applications/claims this worker has (exclude rejected/cancelled)
   const { data: myClaims } = await supabase
     .from('gig_claims')
-    .select('gig_id')
+    .select('gig_id, status')
     .eq('worker_user_id', user!.id)
+    .in('status', ['pending', 'active', 'submitted_for_review', 'approved'])
 
   const myClaimedIds = new Set(myClaims?.map((c) => c.gig_id) ?? [])
 

@@ -52,6 +52,7 @@ export function gigStatusLabel(status: GigStatus): string {
 // Human-readable labels for claim statuses
 export function claimStatusLabel(status: ClaimStatus): string {
   const labels: Record<ClaimStatus, string> = {
+    pending: 'Pending',
     active: 'Active',
     submitted_for_review: 'Submitted for Review',
     approved: 'Approved',
@@ -86,6 +87,7 @@ export function gigStatusClass(status: GigStatus): string {
 
 export function claimStatusClass(status: ClaimStatus): string {
   const classes: Record<ClaimStatus, string> = {
+    pending: 'status-draft',
     active: 'status-open',
     submitted_for_review: 'status-in-review',
     approved: 'status-completed',

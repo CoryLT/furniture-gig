@@ -309,7 +309,7 @@ export type Database = {
           id: string
           gig_id: string
           worker_user_id: string
-          status: 'active' | 'submitted_for_review' | 'approved' | 'rejected' | 'cancelled'
+          status: 'pending' | 'active' | 'submitted_for_review' | 'approved' | 'rejected' | 'cancelled'
           claimed_at: string
           updated_at: string
         }
@@ -317,7 +317,7 @@ export type Database = {
           id?: string
           gig_id: string
           worker_user_id: string
-          status?: 'active' | 'submitted_for_review' | 'approved' | 'rejected' | 'cancelled'
+          status?: 'pending' | 'active' | 'submitted_for_review' | 'approved' | 'rejected' | 'cancelled'
           claimed_at?: string
           updated_at?: string
         }
@@ -325,7 +325,7 @@ export type Database = {
           id?: string
           gig_id?: string
           worker_user_id?: string
-          status?: 'active' | 'submitted_for_review' | 'approved' | 'rejected' | 'cancelled'
+          status?: 'pending' | 'active' | 'submitted_for_review' | 'approved' | 'rejected' | 'cancelled'
           claimed_at?: string
           updated_at?: string
         }

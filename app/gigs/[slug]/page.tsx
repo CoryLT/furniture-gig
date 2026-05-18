@@ -43,16 +43,19 @@ export default async function GigDetailPage({ params }: Props) {
 
   const images = (imagesData ?? []) as GigImageRow[]
 
-  // Load any existing claim
-  const { data: claim } = await supabase
+  // Load ALL applications/claims for this gig
+  const { data: allClaims } = await supabase
     .from('gig_claims')
     .select('*')
     .eq('gig_id', gig.id)
-    .single()
 
-  const myClaimId = claim?.worker_user_id === user.id ? claim : null
-  const isClaimed = !!claim
-  const isMyGig = claim?.worker_user_id === user.id
+  const claims = allClaims ?? []
+  const myClaim = claims.find((c) => c.worker_user_id === user.id) ?? null
+  // "Active" means a worker has been approved and the gig is locked to them
+  const activeClaim = claims.find((c) => c.status === 'active') ?? null
+  const pendingApplicantCount = claims.filter((c) => c.status === 'pending').length
+
+  const isMyGig = activeClaim?.worker_user_id === user.id
   const isOwnPostedGig = gig.poster_user_id === user.id || gig.created_by === user.id
 
   return (
@@ -160,10 +163,11 @@ export default async function GigDetailPage({ params }: Props) {
       {/* Claim action */}
       <ClaimButton
         gig={gig}
-        isClaimed={isClaimed}
+        myClaim={myClaim}
         isMyGig={isMyGig}
         isOwnPostedGig={isOwnPostedGig}
-        existingClaim={myClaimId}
+        hasActiveClaim={!!activeClaim}
+        pendingApplicantCount={pendingApplicantCount}
         userId={user.id}
       />
     </div>
