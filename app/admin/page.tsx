@@ -27,9 +27,9 @@ export default function AdminDashboard() {
           <p className="font-semibold text-foreground">Payouts</p>
           <p className="text-sm text-muted-foreground mt-1">Track and record worker payments.</p>
         </Link>
-        <Link href="/admin/gigs/new" className="card card-body hover:shadow-md transition-shadow">
-          <p className="font-semibold text-foreground">Post New Gig</p>
-          <p className="text-sm text-muted-foreground mt-1">Add a new furniture flipping project.</p>
+        <Link href="/admin/reports" className="card card-body hover:shadow-md transition-shadow">
+          <p className="font-semibold text-foreground">Image Reports</p>
+          <p className="text-sm text-muted-foreground mt-1">Review user-flagged images.</p>
         </Link>
       </div>
     </div>
