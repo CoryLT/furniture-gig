@@ -31,16 +31,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    // Verify this user is a flipper
-    const { data: userRow } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (userRow?.role !== 'flipper') {
-      return NextResponse.json({ error: 'Not a flipper account' }, { status: 403 })
-    }
+    // Note: we used to require users.role === 'flipper' here, but the app now
+    // lets every user post gigs (and thus have a flipper profile) regardless
+    // of their initial signup role.
 
     const { error } = await supabase
       .from('flipper_profiles')
