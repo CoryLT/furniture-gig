@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, X } from 'lucide-react'
-import type { GigRow } from '@/types/database'
+import type { GigRow, GigImageRow } from '@/types/database'
+import GigImageUploader from '@/components/admin/GigImageUploader'
 
 
 const FURNITURE_TYPES = [
@@ -22,9 +23,10 @@ const SKILL_SUGGESTIONS = [
 interface Props {
   gig: GigRow
   hasActiveClaim: boolean
+  images: GigImageRow[]
 }
 
-export default function EditGigForm({ gig, hasActiveClaim }: Props) {
+export default function EditGigForm({ gig, hasActiveClaim, images }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -255,6 +257,9 @@ export default function EditGigForm({ gig, hasActiveClaim }: Props) {
           </form>
         </div>
       </div>
+
+      {/* Photos section — saved automatically as you upload */}
+      <GigImageUploader gigId={gig.id} images={images} onImagesChange={() => {}} />
 
       {/* Danger zone — separated visually from the main form */}
       {gig.status !== 'archived' && (

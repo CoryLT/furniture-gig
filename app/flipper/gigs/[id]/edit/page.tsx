@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import EditGigForm from './EditGigForm'
+import type { GigImageRow } from '@/types/database'
 
 export default async function EditGigPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -30,5 +31,14 @@ export default async function EditGigPage({ params }: { params: { id: string } }
     (c) => c.status !== 'cancelled' && c.status !== 'rejected'
   )
 
-  return <EditGigForm gig={gig} hasActiveClaim={hasActiveClaim} />
+  // Load existing images so the editor can show and re-order them.
+  const { data: imagesData } = await supabase
+    .from('gig_images')
+    .select('*')
+    .eq('gig_id', gig.id)
+    .order('sort_order')
+
+  const images = (imagesData ?? []) as GigImageRow[]
+
+  return <EditGigForm gig={gig} hasActiveClaim={hasActiveClaim} images={images} />
 }
