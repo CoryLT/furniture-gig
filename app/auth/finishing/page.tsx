@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Armchair } from 'lucide-react'
 
 export default function FinishingPage() {
+  const router = useRouter()
   const [status, setStatus] = useState('Signing you in…')
 
   useEffect(() => {
@@ -30,8 +32,6 @@ export default function FinishingPage() {
           return
         }
 
-        // Hand the tokens to the server so it can write a properly chunked
-        // session cookie — bypasses the 4 KB browser cookie limit.
         const res = await fetch('/api/auth/set-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -47,7 +47,17 @@ export default function FinishingPage() {
         }
 
         const { destination } = await res.json()
-        window.location.replace(destination ?? '/auth/onboarding')
+        const target = destination ?? '/auth/onboarding'
+
+        // IMPORTANT: give the browser time to commit the Set-Cookie header
+        // from the fetch above before we navigate. Without this delay, the
+        // middleware on the destination page fires before the auth cookie is
+        // visible, and bounces the user back to the landing page — which is
+        // why sign-in appeared to need two clicks.
+        setStatus('Almost done…')
+        router.refresh()
+        await new Promise((resolve) => setTimeout(resolve, 150))
+        window.location.replace(target)
       } catch (err) {
         console.error('[finishing] unexpected error:', err)
         setStatus('Something went wrong — redirecting to login…')
@@ -56,7 +66,7 @@ export default function FinishingPage() {
     }
 
     handleOAuthCallback()
-  }, [])
+  }, [router])
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
