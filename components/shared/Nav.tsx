@@ -39,6 +39,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   const currentUserIdRef = useRef<string | null>(null)
 
   const links = role === 'admin' ? adminLinks : userLinks
+  const logoHref = role === 'admin' ? '/' : '/gigs'
 
   useEffect(() => {
     if (role === 'admin') return
@@ -201,7 +202,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   return (
     <nav className="border-b border-stone-200 bg-white sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 font-serif text-xl font-bold text-foreground">
+        <Link href={logoHref} className="flex items-center gap-2 font-serif text-xl font-bold text-foreground">
           <Armchair className="w-5 h-5" />
           FlipWork
         </Link>
