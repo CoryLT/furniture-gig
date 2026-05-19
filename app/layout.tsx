@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata, Viewport } from 'next'
 import { DM_Sans, DM_Serif_Display, DM_Mono } from 'next/font/google'
 import './globals.css'
 
@@ -25,6 +25,12 @@ const dmMono = DM_Mono({
 export const metadata: Metadata = {
   title: 'FlipWork',
   description: 'Furniture flipping gig platform',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
 }
 
 export default function RootLayout({

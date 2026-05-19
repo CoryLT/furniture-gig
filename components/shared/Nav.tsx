@@ -1,9 +1,9 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Armchair, LogOut, Menu, X } from 'lucide-react'
+import { Armchair, Menu, X } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 
 interface NavProps {
@@ -12,7 +12,6 @@ interface NavProps {
   userUsername?: string
 }
 
-// Unified nav: any non-admin user sees all of these
 const userLinks = [
   { href: '/gigs', label: 'Browse Gigs' },
   { href: '/my-gigs', label: 'My Gigs' },
@@ -41,9 +40,8 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
 
   const links = role === 'admin' ? adminLinks : userLinks
 
-  // --- Unread messages: initial fetch + realtime subscription ---
   useEffect(() => {
-    if (role === 'admin') return // admins don't use the inbox
+    if (role === 'admin') return
 
     let cancelled = false
     let channel: ReturnType<typeof supabase.channel> | null = null
@@ -53,8 +51,6 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
       if (!user || cancelled) return
       currentUserIdRef.current = user.id
 
-      // 1) Initial unread count.
-      // Find conversations where I'm a participant, then count unread received msgs.
       const { data: convs } = await supabase
         .from('gig_conversations')
         .select('id, flipper_user_id, worker_user_id')
@@ -74,8 +70,6 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
       }
       if (!cancelled) setUnreadMessages(initialCount)
 
-      // 2) Subscribe to NEW messages and read-receipt updates across the whole
-      //    gig_messages table — RLS will already restrict to messages we can see.
       channel = supabase.channel(`nav-unread:${user.id}`)
 
       channel.on(
@@ -86,7 +80,6 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
             sender_user_id: string
             read_at: string | null
           }
-          // Only count messages sent BY someone else and not yet read
           if (
             m.sender_user_id !== currentUserIdRef.current &&
             m.read_at === null
@@ -108,7 +101,6 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
             sender_user_id?: string
             read_at?: string | null
           }
-          // Catch "marked read" transitions on messages where I was the recipient
           if (
             after.sender_user_id !== currentUserIdRef.current &&
             before.read_at === null &&
@@ -131,8 +123,6 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role])
 
-  // When the user navigates to /messages or into a conversation, refresh the
-  // unread count once the page settles — read_at updates may be in flight.
   useEffect(() => {
     if (role === 'admin') return
     if (!pathname?.startsWith('/messages')) return
@@ -162,7 +152,6 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, role])
 
-  // Load current user's username on mount (fallback if not passed in as prop)
   useEffect(() => {
     async function loadCurrentUser() {
       try {
@@ -180,22 +169,18 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
           setCurrentUserUsername(profile.username)
         }
       } catch {
-        // No profile yet — that's fine, link will route to setup page
+        // No profile yet
       }
     }
     loadCurrentUser()
   }, [supabase, role])
 
-
-
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setDropdownOpen(false)
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
@@ -206,9 +191,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   }
 
   const getPublicProfileUrl = () => {
-    // Use the passed-in userUsername, fallback to currentUserUsername
     const username = userUsername || currentUserUsername
-
     if (username) {
       return `/u/${username}`
     }
@@ -218,13 +201,11 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   return (
     <nav className="border-b border-stone-200 bg-white sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-        {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-serif text-xl font-bold text-foreground">
           <Armchair className="w-5 h-5" />
           FlipWork
         </Link>
 
-        {/* Desktop links */}
         <div className="hidden md:flex items-center gap-6">
           {links.map((link) => (
             <Link
@@ -246,9 +227,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
           ))}
         </div>
 
-        {/* Right side - Hamburger menu */}
         <div className="flex items-center gap-4">
-          {/* Desktop hamburger dropdown */}
           <div className="hidden md:block relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -297,7 +276,6 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
             )}
           </div>
 
-          {/* Mobile menu button */}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             className="md:hidden p-2 hover:bg-stone-100 rounded-lg"
@@ -307,16 +285,17 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
         </div>
       </div>
 
-      {/* Mobile menu */}
       {menuOpen && (
         <div className="md:hidden border-t border-stone-200 bg-stone-50">
-          <div className="px-4 py-4 space-y-3">
+          <div className="px-4 py-4 space-y-1">
             {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`py-2 text-sm font-medium inline-flex items-center gap-2 ${
-                  pathname === link.href ? 'text-accent' : 'text-foreground'
+                className={`flex items-center gap-2 py-2.5 px-2 rounded-md text-sm font-medium transition-colors ${
+                  pathname === link.href
+                    ? 'text-accent bg-stone-100'
+                    : 'text-foreground hover:bg-stone-100'
                 }`}
                 onClick={() => setMenuOpen(false)}
               >
@@ -332,7 +311,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
             {getPublicProfileUrl() && (
               <Link
                 href={getPublicProfileUrl()!}
-                className="block py-2 text-sm font-medium text-foreground"
+                className="block py-2.5 px-2 rounded-md text-sm font-medium text-foreground hover:bg-stone-100 transition-colors"
                 onClick={() => setMenuOpen(false)}
               >
                 My Profile
@@ -340,14 +319,14 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
             )}
             <Link
               href="/profile"
-              className="block py-2 text-sm font-medium text-foreground"
+              className="block py-2.5 px-2 rounded-md text-sm font-medium text-foreground hover:bg-stone-100 transition-colors"
               onClick={() => setMenuOpen(false)}
             >
               Account Settings
             </Link>
             <Link
               href="/support"
-              className="block py-2 text-sm font-medium text-foreground"
+              className="block py-2.5 px-2 rounded-md text-sm font-medium text-foreground hover:bg-stone-100 transition-colors"
               onClick={() => setMenuOpen(false)}
             >
               Support
@@ -358,7 +337,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
                 handleLogout()
                 setMenuOpen(false)
               }}
-              className="w-full text-left py-2 text-sm font-medium text-red-600"
+              className="w-full text-left py-2.5 px-2 rounded-md text-sm font-medium text-red-600 hover:bg-stone-100 transition-colors"
             >
               Logout
             </button>
