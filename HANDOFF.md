@@ -200,15 +200,92 @@ Sightengine free tier: 2,000 ops/month, 500/day cap. Each image = 7 ops (7 model
 
 ---
 
+## Auth + mobile polish (DONE — shipped this session)
+
+Three small but high-impact bug fixes plus a UX tweak.
+
+### 1. Google sign-in required two clicks
+**Symptom:** clicking "Sign in with Google" on first attempt redirected to the landing page; second attempt worked.
+
+**Root cause:** race condition in `app/auth/finishing/page.tsx`. The page POSTs OAuth tokens to `/api/auth/set-session` which writes the auth cookie via Set-Cookie. The page then immediately called `window.location.replace(target)`. The browser hadn't fully committed the cookie before the next navigation, so middleware on the destination page saw no auth cookie and bounced the user back to `/`.
+
+**Fix:** added `router.refresh()` + a 150ms `await new Promise(setTimeout)` between the fetch and the redirect. Gives the browser time to commit the Set-Cookie header before the destination page's middleware runs. File: `app/auth/finishing/page.tsx`.
+
+### 2. Vercel SSO login page appearing on mobile production
+**Symptom:** visiting `myflipwork.com` on phone showed Vercel's "Log in to Vercel" page instead of the FlipWork landing page.
+
+**Root cause:** Vercel Deployment Protection was on for production.
+
+**Fix:** Vercel dashboard → Settings → Deployment Protection → set to "Only Preview Deployments." No code change. **Important for future:** if Cory ever connects a new domain or migrates the project, this setting could come back on. Check it.
+
+### 3. Mobile nav menu items squished into one line
+**Symptom:** on mobile, the hamburger menu opened but the top section of nav links appeared as a single squished row instead of stacking.
+
+**Root causes (two bugs in one):**
+- **No viewport meta tag.** Next 14 App Router requires explicit `export const viewport: Viewport` in `app/layout.tsx`. Without it, mobile browsers render at a fake ~980px width and Tailwind's `md:` breakpoints behave like desktop everywhere. Adding the viewport export fixed the breakpoint logic.
+- **Mobile menu links used `inline-flex` instead of `flex`.** `inline-flex` makes elements flow side-by-side like text. Switching to `flex` makes each link a full-width row. Bottom section (My Profile, Account Settings, Support, Logout) already used `block` and worked fine — only the top section (the `links.map(...)` block) had the issue.
+
+**Files changed:**
+- `app/layout.tsx` — added `export const viewport`
+- `components/shared/Nav.tsx` — mobile menu links now use `flex items-center gap-2 py-2.5 px-2 rounded-md`, with hover background and active-route highlight.
+
+### 4. Logo links to /gigs for non-admins
+Cory wanted the FlipWork logo in the top nav to send workers/flippers to `/gigs` (Browse Gigs) instead of `/` (landing page). Admins still go to `/`. One-line change in `components/shared/Nav.tsx`:
+```ts
+const logoHref = role === 'admin' ? '/' : '/gigs'
+```
+Then `<Link href={logoHref}>` on the logo. Logos on auth pages (login, signup) still point to `/` — that's correct since those users aren't logged in.
+
+---
+
+## Payouts + AI support chat (PLANNING — not yet built)
+
+Cory wants to add an AI customer support chat for logged-in users. **Then** mid-conversation realized the payout system needs to be fully polished BEFORE wiring up AI support, since the agent will be answering payout questions and needs accurate ground truth.
+
+### AI support — decisions already made
+- **Who:** logged-in users only (workers + flippers, not visitors)
+- **What:** answer FAQs, handle complaints (sympathize + log), solve real problems (look up gigs + payouts via tools), escalate when stuck
+- **Where:** `/support` page (link already exists in nav, currently a placeholder)
+- **Model:** Claude Haiku 4.5 (~1-2¢/chat) — separate Anthropic API key needed, env var `ANTHROPIC_API_KEY` on Vercel
+- **Persistence:** conversations continue across sessions until user ends or escalation triggers
+- **Limits:** 5 chats/day per user, 50 messages/chat
+- **Admin view:** `/admin/support` — only shows ESCALATED chats (unresolved ones happen in background)
+- **Notifications:** in-app dot for now; email later to `corythacker@proton.me` (skipped for v1)
+- **DB tables (designed but not created):** `support_conversations` (status: active/resolved/escalated, summary), `support_messages` (one per message). Both with RLS so users only see their own.
+
+### Payout polish — required before AI support
+Current state of payouts:
+- `payout_records` table exists with status (unpaid/pending/paid), amount, paypal_reference, payout_date, notes
+- `/admin/payouts` works — summary cards, inline edit row, paid history
+- `/my-gigs/payouts` works — worker sees their unpaid/paid totals + per-row status
+- Payout record auto-creates when admin approves a gig in `ReviewActions.tsx`
+
+**Gaps Cory needs to decide on (asked at end of session, not yet answered):**
+1. **Worker view clarity** — "Unpaid" gives no timing expectation. Need clearer labels and "what this means" copy.
+2. **PayPal email validation** — if worker hasn't set their PayPal email, approval still creates a payout record with no way to pay. Should block approval or warn.
+3. **Flipper payout view** — depends on money flow (flippers → platform → worker, OR flippers → worker direct, OR admin pays from own funds). Cory was asked which model applies but didn't answer before deciding to handoff.
+4. **Status change history** — currently no audit log of unpaid→pending→paid transitions. Probably skip for v1.
+
+### Where we left off
+Cory was asked two scoping questions at the end of the session:
+1. Which payout gaps to address (worker clarity only / + PayPal validation / full polish / walk through each)
+2. How money flows in the business (flipper→platform→worker / flipper→worker direct / admin pays from own funds)
+
+He didn't answer — chose to do a handoff instead. **Next session should reopen these two questions before any code is written.**
+
+---
+
 ## ⚠️ TODOs left at end of session
 
-1. **Rotate `SIGHTENGINE_API_SECRET`** — exposed in chat. Regenerate in Sightengine dashboard, update Vercel env var, redeploy.
+1. **Rotate `SIGHTENGINE_API_SECRET`** — exposed in chat in an earlier session. Regenerate in Sightengine dashboard, update Vercel env var, redeploy. STILL OUTSTANDING.
 2. **Place `ReportImageButton` on photo views** — gallery cards, gig photo grids, avatar viewers. Component is built; just needs to be slotted in.
 3. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
-4. **Legal/TOS work** — started but didn't finish (Cory paused to handle moderation first). Decisions already made:
+4. **Legal/TOS work** — started but didn't finish in a previous session. Decisions already made:
    - Source: generated starter text (lawyer-review-before-launch disclaimer at top)
    - Gate: hard gate — must accept before doing anything
    - Existing infra at `/auth/agreements` already handles multiple required agreements; just needs TOS + Privacy seed and a server-side check that redirects logged-in users with unaccepted required agreements to `/auth/agreements`. A SQL file (`supabase/schema_legal_agreements.sql`) was scaffolded but not completed. Restart fresh.
+5. **Payout polish** — see "Payouts + AI support chat" section above. Two unanswered scoping questions to reopen.
+6. **AI support chat** — full plan in section above. Build AFTER payout polish lands.
 
 ---
 
@@ -238,19 +315,28 @@ Sightengine free tier: 2,000 ops/month, 500/day cap. Each image = 7 ops (7 model
 
 ## What's next (next session)
 
-See `MARKETPLACE_ROADMAP.md` for the full picture. Cory's most likely next moves:
+See `MARKETPLACE_ROADMAP.md` for the full picture. Cory's most likely next moves, in this order:
 
-1. **Finish the moderation work** — rotate the leaked Sightengine secret, place `ReportImageButton` on photo views. Probably the first thing he'll want.
-2. **Terms of Service + privacy policy** — Bucket 1 #5. Cory wants to do this; was paused mid-session. See TODO #4 above.
-3. **Address/pickup details on gigs** — Bucket 1 #3. Smaller in scope; visible to approved worker only.
-4. **Email notifications** — Bucket 1 #1. "You were picked / rejected / paid" emails. Useful for off-platform engagement.
-5. **Ratings/reviews** — Bucket 1 #4.
+1. **Payout polish** — answer the two scoping questions in the Payouts section above, then ship worker clarity + (probably) PayPal email validation. Required before #2.
+2. **AI support chat** — full plan ready in the Payouts section. Needs `ANTHROPIC_API_KEY` env var.
+3. **Rotate `SIGHTENGINE_API_SECRET`** — overdue.
+4. **Place `ReportImageButton`** on photo views — last piece of moderation work.
+5. **Terms of Service + privacy policy** — Bucket 1 #5. Paused mid-build a couple sessions ago.
+6. **Address/pickup details on gigs** — Bucket 1 #3.
+7. **Email notifications** — Bucket 1 #1.
+8. **Ratings/reviews** — Bucket 1 #4.
 
 Cory will pick. Open by confirming what you're about to build in 2-3 lines, then build.
 
 ---
 
 ## This session's commits (most recent first)
+
+- `2ba8d02` Logo links to /gigs for workers and flippers
+- `325aa0e` Fix mobile viewport and mobile menu layout
+- `ccb6ed6` Fix Google sign-in requiring two clicks
+
+## Previous session's commits
 
 - `e723561` Block uploads containing minors (face-attributes model)
 - `1a8736a` Add image reports system + admin reports queue
@@ -259,12 +345,6 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 - `84acc4d` Flipper applicant list with Approve/Reject + per-applicant messaging
 - `674e02b` Switch gig detail page from Claim to Apply (with applicant count)
 - `cc27422` Add SQL migration for application/approval flow
-
-## Previous session's commits
-
-- `6d4e60a` Add realtime unread message badge to Messages nav link
-- `fcd1052` Add /messages inbox page and Messages link to nav
-- `88ea77e` Prevent users from claiming their own gigs (UI + DB trigger + browse filter)
 
 ---
 
