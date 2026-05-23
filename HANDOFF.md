@@ -274,8 +274,8 @@ Cory pivoted from "polish the manual PayPal flow" to "do payouts right." We're b
 | 0 | Stripe account, sandbox, Connect, env vars, SQL, foundation code | ✅ DONE |
 | 1 | Worker Stripe onboarding flow — "Connect your Stripe" button → Stripe Express hosted onboarding → callback saves account ID | ✅ DONE |
 | 2 | Flipper saved payment method — Stripe Elements form when picking worker; create Customer + PaymentMethod | ✅ DONE |
-| 3 | Authorize on pick — wire `approve_applicant` to create PaymentIntent with `capture_method: manual`, `transfer_data.destination` = worker's Connect acct, `application_fee_amount` = 2% | NEXT |
-| 4 | Capture on approval — wire admin "approve work" to call `paymentIntents.capture()` (auto-transfers to worker) | |
+| 3 | Authorize on pick — wire `approve_applicant` to create PaymentIntent with `capture_method: manual`, `transfer_data.destination` = worker's Connect acct, `application_fee_amount` = 2% | ✅ DONE |
+| 4 | Capture on approval — wire admin "approve work" to call `paymentIntents.capture()` (auto-transfers to worker) | NEXT |
 | 5 | Worker payout UI — show payment status, Stripe Express dashboard link, payout schedule | |
 | 6 | Admin payout UI upgrade — show Stripe payment intent ID, status, refund button | |
 | 7 | Stripe webhooks — `/api/stripe/webhook` to handle account.updated, payment_intent.succeeded/.failed, transfer.created, etc. Needs `STRIPE_WEBHOOK_SECRET` env var. | |
@@ -340,6 +340,38 @@ When a flipper clicks "Pick this worker" on a pending applicant, we now require 
 - The `confirm("Pick X for this gig? Everyone else who applied will be rejected.")` runs BEFORE the payment-method check, so if the flipper bails out at the confirm, we never hit Stripe. Good.
 - `@stripe/react-stripe-js@^2.8.0` was added to package.json. `npm install` was run in the sandbox so package-lock.json is updated.
 
+### Phase 3 — Authorize on pick (DONE — shipped this session)
+
+When a flipper picks a worker, the flipper's saved card is now authorized (NOT captured) for the full payment amount. The money sits frozen on the card until admin approves the work in Phase 4, at which point Stripe will capture it and auto-transfer to the worker's Connect account. If anything goes wrong post-hold (DB approve fails, etc.), the authorization is automatically released so flippers never get stuck with phantom holds.
+
+**The flow**
+1. Flipper clicks "Pick this worker" → confirmation dialog now mentions the hold
+2. Frontend checks for a saved card (existing Phase 2 flow). If none, the add-card modal opens; on save, the pick auto-resumes.
+3. Frontend POSTs `{ claimId }` to `/api/stripe/pick-worker`
+4. Server validates: caller is the gig poster (or admin), claim is still `pending`, gig has a valid pay_amount, flipper has a Stripe Customer, **worker has Stripe charges_enabled** (block path — if not ready, error out before touching money)
+5. Server calls `stripe.paymentIntents.create()` with `capture_method: 'manual'`, `off_session: true`, `confirm: true`, `transfer_data.destination` = worker's Connect acct, `application_fee_amount` = 2% of gig amount in cents. Idempotency key = `pick:${claimId}` so double-clicks don't double-charge.
+6. If Stripe returns `requires_action` (3D Secure), server passes the `client_secret` back to the frontend, which runs `stripe.confirmCardPayment(clientSecret)`, then re-calls the endpoint. Idempotency key lets the retry pick up the same PaymentIntent in its new state.
+7. On `requires_capture` (success), server inserts a `payout_records` row with `payment_status='authorized'`, the PaymentIntent ID, full breakdown (`gross_amount`, `stripe_fee_amount`, `platform_fee_amount`, `amount` = worker receives).
+8. Server calls the existing `approve_applicant` RPC — that worker wins, others get rejected (unchanged behavior).
+9. If the DB insert or the RPC fails AFTER the Stripe hold, server calls `stripe.paymentIntents.cancel()` to release the hold, then marks the payout row `canceled`. Flipper is never charged for a failed pick.
+
+**Key code files**
+- `lib/stripe-pick.ts` — `authorizePickPayment()` (creates the PaymentIntent, handles `requires_action`/`requires_capture`/failure) and `cancelPickAuthorization()` (best-effort release).
+- `app/api/stripe/pick-worker/route.ts` — the orchestrator. Does all the validation, calls the helper, writes the payout row, calls the RPC, handles every rollback path.
+- `app/flipper/gigs/[id]/ApplicantActions.tsx` — `runApprove()` now POSTs to the new endpoint instead of calling the RPC directly. Handles the 3DS flow via `loadStripe` + `confirmCardPayment` + automatic retry.
+
+**Schema changes** (in `supabase/`, both run on production)
+- `schema_phase3_authorize_on_pick.sql` — adds index on `payout_records.flipper_user_id` and a SELECT RLS policy so flippers can see their own payout rows.
+- `schema_phase3_payout_records_rls.sql` — adds INSERT and UPDATE RLS policies for `payout_records` (existing schema only allowed worker SELECT + admin ALL). Without this, the route's insert was silently blocked. Discovered during first end-to-end test; auto-rollback worked exactly as designed (the failed test left no money stuck — the canceled PaymentIntent was visible in Stripe sandbox).
+
+**Quirks worth knowing**
+- All Stripe-touching writes use `as any` casts because `types/database.ts` is still out of sync with the Stripe columns (HANDOFF TODO #8). When the types get regenerated, those casts can come out.
+- The `confirm(...)` dialog text was updated to warn flippers that money will be held now: "Money for this gig will be held on your card now. It won't be charged until the work is approved."
+- The route uses **separate queries** (no Supabase embed-joins) for the same RLS reason called out elsewhere in HANDOFF — joins silently return null under RLS without an error.
+- There is a tiny race window: two simultaneous picks for different applicants on the same gig could both pass the `claim.status === 'pending'` check, both authorize, and the loser's hold would stick around until the auto-cancel fires. Not common (one flipper, one screen) but worth knowing. A future fix would be to lock the gig row before authorizing.
+- The first test failed with "Could not save payment record. Authorization was released." This was the missing INSERT RLS policy on `payout_records` — fixed by `schema_phase3_payout_records_rls.sql`. The auto-rollback's PaymentIntent.cancel() correctly released the $26.06 hold (visible in Stripe sandbox).
+- The breakdown returned by `/api/stripe/pick-worker` on success includes `gigAmount`, `flipperPays`, `workerReceives`, `platformFee`, and `stripeFee` — useful for any future UI that shows the flipper their charge breakdown post-pick.
+
 ### Flipper applicant visibility — RLS fixes (DONE — shipped this session)
 
 When testing Phase 2, Cory found that after a worker applied to a gig, the flipper saw "0 Applicants" on `/flipper/gigs/[id]` and "0 claims" on the dashboard. Worker side correctly showed "Pending". This was three layered RLS bugs that had been there since the application/approval refactor — nobody had tested the flipper side from a non-admin account.
@@ -396,7 +428,7 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 ## ⚠️ TODOs left at end of session
 
 1. **Rotate `SIGHTENGINE_API_SECRET`** — exposed in chat in an earlier session. Regenerate in Sightengine dashboard, update Vercel env var, redeploy. STILL OUTSTANDING — Cory has not done this yet across multiple sessions.
-2. **Stripe Connect Phase 3+** — Phases 1 (worker onboarding) and 2 (flipper saves card) are done. Next is authorize-on-pick: wire `approve_applicant` to create a PaymentIntent with `capture_method:manual`, `transfer_data.destination` = worker's Connect account, `application_fee_amount` = 2%. See "Stripe Connect payout system" section above for the full phase list.
+2. **Stripe Connect Phase 4+** — Phases 1 (worker onboarding), 2 (flipper saves card), and 3 (authorize on pick) are done. Next is capture-on-approval: when the admin approves submitted work, call `paymentIntents.capture()` on the held PaymentIntent. Stripe auto-transfers gig amount − 2% to the worker's Connect account. See "Stripe Connect payout system" section above for the full phase list.
 3. **AI support chat** — DEPRIORITIZED until Stripe payouts are live (the AI needs to be able to answer payout questions accurately). Plan still good — Haiku 4.5, `/support` page, `ANTHROPIC_API_KEY` env var, 5 chats/day per user. See prior handoffs for details.
 4. **Place `ReportImageButton` on photo views** — gallery cards, gig photo grids, avatar viewers. Component is built; just needs to be slotted in.
 5. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
@@ -440,9 +472,8 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 See `MARKETPLACE_ROADMAP.md` for the full picture. Cory's most likely next moves, in this order:
 
-1. **Stripe Connect Phase 3: Authorize on pick.** When the flipper picks a worker (via `approve_applicant` RPC or right before/after), create a PaymentIntent against the saved PaymentMethod with `capture_method: 'manual'`, `transfer_data.destination` = worker's Connect account, `application_fee_amount` = 2% of gig amount in cents. Save the PaymentIntent ID + status onto a `payout_records` row. This holds the funds without capturing.
-2. **Stripe Connect Phase 4: Capture on approval.** When the admin approves submitted work (existing `/admin/review` flow), call `paymentIntents.capture()` on the held PaymentIntent. Stripe auto-transfers gig amount minus platform fee to the worker's Connect account.
-3. **Stripe webhooks (Phase 7).** Required for production — `/api/stripe/webhook` to handle `account.updated`, `payment_intent.succeeded/.failed`, `transfer.created`, `charge.refunded`, etc. Needs `STRIPE_WEBHOOK_SECRET` env var.
+1. **Stripe Connect Phase 4: Capture on approval.** When the admin approves submitted work (existing `/admin/review` flow), look up the `payout_records` row by `gig_id` + `worker_user_id`, grab its `stripe_payment_intent_id`, call `paymentIntents.capture()`. Stripe auto-transfers (gig amount − 2%) to the worker's Connect account. Update `payment_status` to `'captured'`, then `'transferred'` when the webhook confirms (or just `'captured'` for now if webhooks aren't wired yet). On rejection, call `paymentIntents.cancel()` instead and set `payment_status='canceled'`.
+2. **Stripe webhooks (Phase 7).** Required for production — `/api/stripe/webhook` to handle `account.updated`, `payment_intent.succeeded/.failed`, `transfer.created`, `charge.refunded`, etc. Needs `STRIPE_WEBHOOK_SECRET` env var.
 4. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions.
 5. **Place `ReportImageButton`** on photo views — last piece of moderation work.
 6. **Terms of Service + privacy policy** — paused mid-build a couple sessions ago.
@@ -456,21 +487,23 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
+- `b96b05a` Stripe Connect Phase 3: RLS fix - flippers can INSERT/UPDATE their own payout_records
+- `e39d4b0` Stripe Connect Phase 3: wire ApplicantActions to /api/stripe/pick-worker + 3DS handling
+- `12b9ad6` Stripe Connect Phase 3: pick-worker API route (authorize on pick)
+- `b61a85c` Stripe Connect Phase 3: authorizePickPayment helper
+- `fd9c564` Stripe Connect Phase 3: SQL for flipper RLS + flipper_user_id index
+
+## Previous session's commits
+
 - `7a18b0a` Flipper dashboard: needs-review banner, pending stat, filters, sort
 - `c236885` Fix: card-save modal didn't fit smaller screens
 - `2080d1f` Fix: flipper applicant list — split join into two queries + disable caching
 - `c26cee0` Fix part 2: posters couldn't see applicant worker_profiles (RLS)
 - `cdb6fbf` Fix: flippers couldn't see applicants on their own gigs (RLS bug)
 - `dd54c2a` Stripe Connect Phase 2: flipper saves card before picking a worker
-
-## Previous session's commits
-
 - `c4d9e37` Stripe Connect Phase 1: worker onboarding flow + apply-gating
 - `bb38180` Update HANDOFF: Stripe Connect foundation shipped, payout pivot documented
 - `62c9a78` Stripe Connect foundation: SDK install, client helper, SQL migration, health route
-- `2ba8d02` Logo links to /gigs for workers and flippers
-- `325aa0e` Fix mobile viewport and mobile menu layout
-- `ccb6ed6` Fix Google sign-in requiring two clicks
 
 ---
 
