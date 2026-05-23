@@ -710,49 +710,61 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 ## What's next (next session)
 
-**Marketplace is now the front door** and **marketplace messaging is live end-to-end**. Both shipped this session and Cory verified them. The dashboard at `/home` still exists but is no longer the post-auth landing.
+**This session: marketplace aesthetic polish.** Killed the big "Marketplace" h1, replaced the boxed filter card with a slim sticky toolbar (search + city chip + Free only pill + sort + count), added auto-filter to viewer's profile city (toggleable), shimmer skeleton on photo load, friendlier empty-state card with action buttons, and polished the listing detail page (tighter padding, pill meta chips, lighter description block). Cory verified visually. Grid spacing is unchanged from before — we don't have enough listings to tune sizing yet.
 
-**Payments system has its safety net** from a previous session (Phase 7 webhooks). Phases 5, 6, 8, 9 still needed before going live with real money.
+**Marketplace is the front door** (previous session) and **marketplace messaging is live end-to-end** (previous session). The dashboard at `/home` still exists but is no longer the post-auth landing.
+
+**Payments system has its safety net** (Phase 7 webhooks). Phases 5, 6, 8, 9 still needed before going live with real money.
 
 **Streak counter** was pitched but deferred again — would require a new `user_activity_log` table with triggers backfilling events from claims/payouts/messages/gigs, plus a streak counter and richer activity feed on `/home`. Still the obvious "addicting to check" next move for the dashboard if Cory ever wants it.
 
 Cory's most likely next moves, in rough order:
 
-1. **Listing reports — Report button + admin queue.** Table exists, button + admin UI don't. Mirrors the existing `image_reports` flow. Probably a half-session of work.
+1. **Terms of Service, Privacy Policy, and the platform's legal agreements.** Cory mentioned wanting to use Claude's `/goal` feature to research this thoroughly. Worker agreement is currently a placeholder (`legal_agreements` table). Bumped to top — Cory wants to do this before more listings/gigs accumulate.
 
-2. **Stripe Connect Phase 5: Worker payout UI polish.** Show Stripe Express dashboard login link on `/my-gigs/payouts`, show expected payout arrival window, surface Stripe-side status (Pending / In transit / Paid) instead of legacy "unpaid/pending/paid."
+2. **Marketplace location filter v2: zip-based + 100-mile radius.** This session shipped exact-city-match only. The full plan is zip-based: add `zip` to `worker_profiles`, `flipper_profiles`, and `marketplace_listings`; build a zip → lat/long lookup; show "within 100 mi of {zip}" with toggle. For logged-out users, prompt for zip and store in localStorage. Will naturally cover the logged-out marketplace location case too (currently they see all 60 most recent listings nationwide).
 
-3. **Stripe Connect Phase 6: Admin payout UI upgrade.** Show stripe_payment_intent_id, payment_status, capture/refund buttons on the admin payouts page. With webhooks in place (Phase 7 done), this is much more useful — the page can now reflect real Stripe state.
+3. **Show available gigs in the marketplace feed.** Cory wants a toggle (like the Free only pill) to mix gigs into the marketplace view. Deferred this session because there's no real data yet to design against. Decisions still open: how the toggle works (items/gigs/both vs. either/or), whether to show gigs to logged-out users (they can't apply without Stripe Connect — discovery vs. bounce tradeoff), and how to make gig cards visually distinct from listing cards.
 
-4. **Email notifications** (Bucket 1 #1 — MARKETPLACE_ROADMAP.md). Needs an email provider (Resend / Postmark / SES). High-impact for retention.
+4. **Listing reports — Report button + admin queue.** Table exists, button + admin UI don't. Mirrors the existing `image_reports` flow.
 
-5. **Stripe Connect Phase 8: Edge cases.** What happens when: flipper's card declines at capture time, worker's Connect account gets restricted after approval, auth expires before work is done, flipper requests refund after capture, gig is canceled after authorization. Webhooks (Phase 7) now exist to detect most of these; the work here is the UI/notification side.
+5. **Stripe Connect Phase 5: Worker payout UI polish.** Show Stripe Express dashboard login link on `/my-gigs/payouts`, show expected payout arrival window, surface Stripe-side status (Pending / In transit / Paid) instead of legacy "unpaid/pending/paid."
 
-6. **Stripe Connect Phase 9: Go-live.** Swap test keys → live keys, redo the webhook destination in LIVE mode in Stripe (test-mode destinations don't carry over — Cory needs to make a second one and put the live `whsec_...` in Vercel), one real $1 transaction to verify, monitor.
+6. **Stripe Connect Phase 6: Admin payout UI upgrade.** Show stripe_payment_intent_id, payment_status, capture/refund buttons on the admin payouts page. With webhooks in place (Phase 7 done), this is much more useful.
 
-7. **Terms of Service + privacy policy** (Bucket 1 #5).
+7. **Email notifications** (Bucket 1 #1 — MARKETPLACE_ROADMAP.md). Needs an email provider (Resend / Postmark / SES). High-impact for retention.
 
-8. **Streak counter + activity log for `/home`** — deferred again, still the next obvious dashboard enhancement.
+8. **Stripe Connect Phase 8: Edge cases.** Flipper's card declines at capture time, worker's Connect account gets restricted after approval, auth expires before work is done, flipper requests refund after capture, gig is canceled after authorization. Webhooks now detect most of these; the work here is the UI/notification side.
 
-9. **Address/pickup details on gigs** (Bucket 1 #3) — paired with messaging; reveal-after-pick.
+9. **Stripe Connect Phase 9: Go-live.** Swap test keys → live keys, redo the webhook destination in LIVE mode in Stripe (test-mode destinations don't carry over — Cory needs to make a second one and put the live `whsec_...` in Vercel), one real $1 transaction to verify, monitor.
 
-10. **Ratings/reviews** (Bucket 1 #4).
+10. **Streak counter + activity log for `/home`** — deferred again, still the next obvious dashboard enhancement.
 
-11. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
+11. **Address/pickup details on gigs** (Bucket 1 #3) — paired with messaging; reveal-after-pick.
 
-12. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions. Two-minute task.
+12. **Ratings/reviews** (Bucket 1 #4).
 
-13. **Place `ReportImageButton`** on photo views (gig and marketplace).
+13. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
 
-14. **Dashboard discoverability micro-fix on `/flipper/dashboard`.** The current flipper-specific dashboard has no signal for "work submitted, awaiting your review." The "Pending applicants" tile only counts pending claims. Lower priority since `/home` surfaces this via the "needs review" action card.
+14. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions. Two-minute task.
 
-15. **"Payouts" nav link is worker-centric.** Currently shown to everyone; flippers hitting it see "$0 earnings" empty state. Either rename it, hide it for users with no payout history, or build a paired flipper-side "Payments you've made" view. Low priority — Cory was aware and laughed it off, but worth fixing eventually.
+15. **Place `ReportImageButton`** on photo views (gig and marketplace).
+
+16. **Dashboard discoverability micro-fix on `/flipper/dashboard`.** The current flipper-specific dashboard has no signal for "work submitted, awaiting your review." The "Pending applicants" tile only counts pending claims. Lower priority since `/home` surfaces this via the "needs review" action card.
+
+17. **"Payouts" nav link is worker-centric.** Currently shown to everyone; flippers hitting it see "$0 earnings" empty state. Either rename it, hide it for users with no payout history, or build a paired flipper-side "Payments you've made" view. Low priority — Cory was aware and laughed it off, but worth fixing eventually.
 
 Cory will pick. Open by confirming what you're about to build in 2-3 lines, then build.
 
 ---
 
 ## This session's commits (most recent first)
+
+- `b4fcc2e` Marketplace: revert grid back to simple explicit columns (auto-fill experiment didn't work; not enough listings to tune)
+- `7dd6251` Marketplace polish round 2: card cap attempt, skeleton shimmer, empty-state CTA, detail page polish, subtler city chip
+- `c05157c` Marketplace polish round 1: drop big header, slim sticky toolbar, viewer-city auto-filter, tighter grid
+
+## Previous session's commits
 
 - `275196b` Marketplace as front door: logo → /marketplace, post-auth lands on /marketplace, preserve ?next= through signup/login/Google
 - `01804bb` Marketplace messaging: Nav unread badge counts listing messages too
@@ -761,20 +773,6 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 - `ee7dccf` Marketplace messaging: wire Message Seller button on listing detail
 - `e8069db` Marketplace messaging: POST /api/listing-messages/start (find-or-create conversation)
 - `90b8014` SQL: idempotent version of marketplace messaging schema (safe to re-run)
-
-## Previous session's commits
-
-- `0d34f94` SQL: marketplace messaging + listing reports (scaffolded by previous session, run by this one)
-- `4b475b0` Marketplace Session 2: posting flow + edit + my listings + actions
-- `efbe202` Marketplace Session 1: public feed + listing detail + new front door
-- `981d50a` Marketplace foundation: schema + RLS + seed data
-- `b610088` HANDOFF: previous session's work (Phase 7 webhooks + unified Dashboard)
-- `f8baa52` Rename 'My Dashboard' header on `/flipper/dashboard` to 'My Posted Gigs'
-- `ac8f100` Fix: Google OAuth login also lands on /home (set-session API)
-- `0194d38` Dashboard tweaks: rename Home→Dashboard, login lands on dashboard, collapse nav into hamburger
-- `56068a4` Add unified Home dashboard at /home (4 hero tiles, 30-day SVG chart, action sections, percentiles, activity feed)
-- `f33e19b` Phase 7 fix: transfer.failed is deprecated, use transfer.reversed instead
-- `066c372` Stripe Connect Phase 7: webhook receiver + 8 event handlers + stripe_webhook_events log table
 
 ## Older commits
 
