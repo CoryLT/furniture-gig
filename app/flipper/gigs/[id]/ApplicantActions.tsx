@@ -3,8 +3,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { loadStripe } from '@stripe/stripe-js'
 import { Button } from '@/components/ui/button'
 import AddPaymentMethodModal from '@/components/shared/AddPaymentMethodModal'
+
+// Module-level cache — loadStripe should be called once.
+const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  : null
 
 interface Props {
   claimId: string
@@ -20,37 +26,104 @@ export default function ApplicantActions({ claimId, workerName }: Props) {
   const [pendingPickAfterCard, setPendingPickAfterCard] = useState(false)
 
   /**
-   * Actually runs the DB approve. Assumes payment method check already passed.
+   * Calls /api/stripe/pick-worker.
+   * That endpoint authorizes the payment (holds money), saves the payout row,
+   * and calls approve_applicant — all in one server-side transaction.
+   *
+   * If Stripe demands 3D Secure, we walk the flipper through it here, then
+   * re-call the endpoint to finish.
    */
   async function runApprove() {
     setLoading('approve')
     setError('')
 
-    const { error: rpcError } = await (supabase.rpc as unknown as (
-      fn: string,
-      args: Record<string, unknown>
-    ) => Promise<{ error: { message?: string } | null }>)('approve_applicant', {
-      p_claim_id: claimId,
-    })
+    try {
+      const res = await fetch('/api/stripe/pick-worker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId }),
+      })
+      const data = await res.json()
 
-    if (rpcError) {
-      setError(rpcError.message || 'Could not approve applicant.')
+      if (res.ok && data.status === 'ok') {
+        router.refresh()
+        return
+      }
+
+      // 3D Secure path
+      if (data.status === 'requires_action' && data.clientSecret) {
+        if (!stripePromise) {
+          setError(
+            'Stripe is not configured. Please contact support.'
+          )
+          setLoading(null)
+          return
+        }
+        const stripe = await stripePromise
+        if (!stripe) {
+          setError('Could not load Stripe. Try again in a moment.')
+          setLoading(null)
+          return
+        }
+
+        // Confirm the PaymentIntent with the bank's 3DS challenge.
+        const { error: confirmError } = await stripe.confirmCardPayment(
+          data.clientSecret
+        )
+        if (confirmError) {
+          setError(
+            confirmError.message ||
+              'Card verification failed. Please try a different card.'
+          )
+          setLoading(null)
+          return
+        }
+
+        // 3DS passed. Re-call the endpoint — Stripe's idempotency key (tied to
+        // the claim ID) means we'll get the same PaymentIntent back, now in
+        // requires_capture state, and the rest of the flow will run.
+        const retryRes = await fetch('/api/stripe/pick-worker', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ claimId }),
+        })
+        const retryData = await retryRes.json()
+
+        if (retryRes.ok && retryData.status === 'ok') {
+          router.refresh()
+          return
+        }
+
+        setError(
+          retryData?.error ||
+            'Could not finish the pick after card verification.'
+        )
+        setLoading(null)
+        return
+      }
+
+      // Generic error
+      setError(data?.error || data?.message || 'Could not pick this worker.')
       setLoading(null)
-      return
+    } catch (err: any) {
+      setError(err?.message || 'Could not pick this worker.')
+      setLoading(null)
     }
-
-    router.refresh()
   }
 
   async function handleApprove() {
-    if (!confirm(`Pick ${workerName} for this gig? Everyone else who applied will be rejected.`)) {
+    if (
+      !confirm(
+        `Pick ${workerName} for this gig?\n\nMoney for this gig will be held on your card now. It won't be charged until the work is approved.\n\nEveryone else who applied will be rejected.`
+      )
+    ) {
       return
     }
 
     setError('')
     setLoading('approve')
 
-    // Check if flipper has a saved card BEFORE locking the claim in
+    // Check if flipper has a saved card BEFORE attempting the pick
     try {
       const res = await fetch('/api/stripe/payment-method/status')
       const data = await res.json()
@@ -69,7 +142,7 @@ export default function ApplicantActions({ claimId, workerName }: Props) {
         return
       }
 
-      // Has a card — go straight to approve
+      // Has a card — go straight to the new pick endpoint
       await runApprove()
     } catch (err: any) {
       setError(err?.message || 'Could not check payment method.')
