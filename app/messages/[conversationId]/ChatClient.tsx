@@ -16,15 +16,20 @@ interface Message {
   pending?: boolean
 }
 
+type ConversationKind = 'gig' | 'listing'
+
 interface Props {
   conversationId: string
+  conversationKind: ConversationKind
   currentUserId: string
   otherUserId: string
   otherName: string
   otherAvatarUrl: string | null
   otherUsername: string | null
-  gigTitle: string
-  gigSlug: string | null
+  // Header context: a short label + a title + (optional) link target
+  contextLabel: string
+  contextTitle: string
+  contextHref: string | null
   initialMessages: Array<{
     id: string
     sender_user_id: string
@@ -53,13 +58,15 @@ function formatTime(iso: string) {
 
 export default function ChatClient({
   conversationId,
+  conversationKind,
   currentUserId,
   otherUserId,
   otherName,
   otherAvatarUrl,
   otherUsername,
-  gigTitle,
-  gigSlug,
+  contextLabel,
+  contextTitle,
+  contextHref,
   initialMessages,
 }: Props) {
   const supabase = createClient()
@@ -68,6 +75,11 @@ export default function ChatClient({
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [otherIsTyping, setOtherIsTyping] = useState(false)
+
+  // The Postgres table name we read/write messages from
+  const messagesTable = conversationKind === 'gig' ? 'gig_messages' : 'listing_messages'
+  // Realtime channel name — must be unique per conversation per kind
+  const channelName = `${conversationKind}-conversation:${conversationId}`
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
@@ -87,7 +99,7 @@ export default function ChatClient({
         .map((m) => m.id)
       if (unreadIds.length === 0) return
       await supabase
-        .from('gig_messages')
+        .from(messagesTable)
         // @ts-expect-error supabase update generics
         .update({ read_at: new Date().toISOString() })
         .in('id', unreadIds)
@@ -99,7 +111,7 @@ export default function ChatClient({
 
   // --- Realtime: subscribe to new messages, message updates, and typing events ---
   useEffect(() => {
-    const channel = supabase.channel(`conversation:${conversationId}`, {
+    const channel = supabase.channel(channelName, {
       config: { presence: { key: currentUserId } },
     })
 
@@ -109,7 +121,7 @@ export default function ChatClient({
       {
         event: 'INSERT',
         schema: 'public',
-        table: 'gig_messages',
+        table: messagesTable,
         filter: `conversation_id=eq.${conversationId}`,
       },
       (payload) => {
@@ -134,7 +146,7 @@ export default function ChatClient({
         // If the new message is from the other person, mark it read right away
         if (m.sender_user_id === otherUserId) {
           supabase
-            .from('gig_messages')
+            .from(messagesTable)
             // @ts-expect-error supabase update generics
             .update({ read_at: new Date().toISOString() })
             .eq('id', m.id)
@@ -149,7 +161,7 @@ export default function ChatClient({
       {
         event: 'UPDATE',
         schema: 'public',
-        table: 'gig_messages',
+        table: messagesTable,
         filter: `conversation_id=eq.${conversationId}`,
       },
       (payload) => {
@@ -183,7 +195,7 @@ export default function ChatClient({
       supabase.removeChannel(channel)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, currentUserId, otherUserId])
+  }, [conversationId, currentUserId, otherUserId, messagesTable, channelName])
 
   // --- Send a typing event, throttled to once every 1.5s ---
   function broadcastTyping() {
@@ -230,15 +242,15 @@ export default function ChatClient({
     broadcastStopTyping()
 
     const { data, error: insertError } = await supabase
-      .from('gig_messages')
-      // @ts-expect-error supabase insert generics
+      .from(messagesTable)
       .insert({
         conversation_id: conversationId,
         sender_user_id: currentUserId,
         body: text,
-      })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any)
       .select('id, sender_user_id, body, read_at, created_at')
-      .single<Message>()
+      .single()
 
     if (insertError) {
       setError('Could not send. Try again.')
@@ -252,15 +264,16 @@ export default function ChatClient({
     // Replace the optimistic message with the real one (the realtime INSERT
     // may also arrive — the merge logic above handles that)
     if (data) {
+      const inserted = data as Message
       setMessages((prev) => {
         const idx = prev.findIndex((p) => p.id === tempId)
         if (idx < 0) {
           // Already replaced by realtime
-          if (prev.some((p) => p.id === data.id)) return prev
-          return [...prev, data]
+          if (prev.some((p) => p.id === inserted.id)) return prev
+          return [...prev, inserted]
         }
         const next = prev.slice()
-        next[idx] = data
+        next[idx] = inserted
         return next
       })
     }
@@ -288,13 +301,13 @@ export default function ChatClient({
             <div className="font-medium text-foreground truncate">{otherName}</div>
           )}
           <div className="text-xs text-muted-foreground truncate">
-            About gig:{' '}
-            {gigSlug ? (
-              <Link href={`/gigs/${gigSlug}`} className="hover:underline inline-flex items-center gap-0.5">
-                {gigTitle} <ExternalLink className="w-3 h-3" />
+            {contextLabel}:{' '}
+            {contextHref ? (
+              <Link href={contextHref} className="hover:underline inline-flex items-center gap-0.5">
+                {contextTitle} <ExternalLink className="w-3 h-3" />
               </Link>
             ) : (
-              <span>{gigTitle}</span>
+              <span>{contextTitle}</span>
             )}
           </div>
         </div>
