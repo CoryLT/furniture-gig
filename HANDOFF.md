@@ -59,53 +59,75 @@ After you push, Cory must:
 - Admin review flow at `/admin`
 - Payouts tracking (manual PayPal, admin updates status)
 - Work Samples photo gallery on profile
-- Messaging (per-applicant, not per-gig — see "Application/approval flow" below)
+- **Marketplace at `/marketplace`** — public feed of items for sale (parallel to the gig system, NOT mixed in). Post a listing, edit, mark sold/hide/delete. See "Marketplace" section below.
+- **Marketplace is the FRONT DOOR.** `/` redirects to `/marketplace` for everyone (logged in or out). Logo points to `/marketplace`. Post-auth landing is `/marketplace`, not `/home`. See "Marketplace as front door" section.
+- **Messaging — TWO kinds**: gig conversations (`gig_conversations`/`gig_messages`) and listing conversations (`listing_conversations`/`listing_messages`). Inbox at `/messages` unions both. Chat page at `/messages/[conversationId]` dispatches by type. Nav unread badge counts unread from both. See "Messaging system" below.
 - **Application/approval flow** — workers apply, flipper picks one (replaced old "first-to-claim wins" model)
-- **Image moderation via Sightengine** — all uploads blocked for porn / violence / weapons / drugs / gore / offensive / minors
+- **Image moderation via Sightengine** — all uploads (gig photos, gig images, avatars, gallery photos, marketplace photos) blocked for porn / violence / weapons / drugs / gore / offensive / minors
 - **User-reported image flagging** — backend API exists but Report button isn't placed on photo views yet
+- **User-reported listing flagging** — `listing_reports` table exists from this session's SQL; no Report button or admin queue built yet
 - **Stripe Connect — workers connect** (Phase 1): workers must connect a Stripe Express account before applying; gated apply button on gig detail
 - **Stripe Connect — flippers save a card** (Phase 2): when flipper clicks "Pick this worker," a modal collects a card via Stripe Elements (SetupIntent + Customer). Saved off-session for Phase 3 authorize-on-pick.
 - **Stripe Connect — authorize on pick** (Phase 3): when flipper picks a worker, a PaymentIntent holds money on their card (`capture_method: manual`). Worker's Connect account is set as `transfer_data.destination`. Platform fee = 2% via `application_fee_amount`.
 - **Stripe Connect — capture on approval** (Phase 4): flipper-side review at `/flipper/review/[claimId]`. When flipper approves submitted work, the held PaymentIntent is captured. Stripe auto-transfers (gig amount − 2%) to the worker's Connect account. Verified end-to-end in sandbox.
 - **Stripe Connect — webhooks** (Phase 7): `/api/stripe/webhook` is live. Receiver verifies Stripe signature, logs every event to `stripe_webhook_events` (idempotent via event ID PK), dispatches 8 event types (`account.updated`, `payment_intent.succeeded/payment_failed/canceled`, `transfer.created/reversed`, `charge.refunded/dispute.created`). Each handler is idempotent and won't move a payout row backwards in its status lifecycle. Always returns 200 unless signature fails — handler errors are logged on the event row but don't ask Stripe to retry (avoids infinite-loop on deterministic bugs). The Stripe dashboard side is configured with ONE event destination scoped to "Connected accounts" (not two — both platform and connected events flow through the same endpoint despite Stripe's UI suggesting otherwise; `transfer.failed` is deprecated, use `transfer.reversed`).
-- **Unified Dashboard at `/home`** — single landing page for logged-in users. Greeting + date, 4-tile hero stats (total earned / invested / gigs completed / active), 30-day stacked-bar SVG chart of daily money flow (hand-rolled, no chart deps), action sections that hide when empty (needs review / pending applicants / unread messages / work in progress), "You vs the community" percentile bars (only shows once user has some activity), recent activity feed (last ~10 events). Brand-new users see a single welcome card instead. Hamburger nav now collapses ALL primary nav items into the dropdown on every viewport — there's no longer a desktop horizontal link row.
-- **Flipper dashboard with filter/sort + needs-review highlights** — banner appears when any gig has pending applicants, dedicated stat tile, filter chips (All / Needs review / Open / In progress / Completed), sort dropdown (Newest / Oldest / Due soon / Most applicants), pending gigs always float to top under "All". Note: does NOT yet surface "work submitted, awaiting your review" — that's a known gap (see What's Next #7).
+- **Unified Dashboard at `/home`** — still exists as a personalized dashboard reachable from the hamburger nav, but is NO LONGER the post-auth landing page (marketplace is). Greeting + date, 4-tile hero stats (total earned / invested / gigs completed / active), 30-day stacked-bar SVG chart of daily money flow (hand-rolled, no chart deps), action sections that hide when empty (needs review / pending applicants / unread messages / work in progress), "You vs the community" percentile bars (only shows once user has some activity), recent activity feed (last ~10 events). Brand-new users see a single welcome card instead. Hamburger nav collapses ALL primary nav items into the dropdown on every viewport — there's no desktop horizontal link row.
+- **Flipper dashboard with filter/sort + needs-review highlights** — banner appears when any gig has pending applicants, dedicated stat tile, filter chips (All / Needs review / Open / In progress / Completed), sort dropdown (Newest / Oldest / Due soon / Most applicants), pending gigs always float to top under "All". Note: does NOT yet surface "work submitted, awaiting your review" — that's a known gap (see What's Next).
 
 ---
 
 ## Messaging system
 
-Bucket 1 #2. Note: with the application/approval flow refactor, there is now ONE conversation per (gig, applicant) rather than one per gig. See that section for the details.
+There are TWO kinds of conversations, on parallel table sets, unified in the UI:
+- **Gig conversations** — one per (gig, applicant). `gig_conversations` + `gig_messages`.
+- **Listing conversations** — one per (marketplace listing, buyer). `listing_conversations` + `listing_messages`.
+
+The inbox at `/messages` queries both, merges, sorts by `last_message_at`. The chat page at `/messages/[conversationId]` looks up the ID in both tables and dispatches. The Nav unread badge subscribes to BOTH messages tables.
 
 ### What's there
-- **`/messages` inbox** — list of all conversations, sorted by recency, with unread badges per row and a total unread summary up top
-- **`/messages/[conversationId]` chat page** — message bubbles, type-and-send composer, realtime delivery, "is typing" indicator (bouncing dots), read receipts ("Sent" / "Seen")
+- **`/messages` inbox** — unified list across gig + listing conversations, sorted by recency, with unread badges per row and a total unread summary up top
+- **`/messages/[conversationId]` chat page** — message bubbles, type-and-send composer, realtime delivery, "is typing" indicator (bouncing dots), read receipts ("Sent" / "Seen"). Dispatches by conversation kind. Header shows "About gig: …" or "About listing: …" with a link to the source.
 - **"Message Flipper" button** on worker's My-Gig detail page (`/my-gigs/[claimId]`)
 - **"Message Worker" button** on each active claim in flipper's gig page (`/flipper/gigs/[id]`)
-- **Realtime unread badge** in the top nav next to "Messages" — ticks up when new messages arrive on ANY page (not just the inbox), ticks back down when read
-- **"Messages" link** in top nav (between "My Posted Gigs" and "Payouts")
+- **"Message Seller" button** on marketplace listing detail (`/marketplace/[slug]`) for any logged-in non-owner
+- **Realtime unread badge** in the top nav — ticks up when new messages arrive on either table on ANY page (not just the inbox), ticks back down when read
+- **"Messages" link** in top nav hamburger
 
-### Key DB tables (in `supabase/schema_messaging.sql`, `schema_messaging_patch_poster.sql`, and `schema_application_flow.sql` — all already run)
+### Key DB tables (all already run)
+
+In `supabase/schema_messaging.sql`, `schema_messaging_patch_poster.sql`, and `schema_application_flow.sql`:
 - `gig_conversations` — one row per (gig, worker) — `UNIQUE(gig_id, worker_user_id)`. Stores `flipper_user_id`, `worker_user_id`, `last_message_at`. RLS allows only the two participants to read/insert/update.
 - `gig_messages` — actual messages. Stores `conversation_id`, `sender_user_id`, `body`, `read_at`, `created_at`. RLS: participants can SELECT and INSERT; recipients can UPDATE read_at on messages they did NOT send.
 - A trigger on `gig_claims` INSERT auto-creates the conversation when status is `pending` OR `active`. Uses `coalesce(poster_user_id, created_by)` for the flipper.
 - A trigger on `gig_messages` INSERT bumps `last_message_at` on the parent conversation.
 - Both tables added to `supabase_realtime` publication for client subscriptions.
 
+In `supabase/schema_marketplace_messaging.sql` (and `schema_marketplace_messaging_idempotent.sql` which is the safe-to-rerun copy):
+- `listing_conversations` — one row per (listing, buyer) — `UNIQUE(listing_id, buyer_user_id)`. Stores `seller_user_id`, `buyer_user_id`, `last_message_at`. RLS allows only the two participants to read/insert/update, with a check that `seller_user_id <> buyer_user_id`.
+- `listing_messages` — same shape as `gig_messages` but parented to `listing_conversations`. Same RLS pattern.
+- NO trigger auto-creates the conversation — the buyer creates it explicitly by clicking "Message Seller" (no implicit application step like gigs have).
+- A trigger on `listing_messages` INSERT bumps `last_message_at` on the parent.
+- Both tables added to `supabase_realtime` publication.
+
 ### Key code files
 - `app/messages/layout.tsx` — auth + Nav wrapper, looks up username from worker OR flipper profile.
-- `app/messages/page.tsx` — inbox (server component). Queries conversations + latest 500 messages, computes preview + unread per conversation in-memory.
-- `app/messages/[conversationId]/page.tsx` — chat page (server). Loads conversation, gig, other-user profile info.
-- `app/messages/[conversationId]/ChatClient.tsx` — the actual realtime chat (client). Subscribes via `supabase.channel(\`conversation:${conversationId}\`)` to Postgres INSERT/UPDATE events AND broadcast `typing`/`stop_typing` events.
-- `components/shared/OpenChatButton.tsx` — reusable "Message" button that POSTs to the start endpoint.
-- `app/api/messages/start/route.ts` — find-or-create conversation by gig_id. Validates the caller is a participant.
-- `components/shared/Nav.tsx` — has the realtime unread badge logic (loadAndSubscribe in useEffect). Subscribes to all `gig_messages` INSERT/UPDATE events; RLS already restricts to visible ones.
+- `app/messages/page.tsx` — inbox (server component). Queries BOTH `gig_conversations` and `listing_conversations`, fetches messages from BOTH tables, merges + sorts in JS, computes preview + unread per conversation.
+- `app/messages/[conversationId]/page.tsx` — chat page (server). Tries `gig_conversations` first, falls back to `listing_conversations`. Dispatches to `renderGigConversation` or `renderListingConversation`. Both branches pass uniform props (including a `contextLabel` + `contextTitle` + `contextHref`) to `ChatClient`.
+- `app/messages/[conversationId]/ChatClient.tsx` — the actual realtime chat (client). Takes a `conversationKind: 'gig' | 'listing'` prop which decides the messages table name and the realtime channel name. Subscribes via `supabase.channel(\`${kind}-conversation:${conversationId}\`)` to Postgres INSERT/UPDATE events on the right table AND broadcast `typing`/`stop_typing` events.
+- `components/shared/OpenChatButton.tsx` — reusable "Message" button for GIG conversations. POSTs to `/api/messages/start`.
+- `components/shared/MessageSellerButton.tsx` — analogous button for LISTING conversations. POSTs to `/api/listing-messages/start`.
+- `app/api/messages/start/route.ts` — find-or-create gig conversation by `gigId` (+ optional `workerUserId` when caller is the flipper). Validates the caller is a participant.
+- `app/api/listing-messages/start/route.ts` — find-or-create listing conversation by `listingId`. Refuses if caller is the seller (sellers don't initiate; they get pinged when a buyer messages them). Refuses if the listing is in `hidden` or `deleted` state.
+- `components/shared/Nav.tsx` — has the realtime unread badge logic. Subscribes to INSERT/UPDATE events on BOTH `gig_messages` AND `listing_messages`. RLS already restricts events to visible ones.
 
 ### Quirks worth knowing
 - The chat client uses **optimistic UI** — when you send a message, it appears immediately as `pending`, then the realtime INSERT replaces it. There's merge logic to avoid duplicate rendering.
 - The typing indicator throttles broadcasts to once per 1.5s. Stops broadcasting on blur or empty input.
-- The unread badge in Nav has TWO triggers: (1) realtime subscription to inserts/updates, and (2) a 1.2s delayed refetch when the user navigates to anything under `/messages` (to catch read_at updates that may be in flight). Both work in tandem.
-- The chat page header avatar/name links to `/u/[username]` if a username exists — handy for flippers vetting workers.
+- The unread badge in Nav has TWO triggers: (1) realtime subscription to inserts/updates on both tables, and (2) a 1.2s delayed refetch (against both tables) when the user navigates to anything under `/messages` (to catch read_at updates that may be in flight). Both work in tandem.
+- The chat page header avatar/name links to `/u/[username]` if a username exists — handy for flippers vetting workers, or buyers/sellers vetting each other.
+- The two table sets are deliberately separate (not unified into one with a `kind` column). Rationale (also in the SQL file header): gig messaging is well-tested, RLS rules differ (listing conversations can be created by anyone non-seller without a claim row), uniqueness constraints differ, and the union-in-code pattern keeps both safer.
+- Conversation IDs are UUIDs and globally unique enough that a collision between `gig_conversations.id` and `listing_conversations.id` is effectively impossible. The chat page's "try gig first, then listing" dispatch is safe.
+
 
 ---
 
@@ -145,13 +167,13 @@ Bucket 1 #2. Note: with the application/approval flow refactor, there is now ONE
 
 ---
 
-## Unified Dashboard at `/home` (DONE — shipped this session)
+## Unified Dashboard at `/home` (DONE — shipped a previous session; superseded as landing by /marketplace this session)
 
 ### What's there
-- **`/home`** is now the default landing for logged-in users (every login path redirects here). Replaces the previous role-specific landing pages.
-- **`/` (root)** redirects logged-in users to `/home`. Logged-out still sees the public marketing landing.
-- **Logo + login** all route to `/home`.
-- **Hamburger nav** restructured: NO horizontal link row anymore. All 7 primary nav items collapsed into the existing hamburger dropdown on every viewport.
+- **`/home`** is the personalized dashboard for logged-in users. **No longer the auto-landing after auth** (that's `/marketplace` now), but still accessible from the hamburger nav ("Dashboard" link) and still protected by middleware.
+- **`/` (root)** now redirects everyone (logged in or out) to `/marketplace`. The original "logged-in → /home, logged-out → marketing landing" logic is gone.
+- **Logo** points to `/marketplace` for workers/flippers, `/admin` for admins. (Previously pointed at `/home`.)
+- **Hamburger nav** structure unchanged from when it shipped: NO horizontal link row; all primary items collapsed into the dropdown on every viewport. The "Dashboard" item in the dropdown is the way users now reach `/home`.
 
 ### Sections on the page (server-rendered)
 1. Greeting ("Good morning, [first name]") + today's date
@@ -169,16 +191,16 @@ If user has zero of everything (no payouts, no claims, no posted gigs, no activi
 - `app/home/page.tsx` — the main page, ~600 lines, server component. Does all data fetching inline (lots of small Supabase queries — could be optimized later if perf becomes an issue).
 - `components/home/ActivityChart.tsx` — hand-rolled SVG client component (no chart library). Renders the 30-day bar chart with hover tooltip.
 - `lib/home-dashboard.ts` — small helpers (`lastNDays`, `toISODate`, `buildBuckets`) for date bucketing.
-- `app/page.tsx` — root, now does an auth check and redirects logged-in users to `/home`.
+- `app/page.tsx` — root. Just redirects to `/marketplace`. (Used to redirect logged-in users to `/home`; that logic moved to favor marketplace.)
 
-### Deliberately NOT done this session
-- **Streak counter** — Cory asked about it, I pitched it, he deferred to a future session because it requires a new `user_activity_log` table with triggers. Currently the closest thing to a streak is the 30-day chart. Adding streaks is the next obvious dashboard enhancement and would noticeably boost the "addicting to check" goal Cory wants.
+### Deliberately NOT done
+- **Streak counter** — Cory deferred. Requires a new `user_activity_log` table with triggers. Currently the closest thing to a streak is the 30-day chart. Adding streaks is still the next obvious dashboard enhancement.
 - The "Recent activity" feed currently queries existing tables; with an activity log table it'd be richer and faster.
 
 ### Quirks worth knowing
 - The percentile section ("outearned X% of workers") is a real calculation, but with only a handful of users it'll often hit 0% or 100%. Looks weird in dev; gets better as user base grows.
 - The chart uses LOCAL timezone for date bucketing (see `toISODate` in `lib/home-dashboard.ts`). If users are spread across timezones, "today" is per-user.
-- Every login redirect path was checked + updated to land on `/home`. The Google OAuth path was the trickiest because it has its own destination logic in `/api/auth/set-session/route.ts` separate from the password-login redirects. If you add a new auth method, send it to `/home`.
+- **Auth path destinations changed.** When `/home` first shipped, every login redirect path was updated to land there. This session, all those paths were updated AGAIN to land on `/marketplace` (with `?next=` preserved if present). If you add a new auth method, send users to `/marketplace`, not `/home`. The full list of touched files is in the "Marketplace as front door" section.
 
 ---
 
@@ -309,12 +331,12 @@ Three small but high-impact bug fixes plus a UX tweak.
 - `app/layout.tsx` — added `export const viewport`
 - `components/shared/Nav.tsx` — mobile menu links now use `flex items-center gap-2 py-2.5 px-2 rounded-md`, with hover background and active-route highlight.
 
-### 4. Logo links to /gigs for non-admins
-Cory wanted the FlipWork logo in the top nav to send workers/flippers to `/gigs` (Browse Gigs) instead of `/` (landing page). Admins still go to `/`. One-line change in `components/shared/Nav.tsx`:
+### 4. Logo links to /marketplace for non-admins (CURRENT — superseded prior `/gigs` and `/home` versions)
+The FlipWork logo's `logoHref` has been through three iterations as the site's front door has evolved. It currently points to `/marketplace` for workers/flippers and `/admin` for admins. The relevant line in `components/shared/Nav.tsx`:
 ```ts
-const logoHref = role === 'admin' ? '/' : '/gigs'
+const logoHref = role === 'admin' ? '/admin' : '/marketplace'
 ```
-Then `<Link href={logoHref}>` on the logo. Logos on auth pages (login, signup) still point to `/` — that's correct since those users aren't logged in.
+Logos on auth pages (login, signup) still point to `/` — that's correct since `/` itself redirects to `/marketplace` now anyway.
 
 ---
 
@@ -533,6 +555,87 @@ The HANDOFF previously called this "wire admin's approve button." Wrong — the 
 
 ---
 
+## Marketplace (DONE — foundation + posting flow + messaging shipped across recent sessions)
+
+A parallel system to the gig flow, for buying/selling furniture. The two systems share auth/profiles but otherwise live side-by-side — they don't mix.
+
+### The flow
+1. Anyone can browse `/marketplace` (public feed, no auth required)
+2. Logged-in users post listings at `/marketplace/new` (with photos)
+3. Logged-in users edit/manage their own listings at `/marketplace/mine`
+4. Logged-in users (non-sellers) message a seller via the "Message Seller" button on the listing detail page
+5. Listings have status `active` / `sold` / `hidden` / `deleted`. Hidden/deleted are excluded from feed and from listing detail. Sold listings stay visible (with a SOLD badge) for credibility.
+
+### Schema (all already run)
+- `supabase/schema_marketplace.sql` — foundation. Tables: `marketplace_listings`, `marketplace_photos`, `marketplace_categories` (seeded). Plus a saved-search infrastructure that's not yet surfaced in UI. Full RLS.
+- `supabase/schema_marketplace_messaging.sql` (original) and `schema_marketplace_messaging_idempotent.sql` (safe-to-rerun copy used after a partial run failed mid-way) — adds `listing_conversations`, `listing_messages`, `listing_reports`. The idempotent version uses `drop policy if exists` before every `create policy` and is the one to use going forward.
+
+### Key code files
+- **Public feed**
+  - `app/marketplace/page.tsx` + `MarketplaceFeed.tsx` + `ListingCard.tsx` — the grid feed with filtering
+  - `app/marketplace/[slug]/page.tsx` + `PhotoCarousel.tsx` — listing detail
+- **Posting / editing**
+  - `app/marketplace/new/page.tsx` + `NewListingForm.tsx`
+  - `app/marketplace/[slug]/edit/page.tsx` + `EditListingForm.tsx`
+  - `app/marketplace/mine/page.tsx` + `MyListingsList.tsx`
+- **Photo upload (with image moderation gate, matching the gig pattern)**
+  - `app/api/upload-marketplace-photo/route.ts` — calls Sightengine via `moderateImage()` before upload; mirrors `/api/upload-gig-image` exactly. Storage bucket: `marketplace-photos`.
+- **Listing state changes**
+  - `app/api/marketplace/[id]/sold/route.ts`, `.../hide/route.ts`, `.../reactivate/route.ts`, `.../delete/route.ts`, `.../update/route.ts` — narrow endpoints, each verifies ownership before mutating.
+- **Validation**
+  - `lib/marketplace-validation.ts` — shared validation rules used by both create and update endpoints.
+- **Messaging** — see "Messaging system" section above (`MessageSellerButton`, `/api/listing-messages/start`).
+
+### Quirks worth knowing
+- **Two photo path conventions exist.** `marketplace_photos.file_path` stores just the path within the bucket (e.g. `<listing-id>/<timestamp>.jpg`). Always call `supabase.storage.from('marketplace-photos').getPublicUrl(file_path)` to render.
+- **Slugs** are auto-generated from the title + a short hash so duplicates don't collide. Listing URLs are `/marketplace/<slug>` not by ID.
+- **`price_mode`** is either `'fixed'` (use `price_cents`) or `'free'` (`price_cents = 0`, but `formatPriceFromCents` returns "Free"). New code that touches price must respect both modes.
+- **No transaction/escrow.** Unlike gigs, marketplace doesn't use Stripe — buyer and seller arrange the deal in DMs and meet up. This is intentional for v1.
+- **No reviews/ratings.** Same as gigs — Bucket 1 #4 in MARKETPLACE_ROADMAP.md.
+- **The `listing_reports` table exists from this session's SQL** but no Report button is placed on listings yet, and there's no admin queue page for it. Parallel to the long-standing `image_reports` TODO.
+- **Listing photo uploads ARE moderated** (the route already calls `moderateImage()` and `logModerationCheck()` with `uploadSource: 'marketplace_photo'`). One less thing to wire — was already done by whoever built Marketplace Session 2.
+
+---
+
+## Marketplace as front door (DONE — shipped this session)
+
+Originally `/home` was the post-auth landing for logged-in users and `/` was a marketing landing page for logged-out users. Cory wanted the marketplace front-and-center for everyone, with the dashboard demoted to "available via the hamburger nav but not a destination."
+
+### What changed
+- **`/` redirects to `/marketplace` for everyone**, logged in or out. The marketing-landing version of `app/page.tsx` is gone. (`/home` is still accessible if you navigate there directly or click "Dashboard" in the hamburger.)
+- **Logo links to `/marketplace`** for workers/flippers. Admin logo still links to `/admin`.
+- **Post-auth lands on `/marketplace`** by default. Every login/signup path updated: `app/auth/login/page.tsx`, `app/auth/login/actions.ts` (dead code but kept consistent), `app/api/auth/set-session/route.ts` (Google OAuth), `app/auth/agreements/page.tsx` (`homeForRole` helper).
+- **`?next=` is preserved through every auth path.** If a user lands on `/auth/login` or `/auth/signup` with `?next=/marketplace/<slug>`, that path survives:
+  - login form → either branch respects `?next=` (with safety checks)
+  - signup → onboarding → agreements (each forwards `?next=`)
+  - Google OAuth: signup/login encodes `?next=` into the `redirectTo` URL going TO Google. `/auth/finishing` reads it back from `window.location.search` and POSTs it to `/api/auth/set-session`. `set-session` validates and uses it as the destination.
+- **Middleware bounces to login WITH `?next=`.** Any protected-route hit without a session now redirects to `/auth/login?next=<original-path>` so the user lands back on their original destination after auth. (Previously, the original destination was lost.)
+
+### Safety rules baked into every `safeNext` check
+- Must start with `/` (no external URLs)
+- Must NOT start with `/auth` (would loop)
+- Must NOT start with `/admin` (workers/flippers can't be redirected into admin-only pages)
+- Admin login does the inverse: `?next=` only honored if it points at `/admin`.
+
+### Key files touched
+- `app/page.tsx` — root, just redirects
+- `app/auth/login/page.tsx` — reads `?next=`, honors it for both email and Google login
+- `app/auth/signup/page.tsx` — reads `?next=`, forwards to onboarding via query param; reciprocal sign-in link carries `?next=` too
+- `app/auth/onboarding/page.tsx` — reads `?next=`, forwards to agreements
+- `app/auth/agreements/page.tsx` — already honored `?next=`; just changed default fallback to `/marketplace`
+- `app/auth/finishing/page.tsx` — reads `?next=` from `window.location.search`, passes through `/api/auth/set-session` body
+- `app/api/auth/set-session/route.ts` — accepts `next` in body, validates as safe, swaps both `'/home'` defaults to `postAuthDestination`
+- `app/api/auth/login/actions.ts` (dead code) — kept consistent
+- `components/shared/Nav.tsx` — `logoHref` changed for non-admins
+- `middleware.ts` — bounce-to-login includes `?next=<original-path>`
+
+### Quirks worth knowing
+- **`/home` still exists** and is intentionally still in the protected-routes list in `middleware.ts`. The "Dashboard" link in the hamburger nav still points there. Just no path leads there automatically anymore. If you delete `/home`, audit the nav link.
+- **The flipper-specific dashboard at `/flipper/dashboard`** is unchanged — it's still its own page, reachable via the "My Posted Gigs" hamburger link.
+- **Verified end-to-end** by Cory after deploy: logo, post-auth landing, listing → signup → land back on listing.
+
+---
+
 ## DEPRECATED — old manual-PayPal payout planning
 
 ⚠️ The whole "polish manual PayPal" plan from the prior session is dead. We pivoted to Stripe Connect (above). The two scoping questions about "money flow" and "which gaps to fix" were answered:
@@ -546,16 +649,23 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 ## ⚠️ TODOs left at end of session
 
 1. **Rotate `SIGHTENGINE_API_SECRET`** — exposed in chat in an earlier session. Regenerate in Sightengine dashboard, update Vercel env var, redeploy. STILL OUTSTANDING — Cory has not done this yet across multiple sessions.
-2. **Stripe Connect Phase 4+** — Phases 1 (worker onboarding), 2 (flipper saves card), and 3 (authorize on pick) are done. Next is capture-on-approval: when the admin approves submitted work, call `paymentIntents.capture()` on the held PaymentIntent. Stripe auto-transfers gig amount − 2% to the worker's Connect account. See "Stripe Connect payout system" section above for the full phase list.
+2. **Stripe Connect Phases 5, 6, 8, 9** — Phases 1-4 + 7 are done. Still needed before going live:
+   - Phase 5: worker payout UI polish (Express dashboard login link, arrival window, Stripe-side status)
+   - Phase 6: admin payout UI upgrade (show PI ID, status, refund button)
+   - Phase 8: edge cases (declined cards at capture, restricted Connect accounts, expired auths, post-capture refunds)
+   - Phase 9: go-live (swap to live keys, new webhook destination in live mode, $1 real-money smoke test)
 3. **AI support chat** — DEPRIORITIZED until Stripe payouts are live (the AI needs to be able to answer payout questions accurately). Plan still good — Haiku 4.5, `/support` page, `ANTHROPIC_API_KEY` env var, 5 chats/day per user. See prior handoffs for details.
 4. **Place `ReportImageButton` on photo views** — gallery cards, gig photo grids, avatar viewers. Component is built; just needs to be slotted in.
-5. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
-6. **Legal/TOS work** — started but didn't finish in a previous session. Decisions already made:
+5. **Listing reports — Report button + admin queue.** `listing_reports` table exists from this session's SQL. Need a "Report listing" button on the marketplace listing detail page, a `/api/report-listing` endpoint, and an admin queue page at something like `/admin/listing-reports`. Parallel to the existing `image_reports` infrastructure — should copy that pattern.
+6. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
+7. **Legal/TOS work** — started but didn't finish in a previous session. Decisions already made:
    - Source: generated starter text (lawyer-review-before-launch disclaimer at top)
    - Gate: hard gate — must accept before doing anything
    - Existing infra at `/auth/agreements` already handles multiple required agreements; just needs TOS + Privacy seed and a server-side check that redirects logged-in users with unaccepted required agreements to `/auth/agreements`. A SQL file (`supabase/schema_legal_agreements.sql`) was scaffolded but not completed. Restart fresh.
-7. **Apply `force-dynamic` audit to other server pages.** The flipper dashboard and gig detail pages needed `force-dynamic + revalidate=0` to stop showing stale claim data. Worth scanning other server pages that show claim/applicant state (worker `/my-gigs`, `/messages`, etc.) and adding the same if they exhibit similar staleness.
-8. **`types/database.ts` is out of sync with several Stripe columns.** Adding the Stripe columns (`users.stripe_customer_id`, `worker_profiles.stripe_*`, `payout_records.payment_status` etc.) would let us remove the `as any` casts sprinkled through all Stripe-touching files.
+8. **Email notifications** (Bucket 1 #1 in MARKETPLACE_ROADMAP.md). Right now if someone applies to your gig, messages you on a listing, or buys/sells something, they have to log in and notice. Needs an email provider (Resend / Postmark / SES) and templated sends for the key events.
+9. **Address/pickup details on gigs** (Bucket 1 #3). Gigs only have city/state. Want full address visible to picked worker only. Schema change + reveal-after-pick UI.
+10. **Apply `force-dynamic` audit to other server pages.** The flipper dashboard and gig detail pages needed `force-dynamic + revalidate=0` to stop showing stale claim data. Worth scanning other server pages that show claim/applicant state (worker `/my-gigs`, `/messages`, etc.) and adding the same if they exhibit similar staleness.
+11. **`types/database.ts` is out of sync** with several Stripe columns AND the new `listing_conversations`/`listing_messages`/`listing_reports` tables. Adding all of them would let us remove the `as any` casts sprinkled through all Stripe-touching AND listing-messaging files.
 
 ---
 
@@ -569,7 +679,7 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 - **Middleware** at root protects `/gigs`, `/my-gigs`, `/admin`, `/flipper`, `/profile`, `/messages`, `/home`, `/auth/agreements`.
 - **Worker profile** uses `first_name` + `last_name` (yes — the old handoff said `full_name`; that was WRONG. The schema and code both use first/last. Trust `types/database.ts`.).
 - **Cory bumped photo limits from 5MB to 10MB** for Work Samples specifically. Avatars stayed at 5MB.
-- **Login redirects now ALL converge on `/home`** for non-admin users. Multiple paths were updated this session: `app/auth/login/page.tsx` (client form), `app/auth/login/actions.ts` (server action), `app/auth/agreements/page.tsx` (`homeForRole` helper, post-agreements destination), and `app/api/auth/set-session/route.ts` (Google OAuth completion). The OAuth path was the sneaky one — it has its own destination logic in the set-session API. If you add a new login or sign-in flow, send users to `/home`, not `/gigs` or `/flipper/dashboard`.
+- **Login redirects now ALL converge on `/marketplace`** for non-admin users, with `?next=` honored when present. Multiple paths updated across two sessions to get here. See the "Marketplace as front door" section for the full file list. If you add a new login or sign-in flow, send users to `/marketplace` by default and honor `?next=` if it's a safe internal path.
 - **Nav UI got compacted this session.** No more desktop horizontal link row. ALL primary nav items live inside the hamburger dropdown on every viewport. The unread-message badge is now anchored to the hamburger button itself for at-a-glance visibility. The old standalone `menuOpen` mobile slide-down was deleted (the single dropdown handles both desktop and mobile). The dropdown nav order is: Dashboard, Browse Gigs, My Gigs, Post a Gig, My Posted Gigs, Messages, Payouts, then a divider, then My Profile / Account Settings / Support / Logout.
 
 ---
@@ -590,44 +700,53 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 - **The webhook route always returns 200** except when signature verification fails (then 400). Handler errors are logged to `stripe_webhook_events.error_message` and `status='error'` but we deliberately don't 500. That's because Stripe will infinite-retry on 5xx and a deterministic crash would amplify the bug. Admins can manually replay events from the Stripe dashboard if needed.
 - **The 'You vs community' section on `/home` has a small-N caveat.** With only a handful of users, percentiles will hit 0% or 100% with little in between. It's wired up correctly; it just gets more interesting once there are more users. Not a bug.
 - **The 30-day chart on `/home`** is a hand-rolled SVG component (`components/home/ActivityChart.tsx`). No Recharts/chart.js dependency. If you need to extend the chart, just edit the SVG directly — easier than learning a chart lib's API.
+- **`/home` is NO LONGER the post-auth landing.** `/marketplace` is. `/home` still works, still in the protected-routes list, still in the hamburger nav as "Dashboard." Just no auth path leads there automatically. If you add a new auth flow, send users to `/marketplace`, not `/home`.
+- **`?next=` chain is fragile across the auth pipeline.** It has to be carried by: login form, signup form, signup→onboarding, onboarding→agreements, agreements→destination, Google OAuth (encoded into `redirectTo`, read back from `window.location.search` on `/auth/finishing`, posted to set-session). If you change ANY of these, test the whole chain end-to-end. Always validate that `next` (a) starts with `/`, (b) doesn't start with `/auth` (loop), and (c) for non-admin users doesn't start with `/admin`.
+- **Marketplace and gigs share auth/profiles but otherwise live separately.** Don't try to "unify" them at the schema layer (separate tables: `marketplace_listings` vs `gigs`, `listing_conversations` vs `gig_conversations`, etc.). The intentional design is parallel systems with a unified UI on top. The messaging code in particular benefits from this — it would have been MUCH worse to add a `kind` column to `gig_conversations` rather than introducing `listing_conversations`.
+- **The marketplace messaging SQL filename** is `schema_marketplace_messaging_idempotent.sql` — the `_idempotent` suffix because the original wasn't safely re-runnable and Cory hit an error mid-run that required a redo. The idempotent version is now the canonical file. If you ship more SQL for these tables, follow the same `drop policy if exists` pattern.
+- **Marketplace photo upload route already moderates images.** Don't add moderation a second time. If you're touching `/api/upload-marketplace-photo`, the gate is already in there; mirror the existing pattern.
 
 ---
 
 ## What's next (next session)
 
-**Payments system has its safety net.** Phase 7 (webhooks) shipped this session, so Stripe can now talk back to us when async stuff happens (transfers, disputes, refunds, account changes). Phases 5, 6, 8, 9 still needed before going live with real money.
+**Marketplace is now the front door** and **marketplace messaging is live end-to-end**. Both shipped this session and Cory verified them. The dashboard at `/home` still exists but is no longer the post-auth landing.
 
-**Unified Dashboard exists.** The "scoreboard"-style dashboard at `/home` is live. Hero stats, 30-day chart, action sections, percentiles, recent activity feed. Cory's reaction was "looks great." Next obvious extension: streaks + activity log (he deferred that one — said "we can add later"). That would mean a new `user_activity_log` table with triggers that fire on existing tables for inserts (claims, payouts, messages, gigs), a one-time backfill for old data, and a streak counter + persistent activity feed on the dashboard. Big addiction-multiplier.
+**Payments system has its safety net** from a previous session (Phase 7 webhooks). Phases 5, 6, 8, 9 still needed before going live with real money.
+
+**Streak counter** was pitched but deferred again — would require a new `user_activity_log` table with triggers backfilling events from claims/payouts/messages/gigs, plus a streak counter and richer activity feed on `/home`. Still the obvious "addicting to check" next move for the dashboard if Cory ever wants it.
 
 Cory's most likely next moves, in rough order:
 
-1. **Streak counter + activity log for the dashboard.** Deferred last session. Adds a `user_activity_log` table, triggers to backfill events, a streak counter on `/home` (consecutive days the user took an action), and a more reliable activity feed. This is the next iteration on the "addicting to check" goal.
+1. **Listing reports — Report button + admin queue.** Table exists, button + admin UI don't. Mirrors the existing `image_reports` flow. Probably a half-session of work.
 
 2. **Stripe Connect Phase 5: Worker payout UI polish.** Show Stripe Express dashboard login link on `/my-gigs/payouts`, show expected payout arrival window, surface Stripe-side status (Pending / In transit / Paid) instead of legacy "unpaid/pending/paid."
 
 3. **Stripe Connect Phase 6: Admin payout UI upgrade.** Show stripe_payment_intent_id, payment_status, capture/refund buttons on the admin payouts page. With webhooks in place (Phase 7 done), this is much more useful — the page can now reflect real Stripe state.
 
-4. **Stripe Connect Phase 8: Edge cases.** What happens when: flipper's card declines at capture time, worker's Connect account gets restricted after approval, auth expires before work is done, flipper requests refund after capture, gig is canceled after authorization. Webhooks (Phase 7) now exist to detect most of these; the work here is the UI/notification side.
+4. **Email notifications** (Bucket 1 #1 — MARKETPLACE_ROADMAP.md). Needs an email provider (Resend / Postmark / SES). High-impact for retention.
 
-5. **Stripe Connect Phase 9: Go-live.** Swap test keys → live keys, redo the webhook destination in LIVE mode in Stripe (test-mode destinations don't carry over — Cory needs to make a second one and put the live `whsec_...` in Vercel), one real $1 transaction to verify, monitor.
+5. **Stripe Connect Phase 8: Edge cases.** What happens when: flipper's card declines at capture time, worker's Connect account gets restricted after approval, auth expires before work is done, flipper requests refund after capture, gig is canceled after authorization. Webhooks (Phase 7) now exist to detect most of these; the work here is the UI/notification side.
 
-6. **Dashboard discoverability micro-fix on `/flipper/dashboard`.** The current flipper-specific dashboard has no signal for "work submitted, awaiting your review." The "Pending applicants" tile only counts pending claims (waiting-to-be-picked). Submitted-for-review claims have no banner or tile. **Note:** the new `/home` dashboard DOES surface this via the "needs review" action card, so this is now lower-priority — it's only relevant if someone uses the flipper-specific page directly.
+6. **Stripe Connect Phase 9: Go-live.** Swap test keys → live keys, redo the webhook destination in LIVE mode in Stripe (test-mode destinations don't carry over — Cory needs to make a second one and put the live `whsec_...` in Vercel), one real $1 transaction to verify, monitor.
 
-7. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
+7. **Terms of Service + privacy policy** (Bucket 1 #5).
 
-8. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions.
+8. **Streak counter + activity log for `/home`** — deferred again, still the next obvious dashboard enhancement.
 
-9. **Place `ReportImageButton`** on photo views.
+9. **Address/pickup details on gigs** (Bucket 1 #3) — paired with messaging; reveal-after-pick.
 
-10. **Terms of Service + privacy policy.**
+10. **Ratings/reviews** (Bucket 1 #4).
 
-11. **Address/pickup details on gigs.**
+11. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
 
-12. **Email notifications.**
+12. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions. Two-minute task.
 
-13. **Ratings/reviews.**
+13. **Place `ReportImageButton`** on photo views (gig and marketplace).
 
-14. **"Payouts" nav link is worker-centric.** Currently shown to everyone; flippers hitting it see "$0 earnings" empty state. Either rename it, hide it for users with no payout history, or build a paired flipper-side "Payments you've made" view. Low priority — Cory was aware and laughed it off, but worth fixing eventually.
+14. **Dashboard discoverability micro-fix on `/flipper/dashboard`.** The current flipper-specific dashboard has no signal for "work submitted, awaiting your review." The "Pending applicants" tile only counts pending claims. Lower priority since `/home` surfaces this via the "needs review" action card.
+
+15. **"Payouts" nav link is worker-centric.** Currently shown to everyone; flippers hitting it see "$0 earnings" empty state. Either rename it, hide it for users with no payout history, or build a paired flipper-side "Payments you've made" view. Low priority — Cory was aware and laughed it off, but worth fixing eventually.
 
 Cory will pick. Open by confirming what you're about to build in 2-3 lines, then build.
 
@@ -635,21 +754,33 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
-- `f8baa52` Rename 'My Dashboard' header on `/flipper/dashboard` to 'My Posted Gigs' to match nav label
+- `275196b` Marketplace as front door: logo → /marketplace, post-auth lands on /marketplace, preserve ?next= through signup/login/Google
+- `01804bb` Marketplace messaging: Nav unread badge counts listing messages too
+- `245427e` Marketplace messaging: inbox shows both gig and listing conversations
+- `977de9c` Marketplace messaging: chat page & ChatClient handle both gig and listing conversations
+- `ee7dccf` Marketplace messaging: wire Message Seller button on listing detail
+- `e8069db` Marketplace messaging: POST /api/listing-messages/start (find-or-create conversation)
+- `90b8014` SQL: idempotent version of marketplace messaging schema (safe to re-run)
+
+## Previous session's commits
+
+- `0d34f94` SQL: marketplace messaging + listing reports (scaffolded by previous session, run by this one)
+- `4b475b0` Marketplace Session 2: posting flow + edit + my listings + actions
+- `efbe202` Marketplace Session 1: public feed + listing detail + new front door
+- `981d50a` Marketplace foundation: schema + RLS + seed data
+- `b610088` HANDOFF: previous session's work (Phase 7 webhooks + unified Dashboard)
+- `f8baa52` Rename 'My Dashboard' header on `/flipper/dashboard` to 'My Posted Gigs'
 - `ac8f100` Fix: Google OAuth login also lands on /home (set-session API)
 - `0194d38` Dashboard tweaks: rename Home→Dashboard, login lands on dashboard, collapse nav into hamburger
 - `56068a4` Add unified Home dashboard at /home (4 hero tiles, 30-day SVG chart, action sections, percentiles, activity feed)
 - `f33e19b` Phase 7 fix: transfer.failed is deprecated, use transfer.reversed instead
 - `066c372` Stripe Connect Phase 7: webhook receiver + 8 event handlers + stripe_webhook_events log table
 
-## Previous session's commits
+## Older commits
 
 - `b6d74c8` Stripe Connect Phase 4: RLS fix + silent-failure guards
 - `85e0ec4` Stripe Connect Phase 4: flipper-side review page (not admin)
 - `922d3f1` Stripe Connect Phase 4: capture on approval
-
-## Older commits
-
 - `b96b05a` Stripe Connect Phase 3: RLS fix - flippers can INSERT/UPDATE their own payout_records
 - `e39d4b0` Stripe Connect Phase 3: wire ApplicantActions to /api/stripe/pick-worker + 3DS handling
 - `12b9ad6` Stripe Connect Phase 3: pick-worker API route (authorize on pick)
