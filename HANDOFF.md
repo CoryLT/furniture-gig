@@ -720,7 +720,13 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 Cory's most likely next moves, in rough order:
 
-1. **Terms of Service, Privacy Policy, and the platform's legal agreements.** Cory mentioned wanting to use Claude's `/goal` feature to research this thoroughly. Worker agreement is currently a placeholder (`legal_agreements` table). Bumped to top — Cory wants to do this before more listings/gigs accumulate.
+1. **Terms of Service, Privacy Policy, Worker Agreement, Flipper Agreement.** Worker agreement is currently a placeholder (`legal_agreements` table). Flipper agreement doesn't exist yet — the current schema only gates workers. Cory wanted to draft all four this session but we paused at the intake questions and didn't draft anything yet. **Before drafting, the next session needs Cory to answer:**
+   - Legal entity behind FlipWork (sole prop vs. LLC). If LLC, the docs name "FlipWork LLC" so they don't have to be rewritten after formation.
+   - State of operation (California is meaningfully harder due to AB5 gig-worker classification rules — worker agreement has to be much more careful about not implying employment).
+   - Local-only vs. nationwide (affects how much state-specific hedging the docs need).
+   - Whether forming an LLC before Stripe Phase 9 go-live is on the table — recommend yes for liability protection given real money flow.
+
+   Plan once those are answered: draft all four documents, get them into the `legal_agreements` table (or wherever the Flipper one will live), then strongly recommend Cory pay an attorney for a 30-minute review of the gig agreement specifically before Phase 9 — California labor law has real teeth here.
 
 2. **Marketplace location filter v2: zip-based + 100-mile radius.** This session shipped exact-city-match only. The full plan is zip-based: add `zip` to `worker_profiles`, `flipper_profiles`, and `marketplace_listings`; build a zip → lat/long lookup; show "within 100 mi of {zip}" with toggle. For logged-out users, prompt for zip and store in localStorage. Will naturally cover the logged-out marketplace location case too (currently they see all 60 most recent listings nationwide).
 
