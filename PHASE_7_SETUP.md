@@ -47,7 +47,7 @@ This tells Stripe where to send the messages.
    - `payment_intent.payment_failed`
    - `payment_intent.canceled`
    - `transfer.created`
-   - `transfer.failed`
+   - `transfer.reversed`
    - `charge.refunded`
    - `charge.dispute.created`
 8. Click **Add events**

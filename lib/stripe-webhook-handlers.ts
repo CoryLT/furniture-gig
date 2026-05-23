@@ -258,11 +258,13 @@ export async function handleTransferCreated(
 }
 
 // ============================================================
-// transfer.failed
-// Transfer to worker failed (bank rejection, account restricted, etc.).
-// Money is still on the platform; needs manual intervention.
+// transfer.reversed
+// A transfer to a worker's connected account was reversed (full or partial).
+// Stripe deprecated transfer.failed; reversals are the modern signal that
+// money meant for the worker isn't getting there. Mark the row 'failed'
+// and leave a clear note for admin.
 // ============================================================
-export async function handleTransferFailed(
+export async function handleTransferReversed(
   event: Stripe.Event,
   supabase: SupabaseClient
 ): Promise<string> {
@@ -287,7 +289,8 @@ export async function handleTransferFailed(
   if (!row) return `no payout_records row for charge ${sourceCharge}; ignored`
 
   const existingNotes = (row as any).notes ?? ''
-  const failureNote = `Transfer failed (id ${transfer.id}); manual review needed.`
+  const reversedAmount = (transfer.amount_reversed ?? 0) / 100
+  const failureNote = `Transfer reversed (id ${transfer.id}, $${reversedAmount.toFixed(2)} reversed); manual review needed.`
   const newNotes = existingNotes
     ? `${existingNotes}\n${failureNote}`
     : failureNote
@@ -303,7 +306,7 @@ export async function handleTransferFailed(
 
   if (updErr) throw new Error(`payout update failed: ${updErr.message}`)
 
-  return `marked payout failed (transfer failed) for charge ${sourceCharge}`
+  return `marked payout failed (transfer reversed) for charge ${sourceCharge}`
 }
 
 // ============================================================

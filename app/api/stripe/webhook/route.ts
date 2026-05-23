@@ -8,7 +8,7 @@ import {
   handlePaymentIntentFailed,
   handlePaymentIntentCanceled,
   handleTransferCreated,
-  handleTransferFailed,
+  handleTransferReversed,
   handleChargeRefunded,
   handleChargeDisputeCreated,
 } from '@/lib/stripe-webhook-handlers'
@@ -149,8 +149,8 @@ export async function POST(req: Request) {
         handlerStatus = 'processed'
         break
 
-      case 'transfer.failed':
-        handlerMessage = await handleTransferFailed(event, supabase)
+      case 'transfer.reversed':
+        handlerMessage = await handleTransferReversed(event, supabase)
         handlerStatus = 'processed'
         break
 
