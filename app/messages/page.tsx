@@ -4,15 +4,35 @@ import { createClient } from '@/lib/supabase/server'
 import { MessageCircle, User } from 'lucide-react'
 import Image from 'next/image'
 
-interface ConvRow {
+// ----- Types -----
+
+interface GigConvRow {
   id: string
-  gig_id: string
+  kind: 'gig'
   flipper_user_id: string
   worker_user_id: string
+  other_user_id: string
   last_message_at: string | null
   created_at: string
-  gigs: { id: string; title: string; slug: string } | null
+  contextTitle: string
+  contextHref: string | null
+  contextLabel: string
 }
+
+interface ListingConvRow {
+  id: string
+  kind: 'listing'
+  seller_user_id: string
+  buyer_user_id: string
+  other_user_id: string
+  last_message_at: string | null
+  created_at: string
+  contextTitle: string
+  contextHref: string | null
+  contextLabel: string
+}
+
+type ConvRow = GigConvRow | ListingConvRow
 
 interface MsgRow {
   id: string
@@ -59,13 +79,11 @@ export default async function MessagesInboxPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  // 1. Get all conversations where this user is a participant.
-  // RLS filters automatically, but we keep the OR filter explicit for safety.
-  const { data: conversationsData } = await supabase
+  // -------- Gig conversations --------
+  const { data: gigConvsData } = await supabase
     .from('gig_conversations')
     .select(`
       id,
-      gig_id,
       flipper_user_id,
       worker_user_id,
       last_message_at,
@@ -73,46 +91,123 @@ export default async function MessagesInboxPage() {
       gigs ( id, title, slug )
     `)
     .or(`flipper_user_id.eq.${user.id},worker_user_id.eq.${user.id}`)
-    .order('last_message_at', { ascending: false, nullsFirst: false })
 
-  const conversations = (conversationsData as ConvRow[] | null) ?? []
-  const conversationIds = conversations.map((c) => c.id)
+  const gigConvsRaw =
+    (gigConvsData as Array<{
+      id: string
+      flipper_user_id: string
+      worker_user_id: string
+      last_message_at: string | null
+      created_at: string
+      gigs: { id: string; title: string; slug: string } | null
+    }> | null) ?? []
 
-  // 2. Pull all messages for these conversations — we'll use them for previews + unread counts.
-  // Capping at 500 latest messages overall to be safe.
-  let messages: MsgRow[] = []
-  if (conversationIds.length > 0) {
-    const { data: messagesData } = await supabase
+  const gigConvs: GigConvRow[] = gigConvsRaw.map((c) => ({
+    id: c.id,
+    kind: 'gig',
+    flipper_user_id: c.flipper_user_id,
+    worker_user_id: c.worker_user_id,
+    other_user_id:
+      c.flipper_user_id === user.id ? c.worker_user_id : c.flipper_user_id,
+    last_message_at: c.last_message_at,
+    created_at: c.created_at,
+    contextLabel: 'About gig',
+    contextTitle: c.gigs?.title ?? 'Gig',
+    contextHref: c.gigs?.slug ? `/gigs/${c.gigs.slug}` : null,
+  }))
+
+  // -------- Listing conversations --------
+  const { data: listingConvsData } = await supabase
+    .from('listing_conversations')
+    .select(`
+      id,
+      seller_user_id,
+      buyer_user_id,
+      last_message_at,
+      created_at,
+      marketplace_listings ( id, title, slug )
+    `)
+    .or(`seller_user_id.eq.${user.id},buyer_user_id.eq.${user.id}`)
+
+  const listingConvsRaw =
+    (listingConvsData as Array<{
+      id: string
+      seller_user_id: string
+      buyer_user_id: string
+      last_message_at: string | null
+      created_at: string
+      marketplace_listings: { id: string; title: string; slug: string } | null
+    }> | null) ?? []
+
+  const listingConvs: ListingConvRow[] = listingConvsRaw.map((c) => ({
+    id: c.id,
+    kind: 'listing',
+    seller_user_id: c.seller_user_id,
+    buyer_user_id: c.buyer_user_id,
+    other_user_id:
+      c.seller_user_id === user.id ? c.buyer_user_id : c.seller_user_id,
+    last_message_at: c.last_message_at,
+    created_at: c.created_at,
+    contextLabel: 'About listing',
+    contextTitle: c.marketplace_listings?.title ?? 'Listing',
+    contextHref: c.marketplace_listings?.slug
+      ? `/marketplace/${c.marketplace_listings.slug}`
+      : null,
+  }))
+
+  // -------- Merge + sort --------
+  const conversations: ConvRow[] = [...gigConvs, ...listingConvs].sort((a, b) => {
+    const at = a.last_message_at ?? a.created_at
+    const bt = b.last_message_at ?? b.created_at
+    return bt.localeCompare(at)
+  })
+
+  // -------- Pull messages for both tables --------
+  const gigConvIds = gigConvs.map((c) => c.id)
+  const listingConvIds = listingConvs.map((c) => c.id)
+
+  let gigMessages: MsgRow[] = []
+  if (gigConvIds.length > 0) {
+    const { data: m } = await supabase
       .from('gig_messages')
       .select('id, conversation_id, sender_user_id, body, read_at, created_at')
-      .in('conversation_id', conversationIds)
+      .in('conversation_id', gigConvIds)
       .order('created_at', { ascending: false })
       .limit(500)
-    messages = (messagesData as MsgRow[] | null) ?? []
+    gigMessages = (m as MsgRow[] | null) ?? []
   }
+
+  let listingMessages: MsgRow[] = []
+  if (listingConvIds.length > 0) {
+    const { data: m } = await supabase
+      .from('listing_messages')
+      .select('id, conversation_id, sender_user_id, body, read_at, created_at')
+      .in('conversation_id', listingConvIds)
+      .order('created_at', { ascending: false })
+      .limit(500)
+    listingMessages = (m as MsgRow[] | null) ?? []
+  }
+
+  const allMessages = [...gigMessages, ...listingMessages]
 
   // Last message per conversation (messages already sorted desc, so first hit is latest)
   const lastByConv = new Map<string, MsgRow>()
   // Unread count: messages received by ME (not sent by me) with read_at = null
   const unreadByConv = new Map<string, number>()
-  for (const m of messages) {
+  for (const m of allMessages) {
     if (!lastByConv.has(m.conversation_id)) lastByConv.set(m.conversation_id, m)
     if (m.sender_user_id !== user.id && m.read_at === null) {
       unreadByConv.set(m.conversation_id, (unreadByConv.get(m.conversation_id) ?? 0) + 1)
     }
   }
 
-  // 3. Gather all "other user" IDs so we can fetch their profiles in one shot.
+  // -------- Other-user profiles --------
   const otherUserIds = Array.from(
-    new Set(
-      conversations.map((c) =>
-        c.flipper_user_id === user.id ? c.worker_user_id : c.flipper_user_id
-      )
-    )
+    new Set(conversations.map((c) => c.other_user_id))
   )
 
-  let workerProfilesById = new Map<string, WorkerProfile>()
-  let flipperProfilesById = new Map<string, FlipperProfile>()
+  const workerProfilesById = new Map<string, WorkerProfile>()
+  const flipperProfilesById = new Map<string, FlipperProfile>()
 
   if (otherUserIds.length > 0) {
     const { data: workerProfiles } = await supabase
@@ -133,23 +228,37 @@ export default async function MessagesInboxPage() {
   }
 
   function getOtherInfo(c: ConvRow) {
-    const otherId = c.flipper_user_id === user!.id ? c.worker_user_id : c.flipper_user_id
-    const iAmWorker = c.worker_user_id === user!.id // so the OTHER side is the flipper
-    const wp = workerProfilesById.get(otherId)
-    const fp = flipperProfilesById.get(otherId)
+    const wp = workerProfilesById.get(c.other_user_id)
+    const fp = flipperProfilesById.get(c.other_user_id)
 
     let name = 'User'
     let avatarUrl: string | null = null
     let username: string | null = null
 
     if (wp) {
-      const full = `${wp.first_name} ${wp.last_name}`.trim()
+      const full = `${wp.first_name ?? ''} ${wp.last_name ?? ''}`.trim()
       if (full) name = full
       if (wp.avatar_url) avatarUrl = wp.avatar_url
       if (wp.username) username = wp.username
     }
-    // If the other side is the flipper, prefer business_name when set
-    if (iAmWorker && fp) {
+
+    // For gig convs: if the OTHER side is the flipper, prefer business_name.
+    // For listing convs: prefer business_name if it's set (whether the other
+    //   side is buyer or seller — either may have a flipper profile).
+    let preferBusinessName = false
+    if (c.kind === 'gig') {
+      preferBusinessName = c.worker_user_id === user!.id
+    } else {
+      // listing conv: prefer business_name if available
+      preferBusinessName = true
+    }
+
+    if (preferBusinessName && fp) {
+      if (fp.business_name && fp.business_name.trim()) name = fp.business_name
+      if (fp.avatar_url) avatarUrl = fp.avatar_url
+      if (fp.username) username = fp.username
+    } else if (!wp && fp) {
+      // No worker profile, use flipper as fallback
       if (fp.business_name && fp.business_name.trim()) name = fp.business_name
       if (fp.avatar_url) avatarUrl = fp.avatar_url
       if (fp.username) username = fp.username
@@ -183,13 +292,14 @@ export default async function MessagesInboxPage() {
           <MessageCircle className="w-10 h-10 text-muted-foreground mx-auto" />
           <h2 className="font-medium text-foreground">No conversations yet</h2>
           <p className="text-sm text-muted-foreground">
-            When you claim a gig, or someone claims one of yours, a chat will appear here.
+            Conversations appear here when you apply to a gig, get one
+            claimed, or message a seller about a marketplace listing.
           </p>
         </div>
       ) : (
         <div className="border border-stone-200 bg-white rounded-lg divide-y divide-stone-200 overflow-hidden">
           {conversations.map((c) => {
-            const { name, avatarUrl, username: _username } = getOtherInfo(c)
+            const { name, avatarUrl } = getOtherInfo(c)
             const last = lastByConv.get(c.id)
             const unread = unreadByConv.get(c.id) ?? 0
             const lastFromMe = last && last.sender_user_id === user!.id
@@ -197,7 +307,6 @@ export default async function MessagesInboxPage() {
               ? `${lastFromMe ? 'You: ' : ''}${last.body}`
               : 'No messages yet'
             const when = timeAgo(c.last_message_at ?? c.created_at)
-            const gigTitle = c.gigs?.title ?? 'Gig'
 
             return (
               <Link
@@ -224,7 +333,7 @@ export default async function MessagesInboxPage() {
                   )}
                 </div>
 
-                {/* Middle: name, gig, preview */}
+                {/* Middle: name, context, preview */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -232,7 +341,7 @@ export default async function MessagesInboxPage() {
                         {name}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
-                        About: {gigTitle}
+                        {c.contextLabel}: {c.contextTitle}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
