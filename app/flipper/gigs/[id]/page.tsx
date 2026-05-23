@@ -6,6 +6,10 @@ import { MapPin, Calendar, Wrench, ArrowLeft, User, Pencil } from 'lucide-react'
 import OpenChatButton from '@/components/shared/OpenChatButton'
 import ApplicantActions from './ApplicantActions'
 
+// Always fetch fresh — never cache this page
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 type WorkerProfile = {
   first_name: string
   last_name: string
@@ -40,14 +44,41 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
 
   if (!gig) notFound()
 
-  // Load claims with worker info
+  // Load claims (no join — we fetch worker profiles separately to avoid
+  // any silent embed-join failures from RLS)
   const { data: claimsRaw } = await supabase
     .from('gig_claims')
-    .select('*, worker_profiles(first_name, last_name, city, state, username, bio, skills)')
+    .select('*')
     .eq('gig_id', gig.id)
     .order('claimed_at', { ascending: false })
 
-  const claims = (claimsRaw ?? []) as unknown as ClaimRow[]
+  // Pull all the worker profiles for those claims in one go
+  const workerIds = (claimsRaw ?? []).map((c: any) => c.worker_user_id)
+  const { data: profilesRaw } = workerIds.length > 0
+    ? await supabase
+        .from('worker_profiles')
+        .select('user_id, first_name, last_name, city, state, username, bio, skills')
+        .in('user_id', workerIds)
+    : { data: [] }
+
+  const profileByUserId = new Map<string, WorkerProfile>()
+  for (const p of (profilesRaw ?? []) as any[]) {
+    profileByUserId.set(p.user_id, {
+      first_name: p.first_name,
+      last_name: p.last_name,
+      city: p.city,
+      state: p.state,
+      username: p.username,
+      bio: p.bio,
+      skills: p.skills,
+    })
+  }
+
+  // Stitch profiles onto claims
+  const claims = ((claimsRaw ?? []) as any[]).map((c) => ({
+    ...c,
+    worker_profiles: profileByUserId.get(c.worker_user_id) ?? null,
+  })) as ClaimRow[]
 
   // Split by status
   const pendingClaims = claims.filter((c) => c.status === 'pending')
