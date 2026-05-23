@@ -47,7 +47,7 @@ export default function LoginPage() {
     if (email.toLowerCase() === adminEmail) {
       router.push('/admin')
     } else {
-      router.push('/gigs')
+      router.push('/home')
     }
   }
 

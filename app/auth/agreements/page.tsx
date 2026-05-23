@@ -4,8 +4,7 @@ import AgreementsClient from './AgreementsClient'
 
 function homeForRole(role: string | null | undefined): string {
   if (role === 'admin') return '/admin'
-  if (role === 'flipper') return '/flipper/dashboard'
-  return '/gigs'
+  return '/home'
 }
 
 export default async function AgreementsPage({

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Armchair, Menu, X } from 'lucide-react'
+import { Armchair, Menu } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 
 interface NavProps {
@@ -13,7 +13,7 @@ interface NavProps {
 }
 
 const userLinks = [
-  { href: '/home', label: 'Home' },
+  { href: '/home', label: 'Dashboard' },
   { href: '/gigs', label: 'Browse Gigs' },
   { href: '/my-gigs', label: 'My Gigs' },
   { href: '/flipper/post-gig', label: 'Post a Gig' },
@@ -32,7 +32,6 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [currentUserUsername, setCurrentUserUsername] = useState<string | null>(null)
@@ -208,39 +207,46 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
           FlipWork
         </Link>
 
-        <div className="hidden md:flex items-center gap-6">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`text-sm font-medium transition-colors inline-flex items-center gap-1.5 ${
-                pathname === link.href
-                  ? 'text-accent'
-                  : 'text-foreground hover:text-accent'
-              }`}
-            >
-              {link.label}
-              {link.href === '/messages' && unreadMessages > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-accent text-accent-foreground text-[10px] font-semibold leading-none">
-                  {unreadMessages > 99 ? '99+' : unreadMessages}
-                </span>
-              )}
-            </Link>
-          ))}
-        </div>
-
         <div className="flex items-center gap-4">
-          <div className="hidden md:block relative" ref={dropdownRef}>
+          <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="p-2 hover:bg-stone-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-amber-600"
+              className="relative p-2 hover:bg-stone-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-amber-600"
               aria-label="Menu"
             >
               <Menu className="w-5 h-5 text-foreground" />
+              {/* At-a-glance unread badge on the hamburger so it's still visible
+                  when nav items are tucked inside */}
+              {unreadMessages > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-accent text-accent-foreground text-[10px] font-semibold leading-none">
+                  {unreadMessages > 99 ? '99+' : unreadMessages}
+                </span>
+              )}
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-stone-200 rounded-lg shadow-lg py-1 z-50">
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-stone-200 rounded-lg shadow-lg py-1 z-50">
+                {/* Primary nav (now collapsed into here on every viewport) */}
+                {links.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setDropdownOpen(false)}
+                    className={`flex items-center justify-between gap-2 px-4 py-2 text-sm transition-colors ${
+                      pathname === link.href
+                        ? 'text-accent bg-stone-50'
+                        : 'text-foreground hover:bg-stone-50 hover:text-accent'
+                    }`}
+                  >
+                    <span>{link.label}</span>
+                    {link.href === '/messages' && unreadMessages > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-accent text-accent-foreground text-[10px] font-semibold leading-none">
+                        {unreadMessages > 99 ? '99+' : unreadMessages}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+                <hr className="my-1" />
                 {getPublicProfileUrl() && (
                   <Link
                     href={getPublicProfileUrl()!}
@@ -277,75 +283,9 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
               </div>
             )}
           </div>
-
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="md:hidden p-2 hover:bg-stone-100 rounded-lg"
-          >
-            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
         </div>
       </div>
 
-      {menuOpen && (
-        <div className="md:hidden border-t border-stone-200 bg-stone-50">
-          <div className="px-4 py-4 space-y-1">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`flex items-center gap-2 py-2.5 px-2 rounded-md text-sm font-medium transition-colors ${
-                  pathname === link.href
-                    ? 'text-accent bg-stone-100'
-                    : 'text-foreground hover:bg-stone-100'
-                }`}
-                onClick={() => setMenuOpen(false)}
-              >
-                {link.label}
-                {link.href === '/messages' && unreadMessages > 0 && (
-                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-accent text-accent-foreground text-[10px] font-semibold leading-none">
-                    {unreadMessages > 99 ? '99+' : unreadMessages}
-                  </span>
-                )}
-              </Link>
-            ))}
-            <hr className="my-2" />
-            {getPublicProfileUrl() && (
-              <Link
-                href={getPublicProfileUrl()!}
-                className="block py-2.5 px-2 rounded-md text-sm font-medium text-foreground hover:bg-stone-100 transition-colors"
-                onClick={() => setMenuOpen(false)}
-              >
-                My Profile
-              </Link>
-            )}
-            <Link
-              href="/profile"
-              className="block py-2.5 px-2 rounded-md text-sm font-medium text-foreground hover:bg-stone-100 transition-colors"
-              onClick={() => setMenuOpen(false)}
-            >
-              Account Settings
-            </Link>
-            <Link
-              href="/support"
-              className="block py-2.5 px-2 rounded-md text-sm font-medium text-foreground hover:bg-stone-100 transition-colors"
-              onClick={() => setMenuOpen(false)}
-            >
-              Support
-            </Link>
-            <hr className="my-2" />
-            <button
-              onClick={() => {
-                handleLogout()
-                setMenuOpen(false)
-              }}
-              className="w-full text-left py-2.5 px-2 rounded-md text-sm font-medium text-red-600 hover:bg-stone-100 transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      )}
     </nav>
   )
 }
