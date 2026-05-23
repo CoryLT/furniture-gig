@@ -67,6 +67,8 @@ After you push, Cory must:
 - **Stripe Connect — flippers save a card** (Phase 2): when flipper clicks "Pick this worker," a modal collects a card via Stripe Elements (SetupIntent + Customer). Saved off-session for Phase 3 authorize-on-pick.
 - **Stripe Connect — authorize on pick** (Phase 3): when flipper picks a worker, a PaymentIntent holds money on their card (`capture_method: manual`). Worker's Connect account is set as `transfer_data.destination`. Platform fee = 2% via `application_fee_amount`.
 - **Stripe Connect — capture on approval** (Phase 4): flipper-side review at `/flipper/review/[claimId]`. When flipper approves submitted work, the held PaymentIntent is captured. Stripe auto-transfers (gig amount − 2%) to the worker's Connect account. Verified end-to-end in sandbox.
+- **Stripe Connect — webhooks** (Phase 7): `/api/stripe/webhook` is live. Receiver verifies Stripe signature, logs every event to `stripe_webhook_events` (idempotent via event ID PK), dispatches 8 event types (`account.updated`, `payment_intent.succeeded/payment_failed/canceled`, `transfer.created/reversed`, `charge.refunded/dispute.created`). Each handler is idempotent and won't move a payout row backwards in its status lifecycle. Always returns 200 unless signature fails — handler errors are logged on the event row but don't ask Stripe to retry (avoids infinite-loop on deterministic bugs). The Stripe dashboard side is configured with ONE event destination scoped to "Connected accounts" (not two — both platform and connected events flow through the same endpoint despite Stripe's UI suggesting otherwise; `transfer.failed` is deprecated, use `transfer.reversed`).
+- **Unified Dashboard at `/home`** — single landing page for logged-in users. Greeting + date, 4-tile hero stats (total earned / invested / gigs completed / active), 30-day stacked-bar SVG chart of daily money flow (hand-rolled, no chart deps), action sections that hide when empty (needs review / pending applicants / unread messages / work in progress), "You vs the community" percentile bars (only shows once user has some activity), recent activity feed (last ~10 events). Brand-new users see a single welcome card instead. Hamburger nav now collapses ALL primary nav items into the dropdown on every viewport — there's no longer a desktop horizontal link row.
 - **Flipper dashboard with filter/sort + needs-review highlights** — banner appears when any gig has pending applicants, dedicated stat tile, filter chips (All / Needs review / Open / In progress / Completed), sort dropdown (Newest / Oldest / Due soon / Most applicants), pending gigs always float to top under "All". Note: does NOT yet surface "work submitted, awaiting your review" — that's a known gap (see What's Next #7).
 
 ---
@@ -104,6 +106,79 @@ Bucket 1 #2. Note: with the application/approval flow refactor, there is now ONE
 - The typing indicator throttles broadcasts to once per 1.5s. Stops broadcasting on blur or empty input.
 - The unread badge in Nav has TWO triggers: (1) realtime subscription to inserts/updates, and (2) a 1.2s delayed refetch when the user navigates to anything under `/messages` (to catch read_at updates that may be in flight). Both work in tandem.
 - The chat page header avatar/name links to `/u/[username]` if a username exists — handy for flippers vetting workers.
+
+---
+
+## Stripe Connect Phase 7: webhooks (DONE — shipped this session)
+
+### What's there
+- **`/api/stripe/webhook`** — POST endpoint that Stripe pings. Verifies signature with `STRIPE_WEBHOOK_SECRET`, inserts a row in `stripe_webhook_events` using event ID as PK (idempotency — duplicate deliveries 200-no-op), dispatches by event type, marks row processed/ignored/error.
+- **`lib/stripe-webhook-handlers.ts`** — one handler per event type. All idempotent (won't move payout rows backward in their status lifecycle).
+- **`stripe_webhook_events` table** — full audit log, payload stored as JSONB, admin-only RLS SELECT.
+
+### Event types handled
+- `account.updated` — syncs `worker_profiles.stripe_charges_enabled / stripe_payouts_enabled / stripe_details_submitted` and stamps `stripe_onboarding_completed_at` first time all are green.
+- `payment_intent.succeeded` — belt-and-suspenders for capture. The sync capture-on-approval API already writes to DB, but if that write failed and Stripe captured anyway, this catches up.
+- `payment_intent.payment_failed` — flips payout row to `payment_status='failed'` with the Stripe error in `notes`.
+- `payment_intent.canceled` — flips to `'canceled'` UNLESS the row is already in `captured`/`transferred`/`refunded` (defensive).
+- `transfer.created` — flips to `'transferred'`, stores `stripe_transfer_id`.
+- `transfer.reversed` — flips to `'failed'` with reason in `notes`. (NOTE: `transfer.failed` was deprecated by Stripe; use `transfer.reversed`.)
+- `charge.refunded` — flips to `'refunded'`, also rolls legacy `payout_status` back to `'unpaid'`, appends refund note.
+- `charge.dispute.created` — does NOT change status (a dispute can be won), just appends a ⚠️ note. Full dispute handling is a Phase 8 task.
+
+### Stripe dashboard setup (already done)
+- ONE event destination: "FlipWork — Connected accounts" → `https://myflipwork.com/api/stripe/webhook`
+- Scope: **Connected accounts** (not "Your account"). All 8 events route through this one destination despite Stripe's UI implying you need a separate destination for platform-scoped events. This works because in test mode the platform events flow through here too, and there's no benefit to splitting them.
+- Signing secret in Vercel as `STRIPE_WEBHOOK_SECRET` (rolled mid-session because it was screenshotted).
+- **For LIVE mode (Phase 9)**: you'll need a SEPARATE destination created in Live mode in Stripe, with its own `whsec_...`. Either swap the env var or add a second one if you want to test alongside live for a bit.
+
+### Key code files
+- `app/api/stripe/webhook/route.ts` — receiver. Uses `runtime = 'nodejs'` (raw body for signature verify). Always returns 200 except 400 on signature failure — deliberate, to prevent Stripe retry storms on deterministic bugs.
+- `lib/stripe-webhook-handlers.ts` — 8 handler functions, each takes `(event, supabaseAdminClient)` and returns a status string for logging.
+- `lib/supabase/admin.ts` — service-role client (pre-existed, used by the webhook).
+- `supabase/schema_phase7_stripe_webhooks.sql` — already run.
+- `PHASE_7_SETUP.md` — setup walkthrough for Cory (SQL + Stripe + Vercel steps).
+
+### Quirks worth knowing
+- The `switch` statement on `event.type` uses `(event.type as string)` cast because Stripe's TS literal union doesn't include all valid runtime event types.
+- The "error" status on `stripe_webhook_events` stores the actual handler error message in `error_message`. The "processed" rows reuse `error_message` to store the handler's status message — a small hack documented in the route.
+
+---
+
+## Unified Dashboard at `/home` (DONE — shipped this session)
+
+### What's there
+- **`/home`** is now the default landing for logged-in users (every login path redirects here). Replaces the previous role-specific landing pages.
+- **`/` (root)** redirects logged-in users to `/home`. Logged-out still sees the public marketing landing.
+- **Logo + login** all route to `/home`.
+- **Hamburger nav** restructured: NO horizontal link row anymore. All 7 primary nav items collapsed into the existing hamburger dropdown on every viewport.
+
+### Sections on the page (server-rendered)
+1. Greeting ("Good morning, [first name]") + today's date
+2. **4 hero stat tiles**: Total earned (lifetime $) · Total invested · Gigs completed (worker + flipper combined) · Active right now
+3. **30-day stacked-bar SVG chart** of daily money flow. Orange = earned, blue = invested. Empty days render as a thin baseline tick. Tooltip on hover.
+4. **Action sections (each hides if empty)**: needs review · pending applicants · unread messages · work in progress
+5. **"You vs the community"**: percentile bars — only shows if user has at least some activity
+6. **Recent activity feed**: last ~10 events, computed inline by querying claims/payouts/gigs and sorting by time
+7. **Quick actions** at the bottom: Post a gig · Browse gigs
+
+### Brand-new user case
+If user has zero of everything (no payouts, no claims, no posted gigs, no activity), they see ONE welcome card with "Post your first gig" and "Browse open gigs" CTAs instead of all the above.
+
+### Key code files
+- `app/home/page.tsx` — the main page, ~600 lines, server component. Does all data fetching inline (lots of small Supabase queries — could be optimized later if perf becomes an issue).
+- `components/home/ActivityChart.tsx` — hand-rolled SVG client component (no chart library). Renders the 30-day bar chart with hover tooltip.
+- `lib/home-dashboard.ts` — small helpers (`lastNDays`, `toISODate`, `buildBuckets`) for date bucketing.
+- `app/page.tsx` — root, now does an auth check and redirects logged-in users to `/home`.
+
+### Deliberately NOT done this session
+- **Streak counter** — Cory asked about it, I pitched it, he deferred to a future session because it requires a new `user_activity_log` table with triggers. Currently the closest thing to a streak is the 30-day chart. Adding streaks is the next obvious dashboard enhancement and would noticeably boost the "addicting to check" goal Cory wants.
+- The "Recent activity" feed currently queries existing tables; with an activity log table it'd be richer and faster.
+
+### Quirks worth knowing
+- The percentile section ("outearned X% of workers") is a real calculation, but with only a handful of users it'll often hit 0% or 100%. Looks weird in dev; gets better as user base grows.
+- The chart uses LOCAL timezone for date bucketing (see `toISODate` in `lib/home-dashboard.ts`). If users are spread across timezones, "today" is per-user.
+- Every login redirect path was checked + updated to land on `/home`. The Google OAuth path was the trickiest because it has its own destination logic in `/api/auth/set-session/route.ts` separate from the password-login redirects. If you add a new auth method, send it to `/home`.
 
 ---
 
@@ -491,9 +566,11 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 - **Photo upload APIs:** `/api/upload-flipper-gallery-photo` and `/api/upload-worker-gallery-photo` use the shared `createClient` from `@/lib/supabase/server` (NOT the manual `createServerClient` pattern — that was a previous bug source).
 - **Avatar uploads** use `/api/upload-avatar` (also shared `createClient`), max 5MB. Work Sample photos max 10MB.
 - **Nav** lives in `components/shared/Nav.tsx`. Hamburger dropdown has "My Profile" (→ `/u/[username]`), "Account Settings" (→ `/profile`), "Support" (→ `/support`), Logout. Now also has the realtime unread message badge.
-- **Middleware** at root protects `/gigs`, `/my-gigs`, `/admin`, `/flipper`, `/profile`, `/messages`, `/auth/agreements`.
+- **Middleware** at root protects `/gigs`, `/my-gigs`, `/admin`, `/flipper`, `/profile`, `/messages`, `/home`, `/auth/agreements`.
 - **Worker profile** uses `first_name` + `last_name` (yes — the old handoff said `full_name`; that was WRONG. The schema and code both use first/last. Trust `types/database.ts`.).
 - **Cory bumped photo limits from 5MB to 10MB** for Work Samples specifically. Avatars stayed at 5MB.
+- **Login redirects now ALL converge on `/home`** for non-admin users. Multiple paths were updated this session: `app/auth/login/page.tsx` (client form), `app/auth/login/actions.ts` (server action), `app/auth/agreements/page.tsx` (`homeForRole` helper, post-agreements destination), and `app/api/auth/set-session/route.ts` (Google OAuth completion). The OAuth path was the sneaky one — it has its own destination logic in the set-session API. If you add a new login or sign-in flow, send users to `/home`, not `/gigs` or `/flipper/dashboard`.
+- **Nav UI got compacted this session.** No more desktop horizontal link row. ALL primary nav items live inside the hamburger dropdown on every viewport. The unread-message badge is now anchored to the hamburger button itself for at-a-glance visibility. The old standalone `menuOpen` mobile slide-down was deleted (the single dropdown handles both desktop and mobile). The dropdown nav order is: Dashboard, Browse Gigs, My Gigs, Post a Gig, My Posted Gigs, Messages, Payouts, then a divider, then My Profile / Account Settings / Support / Logout.
 
 ---
 
@@ -507,45 +584,50 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 - **He's on Max plan.** Use the context you need, but don't be wasteful.
 - **Supabase embed-joins fail SILENTLY under RLS.** A query like `.select('*, worker_profiles(...)')` returns the parent row with the embed set to `null` if RLS blocks the join target — no error, no warning. This bit us on the flipper applicant list. If a join returns null unexpectedly, suspect an RLS policy on the embed target table BEFORE blaming the app code. The safer pattern when in doubt: do two separate queries and stitch in JS.
 - **When adding a feature that lets ONE role see another role's data, check RLS on EVERY table you query, including joined ones.** RLS is the silent gatekeeper — it's not enough to allow access to the primary table.
-- **`force-dynamic` + `revalidate=0` is the cache-buster combo** for server pages that show fast-changing relational data. `/flipper/dashboard` and `/flipper/gigs/[id]` already have it. Add it to any new page that shows claim/applicant/message state.
+- **`force-dynamic` + `revalidate=0` is the cache-buster combo** for server pages that show fast-changing relational data. `/flipper/dashboard`, `/flipper/gigs/[id]`, and `/home` already have it. Add it to any new page that shows claim/applicant/message state.
+- **The `/home` dashboard URL is intentionally NOT `/dashboard`.** It's labeled "Dashboard" in the nav, but the route stayed at `/home` to avoid breaking bookmarks/in-app links. If you decide to rename the route, do an audit of every redirect target (see the multiple login paths note above).
+- **`transfer.failed` doesn't exist as a Stripe webhook event anymore.** Stripe deprecated it. The replacement is `transfer.reversed`. The Phase 7 handler is named `handleTransferReversed`. Don't get confused by older docs/references.
+- **The webhook route always returns 200** except when signature verification fails (then 400). Handler errors are logged to `stripe_webhook_events.error_message` and `status='error'` but we deliberately don't 500. That's because Stripe will infinite-retry on 5xx and a deterministic crash would amplify the bug. Admins can manually replay events from the Stripe dashboard if needed.
+- **The 'You vs community' section on `/home` has a small-N caveat.** With only a handful of users, percentiles will hit 0% or 100% with little in between. It's wired up correctly; it just gets more interesting once there are more users. Not a bug.
+- **The 30-day chart on `/home`** is a hand-rolled SVG component (`components/home/ActivityChart.tsx`). No Recharts/chart.js dependency. If you need to extend the chart, just edit the SVG directly — easier than learning a chart lib's API.
 
 ---
 
 ## What's next (next session)
 
-**Payments system is functionally complete for the happy path, but NOT production-ready.** Phases 0-4 ship; Phases 5-9 still needed before going live with real money. See `MARKETPLACE_ROADMAP.md` for the full picture.
+**Payments system has its safety net.** Phase 7 (webhooks) shipped this session, so Stripe can now talk back to us when async stuff happens (transfers, disputes, refunds, account changes). Phases 5, 6, 8, 9 still needed before going live with real money.
+
+**Unified Dashboard exists.** The "scoreboard"-style dashboard at `/home` is live. Hero stats, 30-day chart, action sections, percentiles, recent activity feed. Cory's reaction was "looks great." Next obvious extension: streaks + activity log (he deferred that one — said "we can add later"). That would mean a new `user_activity_log` table with triggers that fire on existing tables for inserts (claims, payouts, messages, gigs), a one-time backfill for old data, and a streak counter + persistent activity feed on the dashboard. Big addiction-multiplier.
 
 Cory's most likely next moves, in rough order:
 
-1. **Stripe webhooks (Phase 7).** Required before going live with real money. Without webhooks we don't get notified when: a transfer to a worker fails, a flipper disputes a charge, an authorization expires before capture (7+ days), a worker's Connect account status changes async. Build `/api/stripe/webhook` to handle at minimum `account.updated`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `transfer.created`, `transfer.failed`, `charge.refunded`. Needs `STRIPE_WEBHOOK_SECRET` env var on Vercel.
+1. **Streak counter + activity log for the dashboard.** Deferred last session. Adds a `user_activity_log` table, triggers to backfill events, a streak counter on `/home` (consecutive days the user took an action), and a more reliable activity feed. This is the next iteration on the "addicting to check" goal.
 
-2. **Unified dashboard ("Home" / "Today" view).** Cory raised this at end of session. Current state: info is scattered across the flipper dashboard, My Gigs (Active/Applications/History), Messages, Payouts, and Profile/Payments. With universal profiles, one user can be flipping AND applying simultaneously. He wants a single landing page that shows everything needing attention: gigs awaiting your review (as flipper), new applicants (as flipper), unread messages, work in progress (as worker), recent payouts, quick actions. Sections that have nothing to show should vanish — pure-flippers see flipper stuff, pure-workers see worker stuff, both-roles see both. Don't gate by role check; gate by "is there data for this section."
+2. **Stripe Connect Phase 5: Worker payout UI polish.** Show Stripe Express dashboard login link on `/my-gigs/payouts`, show expected payout arrival window, surface Stripe-side status (Pending / In transit / Paid) instead of legacy "unpaid/pending/paid."
 
-3. **Stripe Connect Phase 5: Worker payout UI polish.** Show Stripe Express dashboard login link on `/my-gigs/payouts`, show expected payout arrival window, surface Stripe-side status (Pending / In transit / Paid) instead of legacy "unpaid/pending/paid."
+3. **Stripe Connect Phase 6: Admin payout UI upgrade.** Show stripe_payment_intent_id, payment_status, capture/refund buttons on the admin payouts page. With webhooks in place (Phase 7 done), this is much more useful — the page can now reflect real Stripe state.
 
-4. **Stripe Connect Phase 6: Admin payout UI upgrade.** Show stripe_payment_intent_id, payment_status, capture/refund buttons on the admin payouts page.
+4. **Stripe Connect Phase 8: Edge cases.** What happens when: flipper's card declines at capture time, worker's Connect account gets restricted after approval, auth expires before work is done, flipper requests refund after capture, gig is canceled after authorization. Webhooks (Phase 7) now exist to detect most of these; the work here is the UI/notification side.
 
-5. **Stripe Connect Phase 8: Edge cases.** What happens when: flipper's card declines at capture time, worker's Connect account gets restricted after approval, auth expires before work is done, flipper requests refund after capture, gig is canceled after authorization. Many of these need webhooks (Phase 7) first.
+5. **Stripe Connect Phase 9: Go-live.** Swap test keys → live keys, redo the webhook destination in LIVE mode in Stripe (test-mode destinations don't carry over — Cory needs to make a second one and put the live `whsec_...` in Vercel), one real $1 transaction to verify, monitor.
 
-6. **Stripe Connect Phase 9: Go-live.** Swap test keys → live keys, one real $1 transaction to verify, monitor.
+6. **Dashboard discoverability micro-fix on `/flipper/dashboard`.** The current flipper-specific dashboard has no signal for "work submitted, awaiting your review." The "Pending applicants" tile only counts pending claims (waiting-to-be-picked). Submitted-for-review claims have no banner or tile. **Note:** the new `/home` dashboard DOES surface this via the "needs review" action card, so this is now lower-priority — it's only relevant if someone uses the flipper-specific page directly.
 
-7. **Dashboard discoverability micro-fix (if not doing #2 yet).** The current flipper dashboard has no signal for "work submitted, awaiting your review." The "Pending applicants" tile only counts pending claims (waiting-to-be-picked). Submitted-for-review claims have no banner or tile. Phase 4 surfaced this — solved at the gig-detail level (top section + Review work button) but not at the dashboard level. Add a tile + banner counting gigs with any `submitted_for_review` claim.
+7. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
 
-8. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
+8. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions.
 
-9. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions.
+9. **Place `ReportImageButton`** on photo views.
 
-10. **Place `ReportImageButton`** on photo views.
+10. **Terms of Service + privacy policy.**
 
-11. **Terms of Service + privacy policy.**
+11. **Address/pickup details on gigs.**
 
-12. **Address/pickup details on gigs.**
+12. **Email notifications.**
 
-13. **Email notifications.**
+13. **Ratings/reviews.**
 
-14. **Ratings/reviews.**
-
-15. **"Payouts" nav link is worker-centric.** Currently shown to everyone; flippers hitting it see "$0 earnings" empty state. Either rename it, hide it for users with no payout history, or build a paired flipper-side "Payments you've made" view. Low priority — Cory was aware and laughed it off, but worth fixing eventually.
+14. **"Payouts" nav link is worker-centric.** Currently shown to everyone; flippers hitting it see "$0 earnings" empty state. Either rename it, hide it for users with no payout history, or build a paired flipper-side "Payments you've made" view. Low priority — Cory was aware and laughed it off, but worth fixing eventually.
 
 Cory will pick. Open by confirming what you're about to build in 2-3 lines, then build.
 
@@ -553,20 +635,26 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
+- `f8baa52` Rename 'My Dashboard' header on `/flipper/dashboard` to 'My Posted Gigs' to match nav label
+- `ac8f100` Fix: Google OAuth login also lands on /home (set-session API)
+- `0194d38` Dashboard tweaks: rename Home→Dashboard, login lands on dashboard, collapse nav into hamburger
+- `56068a4` Add unified Home dashboard at /home (4 hero tiles, 30-day SVG chart, action sections, percentiles, activity feed)
+- `f33e19b` Phase 7 fix: transfer.failed is deprecated, use transfer.reversed instead
+- `066c372` Stripe Connect Phase 7: webhook receiver + 8 event handlers + stripe_webhook_events log table
+
+## Previous session's commits
+
 - `b6d74c8` Stripe Connect Phase 4: RLS fix + silent-failure guards
 - `85e0ec4` Stripe Connect Phase 4: flipper-side review page (not admin)
 - `922d3f1` Stripe Connect Phase 4: capture on approval
 
-## Previous session's commits
+## Older commits
 
 - `b96b05a` Stripe Connect Phase 3: RLS fix - flippers can INSERT/UPDATE their own payout_records
 - `e39d4b0` Stripe Connect Phase 3: wire ApplicantActions to /api/stripe/pick-worker + 3DS handling
 - `12b9ad6` Stripe Connect Phase 3: pick-worker API route (authorize on pick)
 - `b61a85c` Stripe Connect Phase 3: authorizePickPayment helper
 - `fd9c564` Stripe Connect Phase 3: SQL for flipper RLS + flipper_user_id index
-
-## Older commits
-
 - `7a18b0a` Flipper dashboard: needs-review banner, pending stat, filters, sort
 - `c236885` Fix: card-save modal didn't fit smaller screens
 - `2080d1f` Fix: flipper applicant list — split join into two queries + disable caching
