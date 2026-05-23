@@ -63,12 +63,15 @@ After you push, Cory must:
 - **Application/approval flow** — workers apply, flipper picks one (replaced old "first-to-claim wins" model)
 - **Image moderation via Sightengine** — all uploads blocked for porn / violence / weapons / drugs / gore / offensive / minors
 - **User-reported image flagging** — backend API exists but Report button isn't placed on photo views yet
+- **Stripe Connect — workers connect** (Phase 1): workers must connect a Stripe Express account before applying; gated apply button on gig detail
+- **Stripe Connect — flippers save a card** (Phase 2): when flipper clicks "Pick this worker," a modal collects a card via Stripe Elements (SetupIntent + Customer). Saved off-session for Phase 3 authorize-on-pick.
+- **Flipper dashboard with filter/sort + needs-review highlights** — banner appears when any gig has pending applicants, dedicated stat tile, filter chips (All / Needs review / Open / In progress / Completed), sort dropdown (Newest / Oldest / Due soon / Most applicants), pending gigs always float to top under "All"
 
 ---
 
 ## Messaging system
 
-Bucket 1 #2. Note: with the application/approval flow refactor (this session), there is now ONE conversation per (gig, applicant) rather than one per gig. See that section for the details.
+Bucket 1 #2. Note: with the application/approval flow refactor, there is now ONE conversation per (gig, applicant) rather than one per gig. See that section for the details.
 
 ### What's there
 - **`/messages` inbox** — list of all conversations, sorted by recency, with unread badges per row and a total unread summary up top
@@ -102,7 +105,7 @@ Bucket 1 #2. Note: with the application/approval flow refactor (this session), t
 
 ---
 
-## Self-claim bug fix (NEW this session)
+## Self-claim bug fix (shipped previous session)
 
 Cory noticed users could claim their own gigs. Three layers of fix:
 
@@ -112,7 +115,7 @@ Cory noticed users could claim their own gigs. Three layers of fix:
 
 ---
 
-## Application/approval flow (DONE — shipped this session)
+## Application/approval flow (DONE — shipped previous session)
 
 Replaced the old "first-to-claim wins" exclusive claim model.
 
@@ -155,7 +158,7 @@ Replaced the old "first-to-claim wins" exclusive claim model.
 
 ---
 
-## Image moderation (DONE — shipped this session)
+## Image moderation (DONE — shipped previous session)
 
 Sightengine integration. All 5 upload paths gated.
 
@@ -200,7 +203,7 @@ Sightengine free tier: 2,000 ops/month, 500/day cap. Each image = 7 ops (7 model
 
 ---
 
-## Auth + mobile polish (DONE — shipped this session)
+## Auth + mobile polish (DONE — shipped previous session)
 
 Three small but high-impact bug fixes plus a UX tweak.
 
@@ -259,7 +262,7 @@ Cory pivoted from "polish the manual PayPal flow" to "do payouts right." We're b
   - `payout_records`: `stripe_payment_intent_id`, `stripe_charge_id`, `stripe_transfer_id`, `flipper_user_id`, `gross_amount`, `stripe_fee_amount`, `platform_fee_amount`, `payment_status` (enum: none/requires_method/authorized/captured/transferred/failed/canceled/refunded)
   - Two indexes for fast lookups
 - `app/api/stripe/health/route.ts` — admin-only `/api/stripe/health` endpoint. GET it as admin to verify Stripe credentials, Connect status, and platform fee math. **Confirmed working — returned `"ok": true` end-to-end.**
-- `package.json` — `stripe@^16.12.0` and `@stripe/stripe-js@^4.10.0` installed
+- `package.json` — `stripe@^16.12.0`, `@stripe/stripe-js@^4.10.0`, and `@stripe/react-stripe-js@^2.8.0` installed
 - Vercel env vars set (Production + Preview + Development):
   - `STRIPE_SECRET_KEY` (test mode, ends in `KEuj`)
   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (test mode)
@@ -270,8 +273,8 @@ Cory pivoted from "polish the manual PayPal flow" to "do payouts right." We're b
 |---|---|---|
 | 0 | Stripe account, sandbox, Connect, env vars, SQL, foundation code | ✅ DONE |
 | 1 | Worker Stripe onboarding flow — "Connect your Stripe" button → Stripe Express hosted onboarding → callback saves account ID | ✅ DONE |
-| 2 | Flipper saved payment method — Stripe Elements form when picking worker; create Customer + PaymentMethod | NEXT |
-| 3 | Authorize on pick — wire `approve_applicant` to create PaymentIntent with `capture_method: manual`, `transfer_data.destination` = worker's Connect acct, `application_fee_amount` = 2% | |
+| 2 | Flipper saved payment method — Stripe Elements form when picking worker; create Customer + PaymentMethod | ✅ DONE |
+| 3 | Authorize on pick — wire `approve_applicant` to create PaymentIntent with `capture_method: manual`, `transfer_data.destination` = worker's Connect acct, `application_fee_amount` = 2% | NEXT |
 | 4 | Capture on approval — wire admin "approve work" to call `paymentIntents.capture()` (auto-transfers to worker) | |
 | 5 | Worker payout UI — show payment status, Stripe Express dashboard link, payout schedule | |
 | 6 | Admin payout UI upgrade — show Stripe payment intent ID, status, refund button | |
@@ -279,7 +282,7 @@ Cory pivoted from "polish the manual PayPal flow" to "do payouts right." We're b
 | 8 | Edge cases — cancellations, refunds, failed cards, expired authorizations (Stripe auths expire after 7 days for cards) | |
 | 9 | Go-live — activate live Stripe account, swap env vars to live keys, test one real $1 transaction | |
 
-### Phase 1 — Worker Stripe onboarding (DONE — shipped this session)
+### Phase 1 — Worker Stripe onboarding (DONE — shipped previous session)
 
 Workers must now connect a Stripe Express account before they can apply to any gig.
 
@@ -311,7 +314,66 @@ Workers must now connect a Stripe Express account before they can apply to any g
 - The status endpoint syncs Stripe → DB on every call. That keeps the DB cache fresh without webhooks. We'll add webhooks in Phase 7 for instant updates from Stripe's side, but pull-on-demand is fine for now.
 - `Stripe.accounts.retrieve()` is a real API call (not cached). The `/profile/payments` page calls it once on load via `/api/stripe/connect/status`. If this gets slow, we could cache the DB-stored flags and only re-fetch on user action.
 
-### Critical gotchas for whoever picks this up
+### Phase 2 — Flipper saves a card before picking (DONE — shipped this session)
+
+When a flipper clicks "Pick this worker" on a pending applicant, we now require them to have a saved Stripe card on file. If they don't, a modal pops open with Stripe Elements; once they save a card, the pick auto-resumes. This sets up the rails for Phase 3 (authorize-on-pick).
+
+**The flow**
+1. Flipper clicks "Pick this worker" on `/flipper/gigs/[id]`
+2. Browser GETs `/api/stripe/payment-method/status` — does the caller have any saved cards?
+3. If yes → straight to `approve_applicant` RPC (existing flow, unchanged)
+4. If no → modal opens; we POST `/api/stripe/payment-method/setup-intent`, which creates a Stripe Customer for the flipper (if needed), saves `users.stripe_customer_id`, and returns a SetupIntent `client_secret`
+5. Modal mounts `<Elements>` with that client_secret and shows the PaymentElement
+6. On submit, `stripe.confirmSetup({ redirect: 'if_required' })` attaches the card to the Customer for off-session reuse
+7. Modal closes, `runApprove()` resumes automatically, gig flips to `claimed`, other applicants get rejected via the existing `approve_applicant` function
+
+**Key code files**
+- `app/api/stripe/payment-method/setup-intent/route.ts` — POST. Creates Customer if missing, returns SetupIntent client_secret. Uses `(supabase as any).from(...)` cast for the `stripe_customer_id` update because the column isn't in `types/database.ts` yet.
+- `app/api/stripe/payment-method/status/route.ts` — GET. Returns `{ hasPaymentMethod, paymentMethods[] }`. Each PM in the list has `id`, `brand`, `last4`, `expMonth`, `expYear`.
+- `components/shared/AddPaymentMethodModal.tsx` — Stripe Elements modal. Module-level `stripePromise` cached via `loadStripe()`. Theme tokens match FlipWork (`colorPrimary: '#0a0a0a'`, DM Sans font, 8px border radius). Modal is scrollable (`max-h-[90vh] overflow-y-auto`) so it works on smaller viewports — earlier version got reported by Cory as not fitting his screen.
+- `app/flipper/gigs/[id]/ApplicantActions.tsx` — `handleApprove()` now hits `/api/stripe/payment-method/status` first. If `hasPaymentMethod` is false, sets `pendingPickAfterCard=true` and opens the modal. `handleCardSaved()` resumes `runApprove()` automatically.
+
+**Quirks worth knowing**
+- `Elements` is rendered conditionally on `clientSecret` — it can't mount before the SetupIntent comes back. Keep that.
+- `confirmSetup` with `redirect: 'if_required'` is critical — the default behavior is a full-page redirect, which would break the auto-resume after card save.
+- The modal resets `clientSecret` to null on close so reopening starts a fresh SetupIntent (avoids stale client_secret bugs).
+- The `confirm("Pick X for this gig? Everyone else who applied will be rejected.")` runs BEFORE the payment-method check, so if the flipper bails out at the confirm, we never hit Stripe. Good.
+- `@stripe/react-stripe-js@^2.8.0` was added to package.json. `npm install` was run in the sandbox so package-lock.json is updated.
+
+### Flipper applicant visibility — RLS fixes (DONE — shipped this session)
+
+When testing Phase 2, Cory found that after a worker applied to a gig, the flipper saw "0 Applicants" on `/flipper/gigs/[id]` and "0 claims" on the dashboard. Worker side correctly showed "Pending". This was three layered RLS bugs that had been there since the application/approval refactor — nobody had tested the flipper side from a non-admin account.
+
+**Root cause:**
+- `gig_claims` RLS only allowed the worker (own claims) and admin. No policy for the gig poster.
+- `worker_profiles` RLS only allowed the profile owner and admin. So even after we fixed gig_claims, the embedded `worker_profiles(...)` join on the gig page silently returned nothing — Postgres returns the parent row with `worker_profiles: null` when an embed-join hits RLS, and the page's `?? null` chain made the applicant card collapse.
+
+**Schema changes** (both already run on production):
+- `supabase/schema_fix_poster_can_see_claims.sql` — adds policy `"Posters can view claims on their gigs"` on `gig_claims` for SELECT. USING clause checks `exists (select 1 from gigs g where g.id = gig_claims.gig_id and coalesce(g.poster_user_id, g.created_by) = auth.uid())`.
+- `supabase/schema_fix_poster_can_see_applicant_profiles.sql` — adds policy `"Posters can view applicant profiles"` on `worker_profiles` for SELECT. USING checks that the row's `user_id` has a claim on a gig the caller posted.
+
+**Code change** in `app/flipper/gigs/[id]/page.tsx`:
+- Split the single `gig_claims` + `worker_profiles(...)` embed-join into two separate queries (load claims, then load profiles by `user_id IN (...)` and stitch them in JS). This makes the page more robust to any future RLS quirks and was the change that finally made applicants render after the two policy fixes.
+- Added `export const dynamic = 'force-dynamic'` + `export const revalidate = 0` to ensure no stale page caches.
+
+### Flipper dashboard upgrade (DONE — shipped this session)
+
+After the RLS fixes, Cory asked for a way to see at a glance which gigs need him to pick a worker. Added a needs-review banner, a pending-applicants stat tile, filter chips, and a sort dropdown to `/flipper/dashboard`.
+
+**What's new**
+- Conditional **banner at the top** (only renders when there are pending applicants): "X gigs need your review — Y pending applicants waiting to be picked. Tap to see them below." Anchor-links to `#your-gigs`.
+- Stats grid expanded from 4 to 5 tiles. New tile: **"Pending applicants"** with accent ring/border when count > 0.
+- New client component `app/flipper/dashboard/FlipperGigList.tsx` handles filter/sort UI and rendering. Page-level component remains a server component for data fetching.
+- **Filter chips**: All / Needs review / Open / In progress / Completed
+- **Sort dropdown**: Newest first (default) / Oldest first / Due date (soonest) / Most applicants
+- Gigs with pending applicants **always float to the top** under the "All" filter regardless of sort selection. Each such gig gets an accent-bordered card and an inline badge: "X pending applicants — needs review".
+- Dashboard set to `force-dynamic` / `revalidate=0` since counts change constantly.
+
+**Files**
+- `app/flipper/dashboard/page.tsx` — fetches gigs + claims, computes `totalClaimsByGig` and `pendingClaimsByGig` separately. Banner + stats + empty state stay in the server component; the list is passed to the client component.
+- `app/flipper/dashboard/FlipperGigList.tsx` — `FilterKey` and `SortKey` typed. `visibleGigs` is memoized on filter/sort changes. The "float pending to top" sort is layered on top of the user's chosen sort, NOT replacing it.
+
+
 - **Stripe API version pinned to `2024-06-20`** in `lib/stripe.ts`. Don't bump unless you're ready to test breaking changes.
 - **All Stripe amounts are in CENTS** — `calculatePaymentBreakdown` returns both cents and dollars. Use cents for Stripe API calls, dollars for display.
 - **The 2% platform fee comes OUT OF the gig amount** (worker receives 98% of gig pay). The flipper pays gig + Stripe fees on top, NOT gig + Stripe + platform fee. This is intentional.
@@ -333,8 +395,8 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 ## ⚠️ TODOs left at end of session
 
-1. **Rotate `SIGHTENGINE_API_SECRET`** — exposed in chat in an earlier session. Regenerate in Sightengine dashboard, update Vercel env var, redeploy. STILL OUTSTANDING.
-2. **Stripe Connect Phase 2+** — Phase 1 (worker onboarding) is done. Next is the flipper payment method form (Stripe Elements when picking a worker). See "Stripe Connect payout system" section above for the full phase list.
+1. **Rotate `SIGHTENGINE_API_SECRET`** — exposed in chat in an earlier session. Regenerate in Sightengine dashboard, update Vercel env var, redeploy. STILL OUTSTANDING — Cory has not done this yet across multiple sessions.
+2. **Stripe Connect Phase 3+** — Phases 1 (worker onboarding) and 2 (flipper saves card) are done. Next is authorize-on-pick: wire `approve_applicant` to create a PaymentIntent with `capture_method:manual`, `transfer_data.destination` = worker's Connect account, `application_fee_amount` = 2%. See "Stripe Connect payout system" section above for the full phase list.
 3. **AI support chat** — DEPRIORITIZED until Stripe payouts are live (the AI needs to be able to answer payout questions accurately). Plan still good — Haiku 4.5, `/support` page, `ANTHROPIC_API_KEY` env var, 5 chats/day per user. See prior handoffs for details.
 4. **Place `ReportImageButton` on photo views** — gallery cards, gig photo grids, avatar viewers. Component is built; just needs to be slotted in.
 5. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
@@ -342,6 +404,8 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
    - Source: generated starter text (lawyer-review-before-launch disclaimer at top)
    - Gate: hard gate — must accept before doing anything
    - Existing infra at `/auth/agreements` already handles multiple required agreements; just needs TOS + Privacy seed and a server-side check that redirects logged-in users with unaccepted required agreements to `/auth/agreements`. A SQL file (`supabase/schema_legal_agreements.sql`) was scaffolded but not completed. Restart fresh.
+7. **Apply `force-dynamic` audit to other server pages.** The flipper dashboard and gig detail pages needed `force-dynamic + revalidate=0` to stop showing stale claim data. Worth scanning other server pages that show claim/applicant state (worker `/my-gigs`, `/messages`, etc.) and adding the same if they exhibit similar staleness.
+8. **`types/database.ts` is out of sync with several Stripe columns.** Adding the Stripe columns (`users.stripe_customer_id`, `worker_profiles.stripe_*`, `payout_records.payment_status` etc.) would let us remove the `as any` casts sprinkled through all Stripe-touching files.
 
 ---
 
@@ -364,8 +428,11 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 - **`PublicWorkerProfileClient.tsx` and `PublicFlipperProfileClient.tsx` are dead components.** The new one is `components/profile/PublicProfileClient.tsx`.
 - **The "Project Instructions" file in this Claude project is OUT OF DATE.** It references Phase 2 as next. Ignore it. Use this handoff and `MARKETPLACE_ROADMAP.md` in the repo root.
 - **Minification trap:** client components with module-level `const` data used in rendering can get stripped in production builds. Keep data inside hooks. (Has bitten previous instances.)
-- **Gig schema has BOTH `poster_user_id` AND `created_by`.** `post-gig/PostGigForm.tsx` fills both. App code reads `poster_user_id`. SQL triggers use `coalesce(poster_user_id, created_by)` for safety. Use the same pattern if you write new SQL.
+- **Gig schema has BOTH `poster_user_id` AND `created_by`.** `post-gig/PostGigForm.tsx` fills both. App code reads `poster_user_id`. SQL triggers AND new RLS policies use `coalesce(poster_user_id, created_by)` for safety. Use the same pattern if you write new SQL.
 - **He's on Max plan.** Use the context you need, but don't be wasteful.
+- **Supabase embed-joins fail SILENTLY under RLS.** A query like `.select('*, worker_profiles(...)')` returns the parent row with the embed set to `null` if RLS blocks the join target — no error, no warning. This bit us on the flipper applicant list. If a join returns null unexpectedly, suspect an RLS policy on the embed target table BEFORE blaming the app code. The safer pattern when in doubt: do two separate queries and stitch in JS.
+- **When adding a feature that lets ONE role see another role's data, check RLS on EVERY table you query, including joined ones.** RLS is the silent gatekeeper — it's not enough to allow access to the primary table.
+- **`force-dynamic` + `revalidate=0` is the cache-buster combo** for server pages that show fast-changing relational data. `/flipper/dashboard` and `/flipper/gigs/[id]` already have it. Add it to any new page that shows claim/applicant/message state.
 
 ---
 
@@ -373,16 +440,15 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 See `MARKETPLACE_ROADMAP.md` for the full picture. Cory's most likely next moves, in this order:
 
-1. **Stripe Connect Phase 2: Flipper payment method.** Stripe Elements card form when picking a worker. Save Customer + PaymentMethod to the flipper's user row. This sets up the rails for Phase 3 (authorize on pick).
-2. **Stripe Connect Phases 3-4:** Wire authorize-on-pick and capture-on-approve into existing `approve_applicant` + admin review flows.
-3. **Stripe webhooks.** Required for production — Stripe pushes account updates, payment status changes, refunds, etc.
-4. **Test the full Phase 1 flow end-to-end.** Cory should test: sign up a fresh test worker → save profile → go to `/profile/payments` → click Connect → fill in Stripe Express form (use test SSN `000-00-0000`, test bank routing `110000000` / account `000123456789`) → return to FlipWork → verify status flips to "ready" → try to apply for a gig (should work now). Before connecting Stripe, applying should be blocked.
-5. **Rotate `SIGHTENGINE_API_SECRET`** — overdue.
-6. **Place `ReportImageButton`** on photo views — last piece of moderation work.
-7. **Terms of Service + privacy policy** — paused mid-build a couple sessions ago.
-8. **Address/pickup details on gigs**.
-9. **Email notifications**.
-10. **Ratings/reviews**.
+1. **Stripe Connect Phase 3: Authorize on pick.** When the flipper picks a worker (via `approve_applicant` RPC or right before/after), create a PaymentIntent against the saved PaymentMethod with `capture_method: 'manual'`, `transfer_data.destination` = worker's Connect account, `application_fee_amount` = 2% of gig amount in cents. Save the PaymentIntent ID + status onto a `payout_records` row. This holds the funds without capturing.
+2. **Stripe Connect Phase 4: Capture on approval.** When the admin approves submitted work (existing `/admin/review` flow), call `paymentIntents.capture()` on the held PaymentIntent. Stripe auto-transfers gig amount minus platform fee to the worker's Connect account.
+3. **Stripe webhooks (Phase 7).** Required for production — `/api/stripe/webhook` to handle `account.updated`, `payment_intent.succeeded/.failed`, `transfer.created`, `charge.refunded`, etc. Needs `STRIPE_WEBHOOK_SECRET` env var.
+4. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions.
+5. **Place `ReportImageButton`** on photo views — last piece of moderation work.
+6. **Terms of Service + privacy policy** — paused mid-build a couple sessions ago.
+7. **Address/pickup details on gigs**.
+8. **Email notifications**.
+9. **Ratings/reviews**.
 
 Cory will pick. Open by confirming what you're about to build in 2-3 lines, then build.
 
@@ -390,10 +456,16 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
-- (pending) Stripe Connect Phase 1: worker onboarding flow + apply-gating
+- `7a18b0a` Flipper dashboard: needs-review banner, pending stat, filters, sort
+- `c236885` Fix: card-save modal didn't fit smaller screens
+- `2080d1f` Fix: flipper applicant list — split join into two queries + disable caching
+- `c26cee0` Fix part 2: posters couldn't see applicant worker_profiles (RLS)
+- `cdb6fbf` Fix: flippers couldn't see applicants on their own gigs (RLS bug)
+- `dd54c2a` Stripe Connect Phase 2: flipper saves card before picking a worker
 
 ## Previous session's commits
 
+- `c4d9e37` Stripe Connect Phase 1: worker onboarding flow + apply-gating
 - `bb38180` Update HANDOFF: Stripe Connect foundation shipped, payout pivot documented
 - `62c9a78` Stripe Connect foundation: SDK install, client helper, SQL migration, health route
 - `2ba8d02` Logo links to /gigs for workers and flippers
