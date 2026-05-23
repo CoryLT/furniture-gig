@@ -23,47 +23,93 @@ export default function ReviewActions({ claimId, gigId, workerId, payAmount }: P
     setLoading('approve')
     setError('')
 
-    // Update claim
-    await supabase
-      .from('gig_claims')
-      .update({ status: 'approved' })
-      .eq('id', claimId)
-
-    // Update gig status
-    await supabase
-      .from('gigs')
-      .update({ status: 'completed' })
-      .eq('id', gigId)
-
-    // Create payout record
-    const { error: payoutError } = await supabase
-      .from('payout_records')
-      .insert({
-        gig_id: gigId,
-        worker_user_id: workerId,
-        amount: payAmount,
-        payout_status: 'unpaid',
+    // 1) Capture the held Stripe payment. Phase 4 step: Stripe charges
+    //    the flipper and auto-transfers the worker's cut to their
+    //    Stripe Connect account.
+    //
+    //    The route is idempotent and gracefully handles the legacy
+    //    case where a gig has no Stripe PaymentIntent (returns ok with
+    //    captured: false). We bail out on any error and leave the DB
+    //    untouched so admin can retry.
+    try {
+      const res = await fetch('/api/stripe/capture-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId }),
       })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data?.error || 'Could not capture payment. Try again.')
+        setLoading(null)
+        return
+      }
 
-    if (payoutError) {
-      setError('Claim approved but failed to create payout record. Please add manually.')
+      // 2) Mark the claim as approved.
+      await supabase
+        .from('gig_claims')
+        .update({ status: 'approved' })
+        .eq('id', claimId)
+
+      // 3) Mark the gig completed.
+      await supabase
+        .from('gigs')
+        .update({ status: 'completed' })
+        .eq('id', gigId)
+
+      // 4) Legacy fallback: if there's no payout_records row at all
+      //    (gigs from before Phase 3), make one now so the admin
+      //    payouts page has something to show.
+      if (data?.captured === false) {
+        const { data: existing } = await (supabase as any)
+          .from('payout_records')
+          .select('id')
+          .eq('gig_id', gigId)
+          .eq('worker_user_id', workerId)
+          .limit(1)
+          .maybeSingle()
+
+        if (!existing) {
+          await (supabase as any)
+            .from('payout_records')
+            .insert({
+              gig_id: gigId,
+              worker_user_id: workerId,
+              amount: payAmount,
+              payout_status: 'unpaid',
+              payment_status: 'none',
+            })
+        }
+      }
+
+      router.push('/admin/payouts')
+      router.refresh()
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Something went wrong. Please try again.'
+      )
+      setLoading(null)
     }
-
-    router.push('/admin/payouts')
-    router.refresh()
   }
 
   async function handleReject() {
     setLoading('reject')
     setError('')
 
-    // Update claim back to active so worker can re-submit
+    // "Send back for revision" — does NOT release the Stripe
+    // authorization. The hold stays in place so the worker can fix
+    // their work and resubmit without forcing the flipper to re-pick.
+    //
+    // Note: Stripe card authorizations expire after ~7 days. If the
+    // worker takes longer than that to resubmit, the auth will lapse
+    // on its own (no charge to the flipper) and a fresh re-pick would
+    // be needed to capture later. Permanent-reject UI can come later.
     await supabase
       .from('gig_claims')
       .update({ status: 'active' })
       .eq('id', claimId)
 
-    // Gig goes back to claimed
     await supabase
       .from('gigs')
       .update({ status: 'claimed' })
@@ -78,8 +124,10 @@ export default function ReviewActions({ claimId, gigId, workerId, payAmount }: P
       <div>
         <h3 className="font-sans font-semibold text-foreground">Review decision</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Approving will mark the gig as completed and create a payout record for{' '}
-          <strong>{formatCurrency(payAmount)}</strong>. Rejecting sends the work back to the worker.
+          Approving will charge the flipper&apos;s card{' '}
+          <strong>{formatCurrency(payAmount)}</strong> and send the worker their
+          payout automatically via Stripe. Rejecting sends the work back to the
+          worker (the hold stays in place).
         </p>
       </div>
 
@@ -92,7 +140,7 @@ export default function ReviewActions({ claimId, gigId, workerId, payAmount }: P
           disabled={loading === 'reject'}
           onClick={handleApprove}
         >
-          Approve & create payout
+          Approve &amp; capture payment
         </Button>
         <Button
           variant="outline"
