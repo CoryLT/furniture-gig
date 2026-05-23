@@ -89,8 +89,8 @@ export default function AddPaymentMethodModal({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="card w-full max-w-md card-body relative">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/40 p-4 overflow-y-auto">
+      <div className="card w-full max-w-md card-body relative my-auto max-h-[90vh] overflow-y-auto">
         <button
           type="button"
           onClick={onClose}
