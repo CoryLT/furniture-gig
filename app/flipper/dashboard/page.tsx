@@ -76,9 +76,9 @@ export default async function FlipperDashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl text-foreground">My Dashboard</h1>
+          <h1 className="text-3xl text-foreground">My Posted Gigs</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your furniture flipping gigs
+            Manage gigs you&apos;ve posted
           </p>
         </div>
         <Link
