@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
           )
           const profiles = await profileRes.json()
           if (Array.isArray(profiles) && profiles[0]?.onboarding_complete === true) {
-            destination = '/flipper/dashboard'
+            destination = '/home'
           }
         } catch {
           // safe fallback — stay on /auth/flipper-onboarding
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
           )
           const profiles = await profileRes.json()
           if (Array.isArray(profiles) && profiles[0]?.onboarding_complete === true) {
-            destination = '/gigs'
+            destination = '/home'
           }
         } catch {
           // If the check fails, default to onboarding — safe fallback
