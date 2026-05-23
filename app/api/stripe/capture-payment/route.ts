@@ -43,19 +43,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
-  const { data: userRow } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  if ((userRow as any)?.role !== 'admin') {
-    return NextResponse.json(
-      { error: 'Admin only.' },
-      { status: 403 }
-    )
-  }
-
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json(
       { error: 'Stripe is not configured.' },
@@ -87,6 +74,41 @@ export async function POST(req: Request) {
       { error: 'Claim not found.', detail: claimErr?.message },
       { status: 404 }
     )
+  }
+
+  // --- 3a. Authorization check: caller must be the gig's poster OR admin ---
+  // Load the gig to find the poster. coalesce(poster_user_id, created_by)
+  // is the standard pattern for this codebase.
+  const { data: gigRow, error: gigErr } = await supabase
+    .from('gigs')
+    .select('id, poster_user_id, created_by')
+    .eq('id', claim.gig_id)
+    .maybeSingle()
+
+  if (gigErr || !gigRow) {
+    return NextResponse.json(
+      { error: 'Gig not found.', detail: gigErr?.message },
+      { status: 404 }
+    )
+  }
+
+  const posterId =
+    (gigRow as any).poster_user_id ?? (gigRow as any).created_by
+
+  if (user.id !== posterId) {
+    // Not the poster — allow admin as a fallback for support.
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if ((userRow as any)?.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'You are not the poster of this gig.' },
+        { status: 403 }
+      )
+    }
   }
 
   // --- 4. Look up the matching payout_records row ---

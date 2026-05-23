@@ -83,11 +83,20 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
   // Split by status
   const pendingClaims = claims.filter((c) => c.status === 'pending')
   const activeClaim = claims.find((c) => c.status === 'active') ?? null
+  // Submitted for review = worker is done, flipper needs to approve/reject.
+  // Gets its own prominent section, NOT grouped with rejected/cancelled.
+  const submittedClaim =
+    claims.find((c) => c.status === 'submitted_for_review') ?? null
   const otherClaims = claims.filter(
-    (c) => !['pending', 'active'].includes(c.status)
+    (c) =>
+      !['pending', 'active', 'submitted_for_review'].includes(c.status)
   )
 
-  const renderApplicantCard = (claim: ClaimRow, showActions: boolean) => {
+  const renderApplicantCard = (
+    claim: ClaimRow,
+    showActions: boolean,
+    showReviewLink: boolean = false
+  ) => {
     const wp = claim.worker_profiles
     const workerName = wp ? `${wp.first_name} ${wp.last_name}`.trim() || 'Worker' : 'Worker'
 
@@ -144,6 +153,14 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
           <OpenChatButton gigId={gig.id} otherUserId={claim.worker_user_id} label="Message" />
           {showActions && (
             <ApplicantActions claimId={claim.id} workerName={workerName} />
+          )}
+          {showReviewLink && (
+            <Link
+              href={`/flipper/review/${claim.id}`}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-accent text-accent-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              Review work
+            </Link>
           )}
         </div>
       </div>
@@ -210,8 +227,22 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
         )}
       </div>
 
-      {/* Picked worker (if any) */}
-      {activeClaim && (
+      {/* Submitted for review (worker is done, flipper needs to approve) */}
+      {submittedClaim && (
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-1">
+            Work submitted for review
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            The worker has finished. Review the checklist and proof photos, then
+            approve to release payment or send back for revision.
+          </p>
+          {renderApplicantCard(submittedClaim, false, true)}
+        </div>
+      )}
+
+      {/* Picked worker (if any, and not in review) */}
+      {activeClaim && !submittedClaim && (
         <div>
           <h2 className="text-lg font-semibold text-foreground mb-4">Picked worker</h2>
           {renderApplicantCard(activeClaim, false)}
@@ -219,7 +250,7 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
       )}
 
       {/* Pending applicants (only show when no worker is picked yet) */}
-      {!activeClaim && (
+      {!activeClaim && !submittedClaim && (
         <div>
           <h2 className="text-lg font-semibold text-foreground mb-1">
             {pendingClaims.length} {pendingClaims.length === 1 ? 'Applicant' : 'Applicants'}
@@ -241,7 +272,7 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
         </div>
       )}
 
-      {/* Past applicants (rejected/cancelled) */}
+      {/* Past applicants (rejected/cancelled/approved) */}
       {otherClaims.length > 0 && (
         <details className="card card-body">
           <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
