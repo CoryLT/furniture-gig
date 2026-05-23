@@ -238,54 +238,78 @@ Then `<Link href={logoHref}>` on the logo. Logos on auth pages (login, signup) s
 
 ---
 
-## Payouts + AI support chat (PLANNING — not yet built)
+## Stripe Connect payout system (IN PROGRESS — foundation shipped)
 
-Cory wants to add an AI customer support chat for logged-in users. **Then** mid-conversation realized the payout system needs to be fully polished BEFORE wiring up AI support, since the agent will be answering payout questions and needs accurate ground truth.
+Cory pivoted from "polish the manual PayPal flow" to "do payouts right." We're building a full Stripe Connect (Express) marketplace. This replaces ALL of the prior manual-PayPal payout planning.
 
-### AI support — decisions already made
-- **Who:** logged-in users only (workers + flippers, not visitors)
-- **What:** answer FAQs, handle complaints (sympathize + log), solve real problems (look up gigs + payouts via tools), escalate when stuck
-- **Where:** `/support` page (link already exists in nav, currently a placeholder)
-- **Model:** Claude Haiku 4.5 (~1-2¢/chat) — separate Anthropic API key needed, env var `ANTHROPIC_API_KEY` on Vercel
-- **Persistence:** conversations continue across sessions until user ends or escalation triggers
-- **Limits:** 5 chats/day per user, 50 messages/chat
-- **Admin view:** `/admin/support` — only shows ESCALATED chats (unresolved ones happen in background)
-- **Notifications:** in-app dot for now; email later to `corythacker@proton.me` (skipped for v1)
-- **DB tables (designed but not created):** `support_conversations` (status: active/resolved/escalated, summary), `support_messages` (one per message). Both with RLS so users only see their own.
+### Decisions locked in
+- **Money model:** Flipper → Platform → Worker (platform holds money in the middle, automatically distributes via Stripe)
+- **Platform fee:** **2%** of the gig amount (configurable via Vercel env `STRIPE_PLATFORM_FEE_PERCENT`)
+- **Charge timing:** Authorize on pick, capture on admin approval (protects flipper; if work rejected, hold is released without charge)
+- **Stripe fees:** Flipper pays Stripe's processing fees ON TOP of the gig amount. Worker always receives full advertised gig pay minus the 2% platform cut.
+- **Account type:** Stripe Express (NOT Standard, NOT Custom) — Stripe handles all the worker KYC/bank/ID via their hosted onboarding
+- **Test environment:** New-style Sandbox called "Flipwork Dev" (account `acct_1TZNIGRrFKq5pWBh`). The old legacy "Test mode" environment was abandoned during setup — don't reference it.
+- **Live Stripe account:** `acct_1TYz1nRplyBq5wmm` (FlipWork live). NOT activated yet. Cory has the live secret key written on paper. We are NOT touching live mode until everything tested in sandbox.
 
-### Payout polish — required before AI support
-Current state of payouts:
-- `payout_records` table exists with status (unpaid/pending/paid), amount, paypal_reference, payout_date, notes
-- `/admin/payouts` works — summary cards, inline edit row, paid history
-- `/my-gigs/payouts` works — worker sees their unpaid/paid totals + per-row status
-- Payout record auto-creates when admin approves a gig in `ReviewActions.tsx`
+### What's shipped (foundation — commit `62c9a78`)
+- `lib/stripe.ts` — server-side Stripe client + `calculatePaymentBreakdown()` helper (all the fee math)
+- `supabase/schema_stripe_connect.sql` — RUN — adds Stripe tracking columns:
+  - `worker_profiles`: `stripe_account_id`, `stripe_charges_enabled`, `stripe_payouts_enabled`, `stripe_details_submitted`, `stripe_onboarding_completed_at`
+  - `users`: `stripe_customer_id` (for flippers' saved payment methods)
+  - `payout_records`: `stripe_payment_intent_id`, `stripe_charge_id`, `stripe_transfer_id`, `flipper_user_id`, `gross_amount`, `stripe_fee_amount`, `platform_fee_amount`, `payment_status` (enum: none/requires_method/authorized/captured/transferred/failed/canceled/refunded)
+  - Two indexes for fast lookups
+- `app/api/stripe/health/route.ts` — admin-only `/api/stripe/health` endpoint. GET it as admin to verify Stripe credentials, Connect status, and platform fee math. **Confirmed working — returned `"ok": true` end-to-end.**
+- `package.json` — `stripe@^16.12.0` and `@stripe/stripe-js@^4.10.0` installed
+- Vercel env vars set (Production + Preview + Development):
+  - `STRIPE_SECRET_KEY` (test mode, ends in `KEuj`)
+  - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (test mode)
+  - `STRIPE_PLATFORM_FEE_PERCENT=2`
 
-**Gaps Cory needs to decide on (asked at end of session, not yet answered):**
-1. **Worker view clarity** — "Unpaid" gives no timing expectation. Need clearer labels and "what this means" copy.
-2. **PayPal email validation** — if worker hasn't set their PayPal email, approval still creates a payout record with no way to pay. Should block approval or warn.
-3. **Flipper payout view** — depends on money flow (flippers → platform → worker, OR flippers → worker direct, OR admin pays from own funds). Cory was asked which model applies but didn't answer before deciding to handoff.
-4. **Status change history** — currently no audit log of unpaid→pending→paid transitions. Probably skip for v1.
+### Build phases — what's left
+| # | Phase | Status |
+|---|---|---|
+| 0 | Stripe account, sandbox, Connect, env vars, SQL, foundation code | ✅ DONE |
+| 1 | Worker Stripe onboarding flow — "Connect your Stripe" button → Stripe Express hosted onboarding → callback saves account ID | NEXT |
+| 2 | Flipper saved payment method — Stripe Elements form when picking worker; create Customer + PaymentMethod | |
+| 3 | Authorize on pick — wire `approve_applicant` to create PaymentIntent with `capture_method: manual`, `transfer_data.destination` = worker's Connect acct, `application_fee_amount` = 2% | |
+| 4 | Capture on approval — wire admin "approve work" to call `paymentIntents.capture()` (auto-transfers to worker) | |
+| 5 | Worker payout UI — show payment status, Stripe Express dashboard link, payout schedule | |
+| 6 | Admin payout UI upgrade — show Stripe payment intent ID, status, refund button | |
+| 7 | Stripe webhooks — `/api/stripe/webhook` to handle account.updated, payment_intent.succeeded/.failed, transfer.created, etc. Needs `STRIPE_WEBHOOK_SECRET` env var. | |
+| 8 | Edge cases — cancellations, refunds, failed cards, expired authorizations (Stripe auths expire after 7 days for cards) | |
+| 9 | Go-live — activate live Stripe account, swap env vars to live keys, test one real $1 transaction | |
 
-### Where we left off
-Cory was asked two scoping questions at the end of the session:
-1. Which payout gaps to address (worker clarity only / + PayPal validation / full polish / walk through each)
-2. How money flows in the business (flipper→platform→worker / flipper→worker direct / admin pays from own funds)
+### Critical gotchas for whoever picks this up
+- **Stripe API version pinned to `2024-06-20`** in `lib/stripe.ts`. Don't bump unless you're ready to test breaking changes.
+- **All Stripe amounts are in CENTS** — `calculatePaymentBreakdown` returns both cents and dollars. Use cents for Stripe API calls, dollars for display.
+- **The 2% platform fee comes OUT OF the gig amount** (worker receives 98% of gig pay). The flipper pays gig + Stripe fees on top, NOT gig + Stripe + platform fee. This is intentional.
+- **`payment_status` enum on `payout_records` is the source of truth** for Stripe-tracked payouts. The old `payout_status` column (unpaid/pending/paid) is still there for backwards compat / legacy manual payouts but new gigs should use `payment_status`.
+- **Connect was set up via the NEW sandbox style.** When asking Cory to do Stripe dashboard things, send him to `https://dashboard.stripe.com/acct_1TZNIGRrFKq5pWBh/test/...` URLs, not the legacy `/test/...` root.
+- **OCR is unreliable for Stripe keys.** Don't trust transcribing keys off screenshots — characters like `l`/`I`/`1` and `O`/`0` are confusable. Always ask Cory to use Stripe's copy button.
 
-He didn't answer — chose to do a handoff instead. **Next session should reopen these two questions before any code is written.**
+---
+
+## DEPRECATED — old manual-PayPal payout planning
+
+⚠️ The whole "polish manual PayPal" plan from the prior session is dead. We pivoted to Stripe Connect (above). The two scoping questions about "money flow" and "which gaps to fix" were answered:
+1. Money flow: flipper → platform → worker
+2. Gaps: full polish — but via Stripe Connect, not by improving manual PayPal tracking
+
+The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payout_date`) still exist and are still wired to the existing admin/worker payout UIs. They'll get replaced as Phases 5-6 ship. Don't delete the legacy columns until live transactions are running on Stripe.
 
 ---
 
 ## ⚠️ TODOs left at end of session
 
 1. **Rotate `SIGHTENGINE_API_SECRET`** — exposed in chat in an earlier session. Regenerate in Sightengine dashboard, update Vercel env var, redeploy. STILL OUTSTANDING.
-2. **Place `ReportImageButton` on photo views** — gallery cards, gig photo grids, avatar viewers. Component is built; just needs to be slotted in.
-3. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
-4. **Legal/TOS work** — started but didn't finish in a previous session. Decisions already made:
+2. **Stripe Connect Phase 1+** — foundation is shipped and verified. Next is the worker onboarding flow. See "Stripe Connect payout system" section above for the full phase list.
+3. **AI support chat** — DEPRIORITIZED until Stripe payouts are live (the AI needs to be able to answer payout questions accurately). Plan still good — Haiku 4.5, `/support` page, `ANTHROPIC_API_KEY` env var, 5 chats/day per user. See prior handoffs for details.
+4. **Place `ReportImageButton` on photo views** — gallery cards, gig photo grids, avatar viewers. Component is built; just needs to be slotted in.
+5. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
+6. **Legal/TOS work** — started but didn't finish in a previous session. Decisions already made:
    - Source: generated starter text (lawyer-review-before-launch disclaimer at top)
    - Gate: hard gate — must accept before doing anything
    - Existing infra at `/auth/agreements` already handles multiple required agreements; just needs TOS + Privacy seed and a server-side check that redirects logged-in users with unaccepted required agreements to `/auth/agreements`. A SQL file (`supabase/schema_legal_agreements.sql`) was scaffolded but not completed. Restart fresh.
-5. **Payout polish** — see "Payouts + AI support chat" section above. Two unanswered scoping questions to reopen.
-6. **AI support chat** — full plan in section above. Build AFTER payout polish lands.
 
 ---
 
@@ -317,14 +341,16 @@ He didn't answer — chose to do a handoff instead. **Next session should reopen
 
 See `MARKETPLACE_ROADMAP.md` for the full picture. Cory's most likely next moves, in this order:
 
-1. **Payout polish** — answer the two scoping questions in the Payouts section above, then ship worker clarity + (probably) PayPal email validation. Required before #2.
-2. **AI support chat** — full plan ready in the Payouts section. Needs `ANTHROPIC_API_KEY` env var.
-3. **Rotate `SIGHTENGINE_API_SECRET`** — overdue.
-4. **Place `ReportImageButton`** on photo views — last piece of moderation work.
-5. **Terms of Service + privacy policy** — Bucket 1 #5. Paused mid-build a couple sessions ago.
-6. **Address/pickup details on gigs** — Bucket 1 #3.
-7. **Email notifications** — Bucket 1 #1.
-8. **Ratings/reviews** — Bucket 1 #4.
+1. **Stripe Connect Phase 1: Worker onboarding flow.** Build the "Connect your Stripe" UI for workers. Should go on `/profile` (or a new `/profile/payments` sub-page). Click button → POST to `/api/stripe/connect/onboard` → server creates Stripe Express account → returns `accountLink.url` → user redirects to Stripe's hosted onboarding → Stripe redirects them back to a return URL → server fetches account state and saves to `worker_profiles`. Use Stripe's `accounts.create({ type: 'express', country: 'US', email: ..., capabilities: { card_payments: { requested: true }, transfers: { requested: true } } })` and `accountLinks.create({ account, refresh_url, return_url, type: 'account_onboarding' })`.
+2. **Stripe Connect Phase 2: Flipper payment method.** Stripe Elements form when picking a worker. Save Customer + PaymentMethod.
+3. **Stripe Connect Phases 3-4:** Wire authorize-on-pick and capture-on-approve into existing `approve_applicant` + admin review flows.
+4. **Stripe webhooks.** Required for production — Stripe pushes account updates, payment status changes, refunds, etc.
+5. **Rotate `SIGHTENGINE_API_SECRET`** — overdue.
+6. **Place `ReportImageButton`** on photo views — last piece of moderation work.
+7. **Terms of Service + privacy policy** — paused mid-build a couple sessions ago.
+8. **Address/pickup details on gigs**.
+9. **Email notifications**.
+10. **Ratings/reviews**.
 
 Cory will pick. Open by confirming what you're about to build in 2-3 lines, then build.
 
@@ -332,19 +358,13 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
-- `2ba8d02` Logo links to /gigs for workers and flippers
-- `325aa0e` Fix mobile viewport and mobile menu layout
-- `ccb6ed6` Fix Google sign-in requiring two clicks
+- `62c9a78` Stripe Connect foundation: SDK install, client helper, SQL migration, health route
 
 ## Previous session's commits
 
-- `e723561` Block uploads containing minors (face-attributes model)
-- `1a8736a` Add image reports system + admin reports queue
-- `1a4b05d` Add Sightengine moderation gate to all image uploads
-- `a3962f6` Add Applications tab to My Gigs page
-- `84acc4d` Flipper applicant list with Approve/Reject + per-applicant messaging
-- `674e02b` Switch gig detail page from Claim to Apply (with applicant count)
-- `cc27422` Add SQL migration for application/approval flow
+- `2ba8d02` Logo links to /gigs for workers and flippers
+- `325aa0e` Fix mobile viewport and mobile menu layout
+- `ccb6ed6` Fix Google sign-in requiring two clicks
 
 ---
 
