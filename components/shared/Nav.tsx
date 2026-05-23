@@ -55,25 +55,43 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
       if (!user || cancelled) return
       currentUserIdRef.current = user.id
 
-      const { data: convs } = await supabase
+      // -------- Conversations from BOTH tables --------
+      const { data: gigConvs } = await supabase
         .from('gig_conversations')
         .select('id, flipper_user_id, worker_user_id')
         .or(`flipper_user_id.eq.${user.id},worker_user_id.eq.${user.id}`)
 
-      const convIds = (convs ?? []).map((c: { id: string }) => c.id)
+      const { data: listingConvs } = await supabase
+        .from('listing_conversations')
+        .select('id, seller_user_id, buyer_user_id')
+        .or(`seller_user_id.eq.${user.id},buyer_user_id.eq.${user.id}`)
 
+      const gigConvIds = (gigConvs ?? []).map((c: { id: string }) => c.id)
+      const listingConvIds = (listingConvs ?? []).map((c: { id: string }) => c.id)
+
+      // -------- Initial unread counts from BOTH tables --------
       let initialCount = 0
-      if (convIds.length > 0) {
+      if (gigConvIds.length > 0) {
         const { count } = await supabase
           .from('gig_messages')
           .select('id', { count: 'exact', head: true })
-          .in('conversation_id', convIds)
+          .in('conversation_id', gigConvIds)
           .neq('sender_user_id', user.id)
           .is('read_at', null)
-        initialCount = count ?? 0
+        initialCount += count ?? 0
+      }
+      if (listingConvIds.length > 0) {
+        const { count } = await supabase
+          .from('listing_messages')
+          .select('id', { count: 'exact', head: true })
+          .in('conversation_id', listingConvIds)
+          .neq('sender_user_id', user.id)
+          .is('read_at', null)
+        initialCount += count ?? 0
       }
       if (!cancelled) setUnreadMessages(initialCount)
 
+      // -------- Realtime subscriptions to BOTH messages tables --------
       channel = supabase.channel(`nav-unread:${user.id}`)
 
       channel.on(
@@ -115,6 +133,45 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
         }
       )
 
+      channel.on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'listing_messages' },
+        (payload) => {
+          const m = payload.new as {
+            sender_user_id: string
+            read_at: string | null
+          }
+          if (
+            m.sender_user_id !== currentUserIdRef.current &&
+            m.read_at === null
+          ) {
+            setUnreadMessages((n) => n + 1)
+          }
+        }
+      )
+
+      channel.on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'listing_messages' },
+        (payload) => {
+          const before = payload.old as {
+            sender_user_id?: string
+            read_at?: string | null
+          }
+          const after = payload.new as {
+            sender_user_id?: string
+            read_at?: string | null
+          }
+          if (
+            after.sender_user_id !== currentUserIdRef.current &&
+            before.read_at === null &&
+            after.read_at !== null
+          ) {
+            setUnreadMessages((n) => Math.max(0, n - 1))
+          }
+        }
+      )
+
       channel.subscribe()
     }
 
@@ -134,22 +191,39 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
     const userId = currentUserIdRef.current
 
     const t = setTimeout(async () => {
-      const { data: convs } = await supabase
+      // Pull conversation IDs from BOTH tables
+      const { data: gigConvs } = await supabase
         .from('gig_conversations')
         .select('id')
         .or(`flipper_user_id.eq.${userId},worker_user_id.eq.${userId}`)
-      const convIds = (convs ?? []).map((c: { id: string }) => c.id)
-      if (convIds.length === 0) {
-        setUnreadMessages(0)
-        return
+      const { data: listingConvs } = await supabase
+        .from('listing_conversations')
+        .select('id')
+        .or(`seller_user_id.eq.${userId},buyer_user_id.eq.${userId}`)
+
+      const gigConvIds = (gigConvs ?? []).map((c: { id: string }) => c.id)
+      const listingConvIds = (listingConvs ?? []).map((c: { id: string }) => c.id)
+
+      let total = 0
+      if (gigConvIds.length > 0) {
+        const { count } = await supabase
+          .from('gig_messages')
+          .select('id', { count: 'exact', head: true })
+          .in('conversation_id', gigConvIds)
+          .neq('sender_user_id', userId)
+          .is('read_at', null)
+        total += count ?? 0
       }
-      const { count } = await supabase
-        .from('gig_messages')
-        .select('id', { count: 'exact', head: true })
-        .in('conversation_id', convIds)
-        .neq('sender_user_id', userId)
-        .is('read_at', null)
-      setUnreadMessages(count ?? 0)
+      if (listingConvIds.length > 0) {
+        const { count } = await supabase
+          .from('listing_messages')
+          .select('id', { count: 'exact', head: true })
+          .in('conversation_id', listingConvIds)
+          .neq('sender_user_id', userId)
+          .is('read_at', null)
+        total += count ?? 0
+      }
+      setUnreadMessages(total)
     }, 1200)
 
     return () => clearTimeout(t)
