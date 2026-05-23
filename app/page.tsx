@@ -1,8 +1,23 @@
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Armchair, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { createClient } from '@/lib/supabase/server'
 
-export default function HomePage() {
+// Don't pre-render at build — we need fresh auth state per request
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+export default async function HomePage() {
+  // If logged in, send them to the personalized dashboard.
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (user) {
+    redirect('/home')
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Simple top bar */}
