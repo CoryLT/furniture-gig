@@ -65,7 +65,9 @@ After you push, Cory must:
 - **User-reported image flagging** — backend API exists but Report button isn't placed on photo views yet
 - **Stripe Connect — workers connect** (Phase 1): workers must connect a Stripe Express account before applying; gated apply button on gig detail
 - **Stripe Connect — flippers save a card** (Phase 2): when flipper clicks "Pick this worker," a modal collects a card via Stripe Elements (SetupIntent + Customer). Saved off-session for Phase 3 authorize-on-pick.
-- **Flipper dashboard with filter/sort + needs-review highlights** — banner appears when any gig has pending applicants, dedicated stat tile, filter chips (All / Needs review / Open / In progress / Completed), sort dropdown (Newest / Oldest / Due soon / Most applicants), pending gigs always float to top under "All"
+- **Stripe Connect — authorize on pick** (Phase 3): when flipper picks a worker, a PaymentIntent holds money on their card (`capture_method: manual`). Worker's Connect account is set as `transfer_data.destination`. Platform fee = 2% via `application_fee_amount`.
+- **Stripe Connect — capture on approval** (Phase 4): flipper-side review at `/flipper/review/[claimId]`. When flipper approves submitted work, the held PaymentIntent is captured. Stripe auto-transfers (gig amount − 2%) to the worker's Connect account. Verified end-to-end in sandbox.
+- **Flipper dashboard with filter/sort + needs-review highlights** — banner appears when any gig has pending applicants, dedicated stat tile, filter chips (All / Needs review / Open / In progress / Completed), sort dropdown (Newest / Oldest / Due soon / Most applicants), pending gigs always float to top under "All". Note: does NOT yet surface "work submitted, awaiting your review" — that's a known gap (see What's Next #7).
 
 ---
 
@@ -275,8 +277,8 @@ Cory pivoted from "polish the manual PayPal flow" to "do payouts right." We're b
 | 1 | Worker Stripe onboarding flow — "Connect your Stripe" button → Stripe Express hosted onboarding → callback saves account ID | ✅ DONE |
 | 2 | Flipper saved payment method — Stripe Elements form when picking worker; create Customer + PaymentMethod | ✅ DONE |
 | 3 | Authorize on pick — wire `approve_applicant` to create PaymentIntent with `capture_method: manual`, `transfer_data.destination` = worker's Connect acct, `application_fee_amount` = 2% | ✅ DONE |
-| 4 | Capture on approval — wire admin "approve work" to call `paymentIntents.capture()` (auto-transfers to worker) | NEXT |
-| 5 | Worker payout UI — show payment status, Stripe Express dashboard link, payout schedule | |
+| 4 | Capture on approval — wire flipper "approve work" to call `paymentIntents.capture()` (auto-transfers to worker) | ✅ DONE |
+| 5 | Worker payout UI — show payment status, Stripe Express dashboard link, payout schedule | NEXT |
 | 6 | Admin payout UI upgrade — show Stripe payment intent ID, status, refund button | |
 | 7 | Stripe webhooks — `/api/stripe/webhook` to handle account.updated, payment_intent.succeeded/.failed, transfer.created, etc. Needs `STRIPE_WEBHOOK_SECRET` env var. | |
 | 8 | Edge cases — cancellations, refunds, failed cards, expired authorizations (Stripe auths expire after 7 days for cards) | |
@@ -405,6 +407,47 @@ After the RLS fixes, Cory asked for a way to see at a glance which gigs need him
 - `app/flipper/dashboard/page.tsx` — fetches gigs + claims, computes `totalClaimsByGig` and `pendingClaimsByGig` separately. Banner + stats + empty state stay in the server component; the list is passed to the client component.
 - `app/flipper/dashboard/FlipperGigList.tsx` — `FilterKey` and `SortKey` typed. `visibleGigs` is memoized on filter/sort changes. The "float pending to top" sort is layered on top of the user's chosen sort, NOT replacing it.
 
+### Phase 4 — Capture on approval (DONE — shipped this session)
+
+When the flipper (NOT admin — see "important pivot" below) approves submitted work, the previously-held Stripe PaymentIntent is captured. Stripe automatically transfers (gig amount − 2%) to the worker's Connect account and the 2% application fee lands in our platform balance.
+
+**Important pivot from the original plan**
+The HANDOFF previously called this "wire admin's approve button." Wrong — the actual reviewer in this app is the **flipper who posted the gig**, not the admin. The old `/admin/review/[claimId]` page is still there but isn't part of the main flow. Phase 4 built a parallel flipper-side review page that mirrors it.
+
+**The flow**
+1. Worker submits work → `gig_claims.status` flips to `submitted_for_review`
+2. Flipper visits `/flipper/gigs/[id]` — sees a new top-level **"Work submitted for review"** section with a Review work button. (Active-claim + pending-applicants sections hide while work is under review so the flipper has one clear next action.)
+3. Click **Review work** → lands on `/flipper/review/[claimId]` — checklist + flipper's reference photos + worker's proof photos + approve/reject buttons
+4. Click **Approve & capture payment** → POSTs to `/api/stripe/capture-payment`
+5. Route verifies caller is poster (OR admin as a fallback), looks up the payout_records row by `gig_id` + `worker_user_id`, calls `stripe.paymentIntents.capture()`, updates `payment_status='captured'` and legacy `payout_status='paid'`, returns ok
+6. Client then updates `gig_claims.status='approved'` and `gigs.status='completed'` (needs the new RLS policy below)
+7. Stripe asynchronously transfers worker's cut. Worker sees the payout as "Pending" on `/my-gigs/payouts` until Stripe completes the bank transfer (~7-14 days for new Connect accounts).
+
+**Key code files**
+- `lib/stripe-capture.ts` — `capturePickPayment(paymentIntentId)`. Calls `stripe.paymentIntents.capture()`. Returns `{ status: 'ok'|'failed' }`. No idempotency key needed; if you capture an already-captured PI Stripe throws and the caller surfaces a message.
+- `app/api/stripe/capture-payment/route.ts` — the orchestrator. Auth check is "poster of this gig OR admin." Looks up the payout_records row, short-circuits to ok if it's already captured (idempotent), graceful no-op for legacy gigs without a Stripe PI. Updates payment_status to 'captured' AND legacy payout_status to 'paid' so the existing admin payouts UI shows the row in the paid bucket.
+- `app/flipper/review/[claimId]/page.tsx` — flipper-side review page. Mirrors `/admin/review/[claimId]/page.tsx` but scoped to gigs the caller posted (redirects to dashboard if not).
+- `app/flipper/review/[claimId]/FlipperReviewActions.tsx` — client component. POSTs to capture-payment, then updates claim/gig status. Uses `.select()` on every update + checks both error AND row count so silent RLS blocks surface as visible errors instead of phantom redirects.
+- `app/flipper/gigs/[id]/page.tsx` — split `submitted_for_review` out of `otherClaims` into its own prominent section with a Review work button. Active + pending sections hide when there's a submitted claim.
+- `app/admin/review/[claimId]/ReviewActions.tsx` — admin-side equivalent. Same approve flow, calls the same endpoint, in case admin needs to step in.
+
+**Schema changes** (already run on production)
+- `schema_phase4_poster_can_review.sql` — new RLS policy "Posters can update claims under review" on `gig_claims`. Lets the gig poster UPDATE a claim row when `status = 'submitted_for_review'`, restricted to flipping it to `'approved'` (accepted) or `'active'` (sent back for revision). Without this, the client-side `gig_claims.update` from the flipper silently fails — no error, no rows changed, redirect fires anyway. Discovered exactly that way during first end-to-end test.
+
+**Quirks worth knowing**
+- "Send back for revision" does NOT release the Stripe authorization. Hold stays in place so the worker can fix and resubmit without forcing a re-pick. Card auths expire after ~7 days though — if the worker takes longer the auth will lapse and a fresh re-pick would be needed.
+- There's no "Permanently reject this worker" button. The current reject is "send back." Permanent-reject UI is a future addition; it'd call `stripe.paymentIntents.cancel()` and set `payment_status='canceled'`.
+- After the first successful test the flipper-side gig page still showed "Review work" until refresh — turned out the redirect was firing before the page re-rendered with fresh data. The `.select()`/row-count guard added in `FlipperReviewActions.tsx` would now catch a genuine silent-RLS failure, but for stale-cache cases the user just needs to refresh. Not worth a fix unless it gets reported.
+- Stripe shows the worker's cut as a Pending transfer until the bank confirms (7-14 days for new Connect accounts). That's normal Stripe behavior, not a bug.
+
+**Verified end-to-end in sandbox**
+- Flipper picks → $26.06 hold appears in Stripe ✓
+- Worker submits work ✓
+- Flipper approves → Stripe captures, payment shows Succeeded ✓
+- Worker's `/my-gigs/payouts` shows $24.50 Pending ✓
+- Flipper dashboard shows "1 Completed, $25 Paid Out" ✓
+- Worker's "My Gigs" History tab shows the gig as Approved ✓
+
 
 - **Stripe API version pinned to `2024-06-20`** in `lib/stripe.ts`. Don't bump unless you're ready to test breaking changes.
 - **All Stripe amounts are in CENTS** — `calculatePaymentBreakdown` returns both cents and dollars. Use cents for Stripe API calls, dollars for display.
@@ -470,16 +513,39 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 ## What's next (next session)
 
-See `MARKETPLACE_ROADMAP.md` for the full picture. Cory's most likely next moves, in this order:
+**Payments system is functionally complete for the happy path, but NOT production-ready.** Phases 0-4 ship; Phases 5-9 still needed before going live with real money. See `MARKETPLACE_ROADMAP.md` for the full picture.
 
-1. **Stripe Connect Phase 4: Capture on approval.** When the admin approves submitted work (existing `/admin/review` flow), look up the `payout_records` row by `gig_id` + `worker_user_id`, grab its `stripe_payment_intent_id`, call `paymentIntents.capture()`. Stripe auto-transfers (gig amount − 2%) to the worker's Connect account. Update `payment_status` to `'captured'`, then `'transferred'` when the webhook confirms (or just `'captured'` for now if webhooks aren't wired yet). On rejection, call `paymentIntents.cancel()` instead and set `payment_status='canceled'`.
-2. **Stripe webhooks (Phase 7).** Required for production — `/api/stripe/webhook` to handle `account.updated`, `payment_intent.succeeded/.failed`, `transfer.created`, `charge.refunded`, etc. Needs `STRIPE_WEBHOOK_SECRET` env var.
-4. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions.
-5. **Place `ReportImageButton`** on photo views — last piece of moderation work.
-6. **Terms of Service + privacy policy** — paused mid-build a couple sessions ago.
-7. **Address/pickup details on gigs**.
-8. **Email notifications**.
-9. **Ratings/reviews**.
+Cory's most likely next moves, in rough order:
+
+1. **Stripe webhooks (Phase 7).** Required before going live with real money. Without webhooks we don't get notified when: a transfer to a worker fails, a flipper disputes a charge, an authorization expires before capture (7+ days), a worker's Connect account status changes async. Build `/api/stripe/webhook` to handle at minimum `account.updated`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `transfer.created`, `transfer.failed`, `charge.refunded`. Needs `STRIPE_WEBHOOK_SECRET` env var on Vercel.
+
+2. **Unified dashboard ("Home" / "Today" view).** Cory raised this at end of session. Current state: info is scattered across the flipper dashboard, My Gigs (Active/Applications/History), Messages, Payouts, and Profile/Payments. With universal profiles, one user can be flipping AND applying simultaneously. He wants a single landing page that shows everything needing attention: gigs awaiting your review (as flipper), new applicants (as flipper), unread messages, work in progress (as worker), recent payouts, quick actions. Sections that have nothing to show should vanish — pure-flippers see flipper stuff, pure-workers see worker stuff, both-roles see both. Don't gate by role check; gate by "is there data for this section."
+
+3. **Stripe Connect Phase 5: Worker payout UI polish.** Show Stripe Express dashboard login link on `/my-gigs/payouts`, show expected payout arrival window, surface Stripe-side status (Pending / In transit / Paid) instead of legacy "unpaid/pending/paid."
+
+4. **Stripe Connect Phase 6: Admin payout UI upgrade.** Show stripe_payment_intent_id, payment_status, capture/refund buttons on the admin payouts page.
+
+5. **Stripe Connect Phase 8: Edge cases.** What happens when: flipper's card declines at capture time, worker's Connect account gets restricted after approval, auth expires before work is done, flipper requests refund after capture, gig is canceled after authorization. Many of these need webhooks (Phase 7) first.
+
+6. **Stripe Connect Phase 9: Go-live.** Swap test keys → live keys, one real $1 transaction to verify, monitor.
+
+7. **Dashboard discoverability micro-fix (if not doing #2 yet).** The current flipper dashboard has no signal for "work submitted, awaiting your review." The "Pending applicants" tile only counts pending claims (waiting-to-be-picked). Submitted-for-review claims have no banner or tile. Phase 4 surfaced this — solved at the gig-detail level (top section + Review work button) but not at the dashboard level. Add a tile + banner counting gigs with any `submitted_for_review` claim.
+
+8. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
+
+9. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions.
+
+10. **Place `ReportImageButton`** on photo views.
+
+11. **Terms of Service + privacy policy.**
+
+12. **Address/pickup details on gigs.**
+
+13. **Email notifications.**
+
+14. **Ratings/reviews.**
+
+15. **"Payouts" nav link is worker-centric.** Currently shown to everyone; flippers hitting it see "$0 earnings" empty state. Either rename it, hide it for users with no payout history, or build a paired flipper-side "Payments you've made" view. Low priority — Cory was aware and laughed it off, but worth fixing eventually.
 
 Cory will pick. Open by confirming what you're about to build in 2-3 lines, then build.
 
@@ -487,13 +553,19 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
+- `b6d74c8` Stripe Connect Phase 4: RLS fix + silent-failure guards
+- `85e0ec4` Stripe Connect Phase 4: flipper-side review page (not admin)
+- `922d3f1` Stripe Connect Phase 4: capture on approval
+
+## Previous session's commits
+
 - `b96b05a` Stripe Connect Phase 3: RLS fix - flippers can INSERT/UPDATE their own payout_records
 - `e39d4b0` Stripe Connect Phase 3: wire ApplicantActions to /api/stripe/pick-worker + 3DS handling
 - `12b9ad6` Stripe Connect Phase 3: pick-worker API route (authorize on pick)
 - `b61a85c` Stripe Connect Phase 3: authorizePickPayment helper
 - `fd9c564` Stripe Connect Phase 3: SQL for flipper RLS + flipper_user_id index
 
-## Previous session's commits
+## Older commits
 
 - `7a18b0a` Flipper dashboard: needs-review banner, pending stat, filters, sort
 - `c236885` Fix: card-save modal didn't fit smaller screens
