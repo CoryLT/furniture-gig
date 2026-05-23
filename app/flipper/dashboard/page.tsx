@@ -1,7 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel } from '@/lib/utils'
-import { Plus, MapPin, Calendar, Users, ArrowRight, DollarSign, Briefcase, Clock } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
+import { Plus, Users, DollarSign, Briefcase, Clock, AlertCircle } from 'lucide-react'
+import FlipperGigList, { FlipperGig } from './FlipperGigList'
+
+// Always fetch fresh — dashboard data changes constantly
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export default async function FlipperDashboardPage() {
   const supabase = createClient()
@@ -9,14 +14,16 @@ export default async function FlipperDashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   // Load flipper's gigs
-  const { data: gigs } = await supabase
+  const { data: gigsRaw } = await supabase
     .from('gigs')
     .select('*')
     .eq('poster_user_id', user!.id)
     .order('created_at', { ascending: false })
 
-  // Load claim counts per gig
-  const gigIds = gigs?.map((g) => g.id) ?? []
+  const gigs = (gigsRaw ?? []) as unknown as FlipperGig[]
+
+  // Load claim counts per gig (all statuses)
+  const gigIds = gigs.map((g) => g.id)
   const { data: claims } = gigIds.length > 0
     ? await supabase
         .from('gig_claims')
@@ -24,18 +31,45 @@ export default async function FlipperDashboardPage() {
         .in('gig_id', gigIds)
     : { data: [] }
 
-  const claimsByGig = (claims ?? []).reduce<Record<string, number>>((acc, c) => {
-    acc[c.gig_id] = (acc[c.gig_id] ?? 0) + 1
-    return acc
-  }, {})
+  // Total claims per gig
+  const totalClaimsByGig = (claims ?? []).reduce<Record<string, number>>(
+    (acc, c: any) => {
+      acc[c.gig_id] = (acc[c.gig_id] ?? 0) + 1
+      return acc
+    },
+    {}
+  )
+
+  // Pending-only claims per gig (these are the ones needing a pick)
+  const pendingClaimsByGig = (claims ?? []).reduce<Record<string, number>>(
+    (acc, c: any) => {
+      if (c.status === 'pending') {
+        acc[c.gig_id] = (acc[c.gig_id] ?? 0) + 1
+      }
+      return acc
+    },
+    {}
+  )
 
   // Stats
-  const totalGigs = gigs?.length ?? 0
-  const activeGigs = gigs?.filter((g) => ['open', 'claimed', 'in_review'].includes(g.status)).length ?? 0
-  const completedGigs = gigs?.filter((g) => g.status === 'completed').length ?? 0
+  const totalGigs = gigs.length
+  const activeGigs = gigs.filter((g) =>
+    ['open', 'claimed', 'in_review'].includes(g.status)
+  ).length
+  const completedGigs = gigs.filter((g) => g.status === 'completed').length
   const totalPayout = gigs
-    ?.filter((g) => g.status === 'completed')
-    .reduce((sum, g) => sum + Number(g.pay_amount), 0) ?? 0
+    .filter((g) => g.status === 'completed')
+    .reduce((sum, g) => sum + Number(g.pay_amount), 0)
+
+  // Count gigs that have any pending applicants — these are the ones that
+  // need the flipper to pick a worker
+  const gigsNeedingReview = Object.values(pendingClaimsByGig).filter(
+    (n) => n > 0
+  ).length
+  const totalPendingApplicants = Object.values(pendingClaimsByGig).reduce(
+    (sum, n) => sum + n,
+    0
+  )
 
   return (
     <div className="space-y-8">
@@ -43,7 +77,9 @@ export default async function FlipperDashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl text-foreground">My Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Manage your furniture flipping gigs</p>
+          <p className="text-muted-foreground mt-1">
+            Manage your furniture flipping gigs
+          </p>
         </div>
         <Link
           href="/flipper/post-gig"
@@ -54,15 +90,42 @@ export default async function FlipperDashboardPage() {
         </Link>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* Needs-review banner (only shows when there's something to act on) */}
+      {gigsNeedingReview > 0 && (
+        <a
+          href="#your-gigs"
+          className="card card-body block border-accent/40 ring-1 ring-accent/20 hover:shadow-md transition-shadow"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+              <AlertCircle className="w-5 h-5 text-accent" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-foreground">
+                {gigsNeedingReview} gig{gigsNeedingReview === 1 ? '' : 's'} need
+                {gigsNeedingReview === 1 ? 's' : ''} your review
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {totalPendingApplicants} pending applicant
+                {totalPendingApplicants === 1 ? '' : 's'} waiting to be picked.
+                Tap to see them below.
+              </p>
+            </div>
+          </div>
+        </a>
+      )}
+
+      {/* Stats — 5 tiles now */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <div className="card card-body">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
               <Briefcase className="w-4 h-4 text-accent" />
             </div>
             <div>
-              <p className="text-2xl font-mono font-semibold text-foreground">{totalGigs}</p>
+              <p className="text-2xl font-mono font-semibold text-foreground">
+                {totalGigs}
+              </p>
               <p className="text-xs text-muted-foreground">Total Gigs</p>
             </div>
           </div>
@@ -73,8 +136,31 @@ export default async function FlipperDashboardPage() {
               <Clock className="w-4 h-4 text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-mono font-semibold text-foreground">{activeGigs}</p>
+              <p className="text-2xl font-mono font-semibold text-foreground">
+                {activeGigs}
+              </p>
               <p className="text-xs text-muted-foreground">Active</p>
+            </div>
+          </div>
+        </div>
+        <div
+          className={
+            gigsNeedingReview > 0
+              ? 'card card-body border-accent/40 ring-1 ring-accent/20'
+              : 'card card-body'
+          }
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+              <AlertCircle className="w-4 h-4 text-accent" />
+            </div>
+            <div>
+              <p className="text-2xl font-mono font-semibold text-foreground">
+                {totalPendingApplicants}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Pending applicant{totalPendingApplicants === 1 ? '' : 's'}
+              </p>
             </div>
           </div>
         </div>
@@ -84,7 +170,9 @@ export default async function FlipperDashboardPage() {
               <Users className="w-4 h-4 text-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-mono font-semibold text-foreground">{completedGigs}</p>
+              <p className="text-2xl font-mono font-semibold text-foreground">
+                {completedGigs}
+              </p>
               <p className="text-xs text-muted-foreground">Completed</p>
             </div>
           </div>
@@ -95,7 +183,9 @@ export default async function FlipperDashboardPage() {
               <DollarSign className="w-4 h-4 text-accent" />
             </div>
             <div>
-              <p className="text-2xl font-mono font-semibold text-foreground">{formatCurrency(totalPayout)}</p>
+              <p className="text-2xl font-mono font-semibold text-foreground">
+                {formatCurrency(totalPayout)}
+              </p>
               <p className="text-xs text-muted-foreground">Paid Out</p>
             </div>
           </div>
@@ -103,13 +193,17 @@ export default async function FlipperDashboardPage() {
       </div>
 
       {/* Gig list */}
-      <div>
+      <div id="your-gigs" className="scroll-mt-4">
         <h2 className="text-lg font-semibold text-foreground mb-4">Your Gigs</h2>
 
-        {!gigs || gigs.length === 0 ? (
+        {gigs.length === 0 ? (
           <div className="card card-body text-center py-16 space-y-3">
-            <p className="text-lg text-muted-foreground">You haven&apos;t posted any gigs yet.</p>
-            <p className="text-sm text-muted-foreground">Post your first gig to find local workers.</p>
+            <p className="text-lg text-muted-foreground">
+              You haven&apos;t posted any gigs yet.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Post your first gig to find local workers.
+            </p>
             <Link
               href="/flipper/post-gig"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent/90 transition-colors mt-2"
@@ -119,52 +213,11 @@ export default async function FlipperDashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-3">
-            {gigs.map((gig) => (
-              <Link
-                key={gig.id}
-                href={`/flipper/gigs/${gig.id}`}
-                className="card hover:shadow-md transition-shadow group block"
-              >
-                <div className="card-body">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <h3 className="font-semibold text-foreground group-hover:text-accent transition-colors">
-                          {gig.title}
-                        </h3>
-                        <span className={gigStatusClass(gig.status)}>{gigStatusLabel(gig.status)}</span>
-                      </div>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
-                        {(gig.city || gig.location_text) && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3.5 h-3.5" />
-                            {gig.city && gig.state ? `${gig.city}, ${gig.state}` : gig.location_text}
-                          </span>
-                        )}
-                        {gig.due_date && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5" />
-                            Due {formatDate(gig.due_date)}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Users className="w-3.5 h-3.5" />
-                          {claimsByGig[gig.id] ?? 0} {claimsByGig[gig.id] === 1 ? 'claim' : 'claims'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="font-mono font-semibold text-foreground">
-                        {formatCurrency(gig.pay_amount)}
-                      </span>
-                      <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+          <FlipperGigList
+            gigs={gigs}
+            totalClaimsByGig={totalClaimsByGig}
+            pendingClaimsByGig={pendingClaimsByGig}
+          />
         )}
       </div>
     </div>
