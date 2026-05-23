@@ -4,7 +4,7 @@ import AgreementsClient from './AgreementsClient'
 
 function homeForRole(role: string | null | undefined): string {
   if (role === 'admin') return '/admin'
-  return '/home'
+  return '/marketplace'
 }
 
 export default async function AgreementsPage({

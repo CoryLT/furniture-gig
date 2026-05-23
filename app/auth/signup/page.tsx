@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Armchair } from 'lucide-react'
@@ -13,6 +13,16 @@ const DEFAULT_ROLE = 'worker' as const
 
 export default function SignupPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // If they came here from a specific page (e.g. /marketplace/<slug>), carry
+  // it through signup → onboarding → agreements so they end up back where
+  // they started. Only honor safe internal paths (no /auth, no /admin).
+  const rawNext = searchParams.get('next') ?? ''
+  const safeNext =
+    rawNext.startsWith('/') && !rawNext.startsWith('/auth') && !rawNext.startsWith('/admin')
+      ? rawNext
+      : null
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,10 +35,13 @@ export default function SignupPage() {
 
   async function handleGoogleSignup() {
     setGoogleLoading(true)
+    // Forward next= through Google so /auth/finishing can pick it up
+    const finishingUrl = new URL(`${window.location.origin}/auth/finishing`)
+    if (safeNext) finishingUrl.searchParams.set('next', safeNext)
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/finishing`,
+        redirectTo: finishingUrl.toString(),
         queryParams: { prompt: 'select_account' },
         data: { role: DEFAULT_ROLE },
       },
@@ -65,8 +78,11 @@ export default function SignupPage() {
     }
 
     // Everyone lands on the basic onboarding (name, phone, location, paypal).
-    // They can post a gig later — we ask for flipper details then.
-    router.push('/auth/onboarding')
+    // Forward ?next= so the user lands back where they started post-agreements.
+    const onboardingHref = safeNext
+      ? `/auth/onboarding?next=${encodeURIComponent(safeNext)}`
+      : '/auth/onboarding'
+    router.push(onboardingHref)
     router.refresh()
   }
 
@@ -144,7 +160,14 @@ export default function SignupPage() {
 
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{' '}
-          <Link href="/auth/login" className="text-accent hover:underline font-medium">
+          <Link
+            href={
+              safeNext
+                ? `/auth/login?next=${encodeURIComponent(safeNext)}`
+                : '/auth/login'
+            }
+            className="text-accent hover:underline font-medium"
+          >
             Sign in
           </Link>
         </p>

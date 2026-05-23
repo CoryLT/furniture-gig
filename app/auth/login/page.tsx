@@ -2,24 +2,38 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Armchair } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
 
+  // Honor ?next=/some/path if it's a safe internal path. We refuse paths
+  // that don't start with "/" and paths that point back at /auth/ (which
+  // would create a loop). Admin paths can only be visited by admins so
+  // the admin branch below ignores ?next= unless it points at /admin.
+  const rawNext = searchParams.get('next') ?? ''
+  const safeNext =
+    rawNext.startsWith('/') && !rawNext.startsWith('/auth') ? rawNext : null
+
   async function handleGoogleLogin() {
     setGoogleLoading(true)
     const supabase = createClient()
+    // Pass the next param through Google OAuth so we can resume after
+    // returning from Google. We can't read URL params on the /auth/finishing
+    // page because Google strips them — so we encode in the redirectTo URL.
+    const finishingUrl = new URL(`${window.location.origin}/auth/finishing`)
+    if (safeNext) finishingUrl.searchParams.set('next', safeNext)
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/finishing`,
+        redirectTo: finishingUrl.toString(),
         queryParams: { prompt: 'select_account' },
       },
     })
@@ -45,9 +59,11 @@ export default function LoginPage() {
 
     const adminEmail = (process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '').toLowerCase()
     if (email.toLowerCase() === adminEmail) {
-      router.push('/admin')
+      // Admins only follow ?next= if it's an /admin path
+      router.push(safeNext && safeNext.startsWith('/admin') ? safeNext : '/admin')
     } else {
-      router.push('/home')
+      // Workers/flippers follow any safe ?next=; otherwise marketplace
+      router.push(safeNext && !safeNext.startsWith('/admin') ? safeNext : '/marketplace')
     }
   }
 
@@ -114,7 +130,14 @@ export default function LoginPage() {
 
         <p className="text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{' '}
-          <Link href="/auth/signup" className="text-accent hover:underline font-medium">
+          <Link
+            href={
+              safeNext
+                ? `/auth/signup?next=${encodeURIComponent(safeNext)}`
+                : '/auth/signup'
+            }
+            className="text-accent hover:underline font-medium"
+          >
             Sign up
           </Link>
         </p>

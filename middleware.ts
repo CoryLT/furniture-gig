@@ -27,6 +27,13 @@ export async function middleware(request: NextRequest) {
   if (!hasSession && needsAuth) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
+    // Preserve the original path (+ query) so the login page can send
+    // the user back there after auth. Skip the next= dance for /auth/*
+    // paths (would loop) and for the bare landing path (no value).
+    const originalPath = pathname + (request.nextUrl.search || '')
+    if (originalPath && !originalPath.startsWith('/auth')) {
+      url.searchParams.set('next', originalPath)
+    }
     return NextResponse.redirect(url)
   }
 

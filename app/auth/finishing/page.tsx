@@ -32,10 +32,21 @@ export default function FinishingPage() {
           return
         }
 
+        // Forward ?next= from this URL through to set-session so the
+        // server can pick the right destination (back to the original page
+        // they were trying to view, falling back to /marketplace).
+        const urlNext = new URLSearchParams(window.location.search).get('next')
+
         const res = await fetch('/api/auth/set-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ access_token, refresh_token, expires_in, expires_at }),
+          body: JSON.stringify({
+            access_token,
+            refresh_token,
+            expires_in,
+            expires_at,
+            next: urlNext ?? undefined,
+          }),
         })
 
         if (!res.ok) {

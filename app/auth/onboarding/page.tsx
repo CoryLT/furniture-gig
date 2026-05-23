@@ -1,13 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { LocationSelect } from '@/components/ui/location-select';
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Forward ?next= so it survives through to /auth/agreements (the page
+  // after this) and then to wherever the user originally wanted to land.
+  const rawNext = searchParams.get('next') ?? '';
+  const safeNext =
+    rawNext.startsWith('/') && !rawNext.startsWith('/auth') && !rawNext.startsWith('/admin')
+      ? rawNext
+      : null;
+
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -83,8 +93,12 @@ export default function OnboardingPage() {
         throw upsertError;
       }
 
-      // Redirect to agreements page
-      router.push('/auth/agreements');
+      // Redirect to agreements page, carrying ?next= so the user lands
+      // back where they originally wanted to go after accepting agreements.
+      const agreementsHref = safeNext
+        ? `/auth/agreements?next=${encodeURIComponent(safeNext)}`
+        : '/auth/agreements';
+      router.push(agreementsHref);
     } catch (err: any) {
       setError(err.message || 'Failed to save profile');
     } finally {

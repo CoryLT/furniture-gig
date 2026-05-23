@@ -35,16 +35,29 @@ function createChunks(key: string, value: string): Array<{ name: string; value: 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { access_token, refresh_token, expires_at, expires_in } = body as {
+    const { access_token, refresh_token, expires_at, expires_in, next } = body as {
       access_token: string
       refresh_token: string
       expires_at?: number
       expires_in?: number
+      next?: string
     }
 
     if (!access_token || !refresh_token) {
       return NextResponse.json({ error: 'Missing tokens' }, { status: 400 })
     }
+
+    // Compute the safe post-auth destination for non-admin users:
+    //   - If a ?next= was passed AND it's a safe internal path → that
+    //   - Otherwise → /marketplace
+    const safeNext =
+      typeof next === 'string' &&
+      next.startsWith('/') &&
+      !next.startsWith('/auth') &&
+      !next.startsWith('/admin')
+        ? next
+        : null
+    const postAuthDestination = safeNext ?? '/marketplace'
 
     const [, b64Segment] = access_token.split('.')
     if (!b64Segment) {
@@ -158,7 +171,7 @@ export async function POST(request: NextRequest) {
           )
           const profiles = await profileRes.json()
           if (Array.isArray(profiles) && profiles[0]?.onboarding_complete === true) {
-            destination = '/home'
+            destination = postAuthDestination
           }
         } catch {
           // safe fallback — stay on /auth/flipper-onboarding
@@ -178,7 +191,7 @@ export async function POST(request: NextRequest) {
           )
           const profiles = await profileRes.json()
           if (Array.isArray(profiles) && profiles[0]?.onboarding_complete === true) {
-            destination = '/home'
+            destination = postAuthDestination
           }
         } catch {
           // If the check fails, default to onboarding — safe fallback
