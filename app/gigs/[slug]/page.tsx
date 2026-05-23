@@ -58,6 +58,21 @@ export default async function GigDetailPage({ params }: Props) {
   const isMyGig = activeClaim?.worker_user_id === user.id
   const isOwnPostedGig = gig.poster_user_id === user.id || gig.created_by === user.id
 
+  // Load worker's Stripe Connect status — required before applying
+  const { data: workerProfile } = await supabase
+    .from('worker_profiles')
+    .select('stripe_account_id, stripe_charges_enabled, stripe_payouts_enabled, stripe_details_submitted' as any)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  const wp = (workerProfile as any) ?? {}
+  const stripeReady =
+    !!wp.stripe_account_id &&
+    !!wp.stripe_charges_enabled &&
+    !!wp.stripe_payouts_enabled &&
+    !!wp.stripe_details_submitted
+  const stripeStarted = !!wp.stripe_account_id
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Back link */}
@@ -169,6 +184,8 @@ export default async function GigDetailPage({ params }: Props) {
         hasActiveClaim={!!activeClaim}
         pendingApplicantCount={pendingApplicantCount}
         userId={user.id}
+        stripeReady={stripeReady}
+        stripeStarted={stripeStarted}
       />
     </div>
   )

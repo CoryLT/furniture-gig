@@ -269,8 +269,8 @@ Cory pivoted from "polish the manual PayPal flow" to "do payouts right." We're b
 | # | Phase | Status |
 |---|---|---|
 | 0 | Stripe account, sandbox, Connect, env vars, SQL, foundation code | ✅ DONE |
-| 1 | Worker Stripe onboarding flow — "Connect your Stripe" button → Stripe Express hosted onboarding → callback saves account ID | NEXT |
-| 2 | Flipper saved payment method — Stripe Elements form when picking worker; create Customer + PaymentMethod | |
+| 1 | Worker Stripe onboarding flow — "Connect your Stripe" button → Stripe Express hosted onboarding → callback saves account ID | ✅ DONE |
+| 2 | Flipper saved payment method — Stripe Elements form when picking worker; create Customer + PaymentMethod | NEXT |
 | 3 | Authorize on pick — wire `approve_applicant` to create PaymentIntent with `capture_method: manual`, `transfer_data.destination` = worker's Connect acct, `application_fee_amount` = 2% | |
 | 4 | Capture on approval — wire admin "approve work" to call `paymentIntents.capture()` (auto-transfers to worker) | |
 | 5 | Worker payout UI — show payment status, Stripe Express dashboard link, payout schedule | |
@@ -278,6 +278,38 @@ Cory pivoted from "polish the manual PayPal flow" to "do payouts right." We're b
 | 7 | Stripe webhooks — `/api/stripe/webhook` to handle account.updated, payment_intent.succeeded/.failed, transfer.created, etc. Needs `STRIPE_WEBHOOK_SECRET` env var. | |
 | 8 | Edge cases — cancellations, refunds, failed cards, expired authorizations (Stripe auths expire after 7 days for cards) | |
 | 9 | Go-live — activate live Stripe account, swap env vars to live keys, test one real $1 transaction | |
+
+### Phase 1 — Worker Stripe onboarding (DONE — shipped this session)
+
+Workers must now connect a Stripe Express account before they can apply to any gig.
+
+**The flow**
+1. Worker opens `/profile` — sees a new "Payments" card with status
+2. Card links to `/profile/payments` — a dedicated page that fetches live status from Stripe
+3. "Connect Stripe account" → POSTs to `/api/stripe/connect/onboard`
+4. Server creates a Stripe Express account (with `card_payments` + `transfers` capabilities), saves the ID to `worker_profiles.stripe_account_id`, returns a hosted `accountLink.url`
+5. Worker is redirected to Stripe's hosted onboarding form (Stripe handles bank info, SSN, ID verification — FlipWork never sees any of it)
+6. Stripe sends them back to `/profile/payments/return` — which calls `stripe.accounts.retrieve()`, syncs `charges_enabled`/`payouts_enabled`/`details_submitted` flags to the DB, and shows a success or "almost there" message
+7. On the gig detail page, if the worker's Stripe isn't fully ready, the Apply button is replaced with a "Set up payments to apply" CTA linking to `/profile/payments`
+
+**Key code files**
+- `app/api/stripe/connect/onboard/route.ts` — POST. Creates Express account if missing, returns onboarding URL.
+- `app/api/stripe/connect/refresh/route.ts` — GET. Stripe redirects here if the link expires; we regenerate and bounce them back to Stripe.
+- `app/api/stripe/connect/return/page.tsx` — Where Stripe sends users post-onboarding. Server-side fetches account state and syncs to DB. (Lives at `app/profile/payments/return/page.tsx` actually — the `return_url` passed to Stripe is `${origin}/profile/payments/return`.)
+- `app/api/stripe/connect/status/route.ts` — GET. Returns fresh status from Stripe (also syncs DB). Used by client components to refresh status without a full page load.
+- `app/api/stripe/connect/login-link/route.ts` — POST. Generates a one-time Stripe Express Dashboard login link so the worker can manage their account (update bank, view payouts, etc.).
+- `app/profile/payments/page.tsx` + `PaymentsClient.tsx` — the dedicated payments page.
+- `app/profile/payments/return/page.tsx` — the post-onboarding return page.
+- `components/profile/ProfilePaymentsSection.tsx` — the summary card on `/profile`.
+- `app/profile/page.tsx` — added `<ProfilePaymentsSection />` between the main form card and the Work Samples card.
+- `app/gigs/[slug]/page.tsx` — now loads `stripe_*` columns and passes `stripeReady` + `stripeStarted` to ClaimButton.
+- `app/gigs/[slug]/ClaimButton.tsx` — new `stripeReady` / `stripeStarted` props. If !stripeReady, the apply form is replaced with a "Set up payments to apply" link to `/profile/payments`.
+
+**Quirks worth knowing**
+- All Stripe-touching DB writes use `as any` casts because `types/database.ts` doesn't have the Stripe columns yet. That's the same pattern HANDOFF already calls out for Supabase `never` type issues. If you need to update those types later, you'll need to add: `stripe_account_id`, `stripe_charges_enabled`, `stripe_payouts_enabled`, `stripe_details_submitted`, `stripe_onboarding_completed_at` to `worker_profiles`.
+- `ProfilePaymentsSection` always shows on `/profile`, regardless of whether the user is primarily a worker or flipper. That's intentional — anyone might apply to a gig.
+- The status endpoint syncs Stripe → DB on every call. That keeps the DB cache fresh without webhooks. We'll add webhooks in Phase 7 for instant updates from Stripe's side, but pull-on-demand is fine for now.
+- `Stripe.accounts.retrieve()` is a real API call (not cached). The `/profile/payments` page calls it once on load via `/api/stripe/connect/status`. If this gets slow, we could cache the DB-stored flags and only re-fetch on user action.
 
 ### Critical gotchas for whoever picks this up
 - **Stripe API version pinned to `2024-06-20`** in `lib/stripe.ts`. Don't bump unless you're ready to test breaking changes.
@@ -302,7 +334,7 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 ## ⚠️ TODOs left at end of session
 
 1. **Rotate `SIGHTENGINE_API_SECRET`** — exposed in chat in an earlier session. Regenerate in Sightengine dashboard, update Vercel env var, redeploy. STILL OUTSTANDING.
-2. **Stripe Connect Phase 1+** — foundation is shipped and verified. Next is the worker onboarding flow. See "Stripe Connect payout system" section above for the full phase list.
+2. **Stripe Connect Phase 2+** — Phase 1 (worker onboarding) is done. Next is the flipper payment method form (Stripe Elements when picking a worker). See "Stripe Connect payout system" section above for the full phase list.
 3. **AI support chat** — DEPRIORITIZED until Stripe payouts are live (the AI needs to be able to answer payout questions accurately). Plan still good — Haiku 4.5, `/support` page, `ANTHROPIC_API_KEY` env var, 5 chats/day per user. See prior handoffs for details.
 4. **Place `ReportImageButton` on photo views** — gallery cards, gig photo grids, avatar viewers. Component is built; just needs to be slotted in.
 5. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
@@ -341,10 +373,10 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 See `MARKETPLACE_ROADMAP.md` for the full picture. Cory's most likely next moves, in this order:
 
-1. **Stripe Connect Phase 1: Worker onboarding flow.** Build the "Connect your Stripe" UI for workers. Should go on `/profile` (or a new `/profile/payments` sub-page). Click button → POST to `/api/stripe/connect/onboard` → server creates Stripe Express account → returns `accountLink.url` → user redirects to Stripe's hosted onboarding → Stripe redirects them back to a return URL → server fetches account state and saves to `worker_profiles`. Use Stripe's `accounts.create({ type: 'express', country: 'US', email: ..., capabilities: { card_payments: { requested: true }, transfers: { requested: true } } })` and `accountLinks.create({ account, refresh_url, return_url, type: 'account_onboarding' })`.
-2. **Stripe Connect Phase 2: Flipper payment method.** Stripe Elements form when picking a worker. Save Customer + PaymentMethod.
-3. **Stripe Connect Phases 3-4:** Wire authorize-on-pick and capture-on-approve into existing `approve_applicant` + admin review flows.
-4. **Stripe webhooks.** Required for production — Stripe pushes account updates, payment status changes, refunds, etc.
+1. **Stripe Connect Phase 2: Flipper payment method.** Stripe Elements card form when picking a worker. Save Customer + PaymentMethod to the flipper's user row. This sets up the rails for Phase 3 (authorize on pick).
+2. **Stripe Connect Phases 3-4:** Wire authorize-on-pick and capture-on-approve into existing `approve_applicant` + admin review flows.
+3. **Stripe webhooks.** Required for production — Stripe pushes account updates, payment status changes, refunds, etc.
+4. **Test the full Phase 1 flow end-to-end.** Cory should test: sign up a fresh test worker → save profile → go to `/profile/payments` → click Connect → fill in Stripe Express form (use test SSN `000-00-0000`, test bank routing `110000000` / account `000123456789`) → return to FlipWork → verify status flips to "ready" → try to apply for a gig (should work now). Before connecting Stripe, applying should be blocked.
 5. **Rotate `SIGHTENGINE_API_SECRET`** — overdue.
 6. **Place `ReportImageButton`** on photo views — last piece of moderation work.
 7. **Terms of Service + privacy policy** — paused mid-build a couple sessions ago.
@@ -358,10 +390,12 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
-- `62c9a78` Stripe Connect foundation: SDK install, client helper, SQL migration, health route
+- (pending) Stripe Connect Phase 1: worker onboarding flow + apply-gating
 
 ## Previous session's commits
 
+- `bb38180` Update HANDOFF: Stripe Connect foundation shipped, payout pivot documented
+- `62c9a78` Stripe Connect foundation: SDK install, client helper, SQL migration, health route
 - `2ba8d02` Logo links to /gigs for workers and flippers
 - `325aa0e` Fix mobile viewport and mobile menu layout
 - `ccb6ed6` Fix Google sign-in requiring two clicks
