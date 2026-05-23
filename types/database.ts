@@ -559,6 +559,143 @@ export type Database = {
           created_at?: string
         }
       }
+      marketplace_categories: {
+        Row: {
+          id: string
+          slug: string
+          label: string
+          sort_order: number
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          slug: string
+          label: string
+          sort_order?: number
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          label?: string
+          sort_order?: number
+          active?: boolean
+          created_at?: string
+        }
+      }
+      marketplace_blocked_keywords: {
+        Row: {
+          id: string
+          phrase: string
+          category: string
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          phrase: string
+          category?: string
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          phrase?: string
+          category?: string
+          active?: boolean
+          created_at?: string
+        }
+      }
+      marketplace_listings: {
+        Row: {
+          id: string
+          seller_user_id: string
+          title: string
+          slug: string
+          description: string
+          category_slug: string
+          price_mode: 'fixed' | 'free'
+          price_cents: number
+          condition: 'new' | 'like_new' | 'good' | 'fair' | 'for_parts' | null
+          location_city: string
+          location_state: string
+          location_lat: number | null
+          location_lng: number | null
+          status: 'active' | 'sold' | 'hidden' | 'deleted'
+          view_count: number
+          created_at: string
+          updated_at: string
+          sold_at: string | null
+        }
+        Insert: {
+          id?: string
+          seller_user_id: string
+          title: string
+          slug: string
+          description?: string
+          category_slug: string
+          price_mode?: 'fixed' | 'free'
+          price_cents?: number
+          condition?: 'new' | 'like_new' | 'good' | 'fair' | 'for_parts' | null
+          location_city?: string
+          location_state?: string
+          location_lat?: number | null
+          location_lng?: number | null
+          status?: 'active' | 'sold' | 'hidden' | 'deleted'
+          view_count?: number
+          created_at?: string
+          updated_at?: string
+          sold_at?: string | null
+        }
+        Update: {
+          id?: string
+          seller_user_id?: string
+          title?: string
+          slug?: string
+          description?: string
+          category_slug?: string
+          price_mode?: 'fixed' | 'free'
+          price_cents?: number
+          condition?: 'new' | 'like_new' | 'good' | 'fair' | 'for_parts' | null
+          location_city?: string
+          location_state?: string
+          location_lat?: number | null
+          location_lng?: number | null
+          status?: 'active' | 'sold' | 'hidden' | 'deleted'
+          view_count?: number
+          created_at?: string
+          updated_at?: string
+          sold_at?: string | null
+        }
+      }
+      marketplace_photos: {
+        Row: {
+          id: string
+          listing_id: string
+          file_path: string
+          caption: string
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          listing_id: string
+          file_path: string
+          caption?: string
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          listing_id?: string
+          file_path?: string
+          caption?: string
+          sort_order?: number
+          created_at?: string
+        }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -584,6 +721,10 @@ export type WorkerPhotoGalleryRow = Database['public']['Tables']['worker_photo_g
 export type FlipperPhotoGalleryRow = Database['public']['Tables']['flipper_photo_galleries']['Row']
 export type GigConversationRow = Database['public']['Tables']['gig_conversations']['Row']
 export type GigMessageRow = Database['public']['Tables']['gig_messages']['Row']
+export type MarketplaceCategoryRow = Database['public']['Tables']['marketplace_categories']['Row']
+export type MarketplaceBlockedKeywordRow = Database['public']['Tables']['marketplace_blocked_keywords']['Row']
+export type MarketplaceListingRow = Database['public']['Tables']['marketplace_listings']['Row']
+export type MarketplacePhotoRow = Database['public']['Tables']['marketplace_photos']['Row']
 
 // Status types
 export type GigStatus = GigRow['status']

@@ -105,3 +105,62 @@ export function payoutStatusClass(status: PayoutStatus): string {
   }
   return classes[status] ?? ''
 }
+
+// ============================================================
+// Marketplace helpers
+// ============================================================
+
+// Format a cents amount as USD price text. Used on listing cards.
+// e.g. 15000 -> "$150"  |  19999 -> "$199.99"
+export function formatPriceFromCents(
+  cents: number,
+  mode: 'fixed' | 'free' = 'fixed'
+): string {
+  if (mode === 'free') return 'Free'
+  const dollars = cents / 100
+  // Show no decimals when it's a whole dollar amount; otherwise 2 decimals
+  const hasCents = cents % 100 !== 0
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: 2,
+  }).format(dollars)
+}
+
+// Short relative time, like "2h ago", "3d ago", "Just now"
+export function timeAgo(dateStr: string | null | undefined): string {
+  if (!dateStr) return ''
+  const then = new Date(dateStr).getTime()
+  if (Number.isNaN(then)) return ''
+  const diffSec = Math.max(0, Math.floor((Date.now() - then) / 1000))
+  if (diffSec < 30) return 'Just now'
+  if (diffSec < 60) return `${diffSec}s ago`
+  const min = Math.floor(diffSec / 60)
+  if (min < 60) return `${min}m ago`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  const day = Math.floor(hr / 24)
+  if (day < 7) return `${day}d ago`
+  const wk = Math.floor(day / 7)
+  if (wk < 5) return `${wk}w ago`
+  const mo = Math.floor(day / 30)
+  if (mo < 12) return `${mo}mo ago`
+  const yr = Math.floor(day / 365)
+  return `${yr}y ago`
+}
+
+// Human-readable condition label
+export function conditionLabel(
+  condition: 'new' | 'like_new' | 'good' | 'fair' | 'for_parts' | null
+): string {
+  if (!condition) return ''
+  const labels = {
+    new: 'New',
+    like_new: 'Like New',
+    good: 'Good',
+    fair: 'Fair',
+    for_parts: 'For Parts',
+  }
+  return labels[condition]
+}
