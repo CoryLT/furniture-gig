@@ -50,16 +50,37 @@ export default function FlipperReviewActions({
       }
 
       // 2) Mark the claim as approved.
-      await supabase
+      //    .select() forces Supabase to return the updated rows so we
+      //    can detect RLS-blocked writes (which otherwise silently
+      //    return no error AND no rows changed).
+      const { data: claimUpdate, error: claimUpdateErr } = await (supabase as any)
         .from('gig_claims')
         .update({ status: 'approved' })
         .eq('id', claimId)
+        .select('id')
+
+      if (claimUpdateErr || !claimUpdate || claimUpdate.length === 0) {
+        setError(
+          'Payment captured, but could not mark the claim as approved. ' +
+            'Please contact support — your money was charged. ' +
+            (claimUpdateErr?.message ?? '')
+        )
+        setLoading(null)
+        return
+      }
 
       // 3) Mark the gig completed.
-      await supabase
+      const { data: gigUpdate, error: gigUpdateErr } = await (supabase as any)
         .from('gigs')
         .update({ status: 'completed' })
         .eq('id', gigId)
+        .select('id')
+
+      if (gigUpdateErr || !gigUpdate || gigUpdate.length === 0) {
+        // Claim already flipped to approved — partial state but not fatal.
+        // Log to console and continue; gig status can be cleaned up later.
+        console.warn('[approve] Gig status update may have failed:', gigUpdateErr)
+      }
 
       // 4) Legacy fallback: if there's no payout_records row at all
       //    (gigs from before Phase 3), make one now so the payouts
@@ -112,12 +133,22 @@ export default function FlipperReviewActions({
     // worker takes longer than that to resubmit, the auth will lapse
     // (no charge to the flipper) and a fresh re-pick would be needed
     // to capture later. Permanent-reject UI can come later.
-    await supabase
+    const { data: rejectUpdate, error: rejectUpdateErr } = await (supabase as any)
       .from('gig_claims')
       .update({ status: 'active' })
       .eq('id', claimId)
+      .select('id')
 
-    await supabase
+    if (rejectUpdateErr || !rejectUpdate || rejectUpdate.length === 0) {
+      setError(
+        'Could not send back for revision. ' +
+          (rejectUpdateErr?.message ?? 'RLS may be blocking the update.')
+      )
+      setLoading(null)
+      return
+    }
+
+    await (supabase as any)
       .from('gigs')
       .update({ status: 'claimed' })
       .eq('id', gigId)
