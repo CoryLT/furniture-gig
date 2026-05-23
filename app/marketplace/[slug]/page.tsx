@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import PublicTopBar from '@/components/shared/PublicTopBar'
 import Nav from '@/components/shared/Nav'
 import PhotoCarousel from './PhotoCarousel'
+import MessageSellerButton from '@/components/shared/MessageSellerButton'
 import type {
   MarketplaceListingRow,
   MarketplacePhotoRow,
@@ -203,11 +204,9 @@ export default async function MarketplaceListingPage({ params }: Props) {
                   </>
                 ) : user ? (
                   <>
-                    <Button variant="accent" className="w-full" disabled>
-                      Message Seller
-                    </Button>
+                    <MessageSellerButton listingId={listing.id} />
                     <p className="text-xs text-muted-foreground text-center">
-                      Messaging will be enabled in a future update.
+                      You'll be able to chat with the seller about this item.
                     </p>
                   </>
                 ) : (
