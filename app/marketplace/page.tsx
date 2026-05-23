@@ -5,7 +5,6 @@ import MarketplaceFeed from './MarketplaceFeed'
 import type {
   MarketplaceListingRow,
   MarketplacePhotoRow,
-  MarketplaceCategoryRow,
 } from '@/types/database'
 
 // Marketplace is public, but content changes constantly — bypass the cache
@@ -19,15 +18,6 @@ export default async function MarketplacePage() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  // Get categories for the filter dropdown
-  const { data: categoriesData } = await supabase
-    .from('marketplace_categories')
-    .select('*')
-    .eq('active', true)
-    .order('sort_order')
-
-  const categories = (categoriesData ?? []) as MarketplaceCategoryRow[]
 
   // Get the latest active listings — most recent first.
   // We grab a generous batch (60) so the client can filter/sort
@@ -115,10 +105,11 @@ export default async function MarketplacePage() {
     }
   })
 
-  // Look up the viewer's role for nav rendering
+  // Look up the viewer's role for nav rendering + city for auto-filter
   let userRole: 'worker' | 'admin' | 'flipper' = 'worker'
   let userName: string | undefined
   let userUsername: string | undefined
+  let viewerCity: string | null = null
 
   if (user) {
     const { data: row } = await supabase
@@ -130,12 +121,23 @@ export default async function MarketplacePage() {
 
     const { data: wp } = await supabase
       .from('worker_profiles')
-      .select('first_name, username')
+      .select('first_name, username, city')
       .eq('user_id', user.id)
       .maybeSingle()
     if (wp) {
       userName = wp.first_name ?? undefined
       userUsername = wp.username ?? undefined
+      if (wp.city && wp.city.trim()) viewerCity = wp.city.trim()
+    }
+
+    // Fall back to flipper_profiles city if worker_profiles didn't have one
+    if (!viewerCity) {
+      const { data: fp } = await supabase
+        .from('flipper_profiles')
+        .select('city')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (fp?.city && fp.city.trim()) viewerCity = fp.city.trim()
     }
   }
 
@@ -148,20 +150,11 @@ export default async function MarketplacePage() {
       )}
 
       <main className="flex-1">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          <div className="mb-6">
-            <h1 className="text-3xl sm:text-4xl text-foreground mb-1">
-              Marketplace
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Furniture, decor, tools, and more — from people in your area.
-            </p>
-          </div>
-
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
           <MarketplaceFeed
             initialListings={enriched}
-            categories={categories}
             isLoggedIn={!!user}
+            viewerCity={viewerCity}
           />
         </div>
       </main>

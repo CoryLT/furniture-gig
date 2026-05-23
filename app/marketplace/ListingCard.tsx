@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { MapPin, ImageIcon } from 'lucide-react'
+import { ImageIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatPriceFromCents, timeAgo } from '@/lib/utils'
 import type { MarketplaceListingRow } from '@/types/database'
@@ -30,7 +30,7 @@ export default function ListingCard({ listing }: Props) {
   return (
     <Link
       href={`/marketplace/${listing.slug}`}
-      className="group block rounded-lg overflow-hidden bg-card border border-border hover:shadow-md transition-shadow"
+      className="group block rounded-md overflow-hidden bg-card border border-border hover:border-foreground/30 hover:shadow-sm transition"
     >
       {/* Square cover photo */}
       <div className="relative aspect-square bg-muted">
@@ -44,43 +44,41 @@ export default function ListingCard({ listing }: Props) {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-            <ImageIcon className="w-8 h-8 opacity-40" strokeWidth={1.5} />
+            <ImageIcon className="w-7 h-7 opacity-40" strokeWidth={1.5} />
           </div>
         )}
 
         {/* Free badge */}
         {listing.price_mode === 'free' && !isSold && (
-          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-xs font-semibold">
+          <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-semibold tracking-wide">
             FREE
           </div>
         )}
 
         {/* Sold overlay */}
         {isSold && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <div className="px-3 py-1 rounded-md bg-white text-stone-900 text-sm font-semibold">
+          <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
+            <div className="px-2.5 py-1 rounded-md bg-white text-stone-900 text-xs font-semibold tracking-wide">
               SOLD
             </div>
           </div>
         )}
       </div>
 
-      {/* Body */}
-      <div className="p-3 space-y-1">
-        <div className="font-mono font-semibold text-foreground">
+      {/* Body — tighter, price first */}
+      <div className="p-2 sm:p-2.5">
+        <div className="font-mono font-semibold text-sm sm:text-[15px] text-foreground leading-tight">
           {formatPriceFromCents(listing.price_cents, listing.price_mode)}
         </div>
-        <div className="text-sm text-foreground line-clamp-2 leading-snug min-h-[2.5em]">
+        <div className="text-xs sm:text-sm text-foreground line-clamp-2 leading-snug mt-0.5">
           {listing.title}
         </div>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <MapPin className="w-3 h-3 shrink-0" />
+        <div className="flex items-center text-[11px] text-muted-foreground mt-1 gap-1">
           <span className="truncate">
-            {listing.location_city
-              ? `${listing.location_city}${listing.location_state ? ', ' + listing.location_state : ''}`
-              : listing.location_state || '—'}
+            {listing.location_city || listing.location_state || '—'}
           </span>
-          <span className="ml-auto shrink-0">{timeAgo(listing.created_at)}</span>
+          <span className="ml-auto shrink-0">·</span>
+          <span className="shrink-0">{timeAgo(listing.created_at)}</span>
         </div>
       </div>
     </Link>
