@@ -193,14 +193,7 @@ export default function MarketplaceFeed({
           </div>
         </div>
       ) : (
-        <div
-          className="grid gap-2 sm:gap-2.5"
-          style={{
-            gridTemplateColumns:
-              'repeat(auto-fill, minmax(min(50%, 220px), 1fr))',
-            maxWidth: '100%',
-          }}
-        >
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-2.5">
           {filteredSorted.map((l) => (
             <ListingCard key={l.id} listing={l} />
           ))}
