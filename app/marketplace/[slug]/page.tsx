@@ -129,7 +129,7 @@ export default async function MarketplaceListingPage({ params }: Props) {
       )}
 
       <main className="flex-1">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
           {/* Back link */}
           <Link
             href="/marketplace"
@@ -166,22 +166,22 @@ export default async function MarketplaceListingPage({ params }: Props) {
               </div>
 
               {/* Meta chips */}
-              <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+              <div className="flex flex-wrap gap-1.5 text-xs">
                 {category && (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-secondary">
-                    <Tag className="w-3.5 h-3.5" />
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-secondary text-foreground">
+                    <Tag className="w-3 h-3" />
                     {category.label}
                   </span>
                 )}
                 {listing.condition && (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-secondary">
-                    <Package className="w-3.5 h-3.5" />
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-secondary text-foreground">
+                    <Package className="w-3 h-3" />
                     {conditionLabel(listing.condition)}
                   </span>
                 )}
                 {(listing.location_city || listing.location_state) && (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-secondary">
-                    <MapPin className="w-3.5 h-3.5" />
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-secondary text-foreground">
+                    <MapPin className="w-3 h-3" />
                     {[listing.location_city, listing.location_state]
                       .filter(Boolean)
                       .join(', ')}
@@ -276,17 +276,13 @@ export default async function MarketplaceListingPage({ params }: Props) {
 
           {/* Description (full width, below the photo + meta) */}
           {listing.description && (
-            <div className="card mt-6">
-              <div className="card-header">
-                <h2 className="font-sans font-semibold text-foreground">
-                  Description
-                </h2>
+            <div className="card card-body mt-6">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-3">
+                Description
               </div>
-              <div className="card-body">
-                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                  {listing.description}
-                </p>
-              </div>
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                {listing.description}
+              </p>
             </div>
           )}
         </div>

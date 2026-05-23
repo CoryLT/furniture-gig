@@ -1,7 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Search, X, MapPin } from 'lucide-react'
+import Link from 'next/link'
+import { Search, MapPin } from 'lucide-react'
 import ListingCard, { type ListingCardData } from './ListingCard'
 
 interface Props {
@@ -99,7 +100,6 @@ export default function MarketplaceFeed({
               >
                 <MapPin className="w-3.5 h-3.5" />
                 {viewerCity}
-                {cityFilterOn && <X className="w-3.5 h-3.5 -mr-1" />}
               </button>
             )}
 
@@ -143,27 +143,64 @@ export default function MarketplaceFeed({
 
       {/* Grid */}
       {filteredSorted.length === 0 ? (
-        <div className="card card-body text-center py-16">
-          <p className="text-sm text-muted-foreground">
-            No listings match these filters.
+        <div className="rounded-lg border border-dashed border-border bg-card text-center py-16 px-4">
+          <p className="text-sm text-foreground font-medium">
+            Nothing here yet.
           </p>
-          {cityFilterOn && viewerCity && (
-            <button
-              type="button"
-              onClick={() => setCityFilterOn(false)}
-              className="mt-3 text-xs text-accent hover:underline"
-            >
-              Show listings outside {viewerCity}
-            </button>
-          )}
-          {!isLoggedIn && (
-            <p className="text-xs text-muted-foreground mt-2">
-              New here? Sign up to post your own.
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground mt-1">
+            {cityFilterOn && viewerCity
+              ? `No listings in ${viewerCity} match your filters.`
+              : 'No listings match your filters.'}
+          </p>
+          <div className="flex flex-wrap gap-2 justify-center mt-4">
+            {cityFilterOn && viewerCity && (
+              <button
+                type="button"
+                onClick={() => setCityFilterOn(false)}
+                className="text-xs font-medium px-3 py-1.5 rounded-md border border-input bg-card hover:bg-secondary transition"
+              >
+                Show all locations
+              </button>
+            )}
+            {(search || freeOnly) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('')
+                  setFreeOnly(false)
+                }}
+                className="text-xs font-medium px-3 py-1.5 rounded-md border border-input bg-card hover:bg-secondary transition"
+              >
+                Clear filters
+              </button>
+            )}
+            {isLoggedIn && (
+              <Link
+                href="/marketplace/new"
+                className="text-xs font-medium px-3 py-1.5 rounded-md bg-foreground text-background hover:opacity-90 transition"
+              >
+                Post a listing
+              </Link>
+            )}
+            {!isLoggedIn && (
+              <Link
+                href="/auth/signup"
+                className="text-xs font-medium px-3 py-1.5 rounded-md bg-foreground text-background hover:opacity-90 transition"
+              >
+                Sign up to post
+              </Link>
+            )}
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-2.5">
+        <div
+          className="grid gap-2 sm:gap-2.5"
+          style={{
+            gridTemplateColumns:
+              'repeat(auto-fill, minmax(min(50%, 220px), 1fr))',
+            maxWidth: '100%',
+          }}
+        >
           {filteredSorted.map((l) => (
             <ListingCard key={l.id} listing={l} />
           ))}

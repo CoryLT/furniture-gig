@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { ImageIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -18,6 +19,7 @@ interface Props {
 
 export default function ListingCard({ listing }: Props) {
   const supabase = createClient()
+  const [loaded, setLoaded] = useState(false)
 
   const coverUrl = listing.cover_photo_path
     ? supabase.storage
@@ -33,15 +35,24 @@ export default function ListingCard({ listing }: Props) {
       className="group block rounded-md overflow-hidden bg-card border border-border hover:border-foreground/30 hover:shadow-sm transition"
     >
       {/* Square cover photo */}
-      <div className="relative aspect-square bg-muted">
+      <div className="relative aspect-square bg-muted overflow-hidden">
         {coverUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={coverUrl}
-            alt={listing.title}
-            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-200"
-            loading="lazy"
-          />
+          <>
+            {/* Skeleton shimmer while loading */}
+            {!loaded && (
+              <div className="absolute inset-0 bg-gradient-to-br from-stone-100 via-stone-200 to-stone-100 animate-pulse" />
+            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={coverUrl}
+              alt={listing.title}
+              onLoad={() => setLoaded(true)}
+              className={`w-full h-full object-cover group-hover:scale-[1.02] transition-all duration-300 ${
+                loaded ? 'opacity-100' : 'opacity-0'
+              }`}
+              loading="lazy"
+            />
+          </>
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
             <ImageIcon className="w-7 h-7 opacity-40" strokeWidth={1.5} />
