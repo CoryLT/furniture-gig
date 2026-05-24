@@ -12,8 +12,9 @@ import ConfirmActionModal from '@/components/shared/ConfirmActionModal'
 
 
 const FURNITURE_TYPES = [
-  'Chair', 'Sofa / Couch', 'Dresser', 'Table', 'Desk', 'Bookcase',
-  'Bed Frame', 'Cabinet', 'Armoire', 'Bench', 'Ottoman', 'Other',
+  'Chair', 'Sofa / Couch', 'Dresser', 'Chest of Drawers', 'Nightstand',
+  'Table', 'Desk', 'Bookcase', 'Bed Frame', 'Cabinet', 'Armoire',
+  'Bench', 'Ottoman', 'Other',
 ]
 
 const SKILL_SUGGESTIONS = [
