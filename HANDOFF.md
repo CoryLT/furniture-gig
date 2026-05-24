@@ -719,9 +719,19 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 ## What's next (next session)
 
-**This session: marketplace aesthetic polish.** Killed the big "Marketplace" h1, replaced the boxed filter card with a slim sticky toolbar (search + city chip + Free only pill + sort + count), added auto-filter to viewer's profile city (toggleable), shimmer skeleton on photo load, friendlier empty-state card with action buttons, and polished the listing detail page (tighter padding, pill meta chips, lighter description block). Cory verified visually. Grid spacing is unchanged from before — we don't have enough listings to tune sizing yet.
+**This session: small UX/quality-of-life fixes across post-gig, list-item, and photo flows.** Eight commits, all small, all shipped:
+- Swapped city/state field order globally (State on left, City on right) since state has to be picked first anyway
+- Added "Show archived (N)" toggle on the flipper dashboard; archived gigs are now hidden by default
+- Added "Chest of Drawers" and "Nightstand" to the gig furniture-type dropdown
+- Built the **checklist editor** for post-gig and edit-gig forms — was previously missing despite worker side already displaying checklists. New SQL policy required (was applied to prod)
+- Fixed a **401 Unauthorized** on the photo gallery delete on `/profile` — the route was hand-rolling its own Supabase client with the newer `getAll/setAll` cookies API while the rest of the codebase uses the older `get/set/remove` style; mismatch killed session reads
+- Added "← Back to details" on Step 2 of the List an Item flow, with smart update-vs-create on re-save
+- Added **30s server-side + 60s client-side timeouts** to the listing photo upload pipeline, plus per-photo try/catch so one bad photo can't lock the whole loop
+- Replaced the misleading "drag-to-reorder coming soon" message with **real arrow-button reordering** + always-visible delete + "Cover" badge on listing photos (both create and edit pages). New API route `POST /api/marketplace/[id]/reorder-photos`
 
-**Marketplace is the front door** (previous session) and **marketplace messaging is live end-to-end** (previous session). The dashboard at `/home` still exists but is no longer the post-auth landing.
+**Open at session end: photo upload still hangs on some images.** Cory paused mid-debug on a 4032x3024 / 4.6 MB iPhone JPEG that hangs indefinitely. The 30s/60s timeouts shipped this session should make it fail with an error instead of hang forever, but Cory had not yet retested after deploy when he broke for the night. See TODO #1 below for the next steps.
+
+**Marketplace is the front door** and **marketplace messaging is live end-to-end** (previous sessions). The dashboard at `/home` still exists but is no longer the post-auth landing.
 
 **Payments system has its safety net** (Phase 7 webhooks). Phases 5, 6, 8, 9 still needed before going live with real money.
 
@@ -729,9 +739,20 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 Cory's most likely next moves, in rough order:
 
-1. **Mutual cancel for gigs + tighten hard delete.** Known safety hole shipped this session: a claimed gig can be hard-deleted even when a worker is mid-claim (as long as no Stripe money has moved). Plan is to build an Upwork/TaskRabbit-style mutual cancel (either side requests, the other accepts/declines via system message in chat, claim → `cancelled_by_mutual_agreement`, Stripe auth released), and at the same time block hard delete when any claim is in `pending`/`active`/`submitted_for_review`. Full plan + file touches are in TODO #12.
+1. **Resume the photo-upload hang investigation** (paused at end of this session). Cory has a specific reproducer: this exact iPhone JPEG hangs the listing photo upload — `cedar_raised_bed_6_x3_x_17.jpeg`, 4032×3024 (~12 MP), 4.6 MB, EXIF orientation tag present. This session shipped a 30s timeout on the Sightengine moderation call and a 60s timeout on the client fetch + per-photo try/catch (commit `9796c9f`). Cory had NOT yet re-tested with the timeout fix deployed when he broke for the night.
 
-2. **Terms of Service, Privacy Policy, Worker Agreement, Flipper Agreement.** Worker agreement is currently a placeholder (`legal_agreements` table). Flipper agreement doesn't exist yet — the current schema only gates workers. Cory wanted to draft all four this session but we paused at the intake questions and didn't draft anything yet. **Before drafting, the next session needs Cory to answer:**
+   **Three branches depending on what re-testing shows:**
+   - **(a) The fix worked, error now shows instead of hanging** → great, document it and move on. Optionally suggest client-side image compression (e.g. `browser-image-compression`) to auto-shrink before upload so big iPhone photos don't time out at Sightengine in the first place.
+   - **(b) Still hangs with no error at all** → the timeout isn't reaching that codepath. Investigate: is Vercel terminating the function before the AbortController fires? Hobby plan has a 60s function timeout that would beat the 60s client timeout. Check `vercel.json` / function config. Could also be that the upload is hanging BEFORE it reaches the moderation step (e.g. in the Vercel ingress for the large multipart body). Add console.error logging at every await in `app/api/upload-marketplace-photo/route.ts` to find which line is the actual hang point.
+   - **(c) Fails fast with a moderation timeout error** → fix is working; recommend client-side compression as the real solution.
+
+   Same hang/timeout treatment may need to be applied to OTHER photo upload routes (`/api/upload-gig-photo`, `/api/upload-flipper-gallery-photo`, `/api/upload-worker-gallery-photo`, `/api/upload-avatar`). They all funnel through the same `runModeration()` helper in `lib/moderation.ts` so the 30s timeout in there is shared — but the client-side timeout + try/catch is only in `NewListingForm.tsx` right now. Other upload UIs probably have the same vulnerability.
+
+2. **Back button on Step 2 of Post a Gig flow.** Cory asked for this, I asked the clarifying "what should back do" question (option A = back to Step 1 same flow, option B = route to Edit Gig page), then he deferred — "skip this for now, focus on the photo delete bug first." Never got back to it. Same pattern as the List an Item back button shipped this session (`1b9a0c0`) — Step 1 already creates the gig, so coming back needs to switch save from create → update. Reference that commit for the pattern. Cory's preference was unstated; ask before building.
+
+3. **Mutual cancel for gigs + tighten hard delete.** Known safety hole shipped a previous session: a claimed gig can be hard-deleted even when a worker is mid-claim (as long as no Stripe money has moved). Plan is to build an Upwork/TaskRabbit-style mutual cancel (either side requests, the other accepts/declines via system message in chat, claim → `cancelled_by_mutual_agreement`, Stripe auth released), and at the same time block hard delete when any claim is in `pending`/`active`/`submitted_for_review`. Full plan + file touches are in TODO #12.
+
+4. **Terms of Service, Privacy Policy, Worker Agreement, Flipper Agreement.** Worker agreement is currently a placeholder (`legal_agreements` table). Flipper agreement doesn't exist yet — the current schema only gates workers. Cory wanted to draft all four a previous session but we paused at the intake questions and didn't draft anything yet. **Before drafting, the next session needs Cory to answer:**
    - Legal entity behind FlipWork (sole prop vs. LLC). If LLC, the docs name "FlipWork LLC" so they don't have to be rewritten after formation.
    - State of operation (California is meaningfully harder due to AB5 gig-worker classification rules — worker agreement has to be much more careful about not implying employment).
    - Local-only vs. nationwide (affects how much state-specific hedging the docs need).
@@ -739,37 +760,37 @@ Cory's most likely next moves, in rough order:
 
    Plan once those are answered: draft all four documents, get them into the `legal_agreements` table (or wherever the Flipper one will live), then strongly recommend Cory pay an attorney for a 30-minute review of the gig agreement specifically before Phase 9 — California labor law has real teeth here.
 
-2. **Marketplace location filter v2: zip-based + 100-mile radius.** This session shipped exact-city-match only. The full plan is zip-based: add `zip` to `worker_profiles`, `flipper_profiles`, and `marketplace_listings`; build a zip → lat/long lookup; show "within 100 mi of {zip}" with toggle. For logged-out users, prompt for zip and store in localStorage. Will naturally cover the logged-out marketplace location case too (currently they see all 60 most recent listings nationwide).
+5. **Marketplace location filter v2: zip-based + 100-mile radius.** A previous session shipped exact-city-match only. The full plan is zip-based: add `zip` to `worker_profiles`, `flipper_profiles`, and `marketplace_listings`; build a zip → lat/long lookup; show "within 100 mi of {zip}" with toggle. For logged-out users, prompt for zip and store in localStorage. Will naturally cover the logged-out marketplace location case too (currently they see all 60 most recent listings nationwide).
 
-3. **Show available gigs in the marketplace feed.** Cory wants a toggle (like the Free only pill) to mix gigs into the marketplace view. Deferred this session because there's no real data yet to design against. Decisions still open: how the toggle works (items/gigs/both vs. either/or), whether to show gigs to logged-out users (they can't apply without Stripe Connect — discovery vs. bounce tradeoff), and how to make gig cards visually distinct from listing cards.
+6. **Show available gigs in the marketplace feed.** Cory wants a toggle (like the Free only pill) to mix gigs into the marketplace view. Deferred a previous session because there's no real data yet to design against. Decisions still open: how the toggle works (items/gigs/both vs. either/or), whether to show gigs to logged-out users (they can't apply without Stripe Connect — discovery vs. bounce tradeoff), and how to make gig cards visually distinct from listing cards.
 
-4. **Listing reports — Report button + admin queue.** Table exists, button + admin UI don't. Mirrors the existing `image_reports` flow.
+7. **Listing reports — Report button + admin queue.** Table exists, button + admin UI don't. Mirrors the existing `image_reports` flow.
 
-5. **Stripe Connect Phase 5: Worker payout UI polish.** Show Stripe Express dashboard login link on `/my-gigs/payouts`, show expected payout arrival window, surface Stripe-side status (Pending / In transit / Paid) instead of legacy "unpaid/pending/paid."
+8. **Stripe Connect Phase 5: Worker payout UI polish.** Show Stripe Express dashboard login link on `/my-gigs/payouts`, show expected payout arrival window, surface Stripe-side status (Pending / In transit / Paid) instead of legacy "unpaid/pending/paid."
 
-6. **Stripe Connect Phase 6: Admin payout UI upgrade.** Show stripe_payment_intent_id, payment_status, capture/refund buttons on the admin payouts page. With webhooks in place (Phase 7 done), this is much more useful.
+9. **Stripe Connect Phase 6: Admin payout UI upgrade.** Show stripe_payment_intent_id, payment_status, capture/refund buttons on the admin payouts page. With webhooks in place (Phase 7 done), this is much more useful.
 
-7. **Email notifications** (Bucket 1 #1 — MARKETPLACE_ROADMAP.md). Needs an email provider (Resend / Postmark / SES). High-impact for retention.
+10. **Email notifications** (Bucket 1 #1 — MARKETPLACE_ROADMAP.md). Needs an email provider (Resend / Postmark / SES). High-impact for retention.
 
-8. **Stripe Connect Phase 8: Edge cases.** Flipper's card declines at capture time, worker's Connect account gets restricted after approval, auth expires before work is done, flipper requests refund after capture, gig is canceled after authorization. Webhooks now detect most of these; the work here is the UI/notification side.
+11. **Stripe Connect Phase 8: Edge cases.** Flipper's card declines at capture time, worker's Connect account gets restricted after approval, auth expires before work is done, flipper requests refund after capture, gig is canceled after authorization. Webhooks now detect most of these; the work here is the UI/notification side.
 
-9. **Stripe Connect Phase 9: Go-live.** Swap test keys → live keys, redo the webhook destination in LIVE mode in Stripe (test-mode destinations don't carry over — Cory needs to make a second one and put the live `whsec_...` in Vercel), one real $1 transaction to verify, monitor.
+12. **Stripe Connect Phase 9: Go-live.** Swap test keys → live keys, redo the webhook destination in LIVE mode in Stripe (test-mode destinations don't carry over — Cory needs to make a second one and put the live `whsec_...` in Vercel), one real $1 transaction to verify, monitor.
 
-10. **Streak counter + activity log for `/home`** — deferred again, still the next obvious dashboard enhancement.
+13. **Streak counter + activity log for `/home`** — deferred again, still the next obvious dashboard enhancement.
 
-11. **Address/pickup details on gigs** (Bucket 1 #3) — paired with messaging; reveal-after-pick.
+14. **Address/pickup details on gigs** (Bucket 1 #3) — paired with messaging; reveal-after-pick.
 
-12. **Ratings/reviews** (Bucket 1 #4).
+15. **Ratings/reviews** (Bucket 1 #4).
 
-13. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
+16. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
 
-14. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions. Two-minute task.
+17. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions. Two-minute task.
 
-15. **Place `ReportImageButton`** on photo views (gig and marketplace).
+18. **Place `ReportImageButton`** on photo views (gig and marketplace).
 
-16. **Dashboard discoverability micro-fix on `/flipper/dashboard`.** The current flipper-specific dashboard has no signal for "work submitted, awaiting your review." The "Pending applicants" tile only counts pending claims. Lower priority since `/home` surfaces this via the "needs review" action card.
+19. **Dashboard discoverability micro-fix on `/flipper/dashboard`.** The current flipper-specific dashboard has no signal for "work submitted, awaiting your review." The "Pending applicants" tile only counts pending claims. Lower priority since `/home` surfaces this via the "needs review" action card.
 
-17. **"Payouts" nav link is worker-centric.** Currently shown to everyone; flippers hitting it see "$0 earnings" empty state. Either rename it, hide it for users with no payout history, or build a paired flipper-side "Payments you've made" view. Low priority — Cory was aware and laughed it off, but worth fixing eventually.
+20. **"Payouts" nav link is worker-centric.** Currently shown to everyone; flippers hitting it see "$0 earnings" empty state. Either rename it, hide it for users with no payout history, or build a paired flipper-side "Payments you've made" view. Low priority — Cory was aware and laughed it off, but worth fixing eventually.
 
 Cory will pick. Open by confirming what you're about to build in 2-3 lines, then build.
 
@@ -777,16 +798,21 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
-- `df33049` Fix ghost count on /my-gigs from orphan claims: app-side filter skips claims whose `gigs` join is null (orphan from before cascade was reliable), plus a one-time SQL cleanup file `schema_cleanup_orphan_claims.sql` that deletes any existing orphans AND re-asserts the `on delete cascade` FK so new ones can't appear after a gig delete. SQL was run on prod.
-- `8448e85` Fix stale count on /my-gigs after a gig is deleted: added `export const dynamic = 'force-dynamic'` + `export const revalidate = 0` to `app/my-gigs/page.tsx`. Tab badges were caching and showing pre-delete counts. This was the fix HANDOFF TODO #10 specifically called out for `/my-gigs`.
-- `4887c65` HANDOFF: log this session's delete/archive work + mutual-cancel TODO
-- `be99d6c` Add gig delete + fix mobile archive (modal-based confirms): new POST /api/gigs/[id]/delete with Stripe-money guard, new SQL RLS DELETE policy for gig posters, new ConfirmActionModal replacing window.confirm() (was failing on mobile), Delete button on edit page + three-dot menu on flipper dashboard rows. Known limitation called out in TODO #12: doesn't block delete when a non-paid claim is attached — mutual-cancel + delete-tightening is the planned follow-up.
+- `5186236` Add visible delete + arrow-button reorder for listing photos: new API route `POST /api/marketplace/[id]/reorder-photos` (owner/admin only, defensively verifies every photo belongs to the listing), photo grid in both `NewListingForm.tsx` and `EditListingForm.tsx` got always-visible delete button + cover badge + up/down arrow buttons + disabled state at ends. Reorder uses optimistic UI with rollback. Removed misleading "Drag-to-reorder coming soon" copy.
+- `9796c9f` Fix indefinite hang on listing photo upload: added 30s AbortController timeout to the Sightengine fetch in `lib/moderation.ts` (returns existing `service_error` result on abort), added 60s AbortController timeout to the client fetch in `NewListingForm.tsx`, added per-photo try/catch so one bad photo doesn't lock the whole loop. Cory hadn't re-tested with the reproducer file before breaking — see TODO #1.
+- `1b9a0c0` Add 'Back to details' button on List an Item photos step: button at top of Step 2 calls `setStep('details')`, save handler in Step 1 now branches: if `savedListingId` exists, calls `/api/marketplace/[id]/update` instead of `/api/marketplace/create` to avoid duplicate listings. Step 1 button label dynamically shows "Save changes" when returning vs. "Continue to photos" on first pass.
+- `84fb9c7` Fix 401 on photo gallery delete by using shared server client: `/api/delete-gallery-photo` was hand-rolling its own Supabase client with the newer `getAll/setAll + await cookies()` style, mismatching the rest of the codebase that uses `lib/supabase/server.ts`'s `get/set/remove + sync cookies()` style. `auth.getUser()` always returned 401. Switched to the shared `createClient()`.
+- `761b067` Add checklist editor to gig create/edit forms: new reusable `components/shared/ChecklistEditor.tsx` (title/description/required toggle/up-down ordering/remove + 6 quick-add suggestions), wired into `PostGigForm.tsx` between Short Summary and Full Description, wired into `EditGigForm.tsx` with delete-all + reinsert sync strategy on save. New SQL migration `supabase/schema_checklist_flipper_rls.sql` adds a policy letting gig posters manage checklist items on their own gigs (previously only admins could). Cory ran the SQL in prod.
+- `4f98ee9` Add 'Chest of Drawers' and 'Nightstand' to furniture type dropdown: updated `FURNITURE_TYPES` array in both `PostGigForm.tsx` and `EditGigForm.tsx` to keep them in sync.
+- `c1f0f4d` Hide archived gigs by default; add 'Show archived' toggle on flipper dashboard: `FlipperGigList.tsx` got a `showArchived` state, archived gigs filter out by default, a `Show archived (N)` checkbox renders only when archived gigs exist. Also fixed the `Total Gigs` stat tile to exclude archived. Public marketplace was already filtered to `status='open'` so no change needed there.
+- `c90f9f0` Swap city/state order: State on left, City on right: one fix to the shared `components/ui/location-select.tsx` covers 9 pages (worker/flipper onboarding, profile editors, post-gig, edit-gig, new listing, edit listing, etc.) plus the marketplace filter `components/worker/GigFilterContent.tsx` which had its own copy. Reasoning: city dropdown was disabled until state was picked, so left→right tab/click flow was awkward.
 
 ## Previous session's commits
 
-- `b4fcc2e` Marketplace: revert grid back to simple explicit columns (auto-fill experiment didn't work; not enough listings to tune)
-- `7dd6251` Marketplace polish round 2: card cap attempt, skeleton shimmer, empty-state CTA, detail page polish, subtler city chip
-- `c05157c` Marketplace polish round 1: drop big header, slim sticky toolbar, viewer-city auto-filter, tighter grid
+- `df33049` Fix ghost count on /my-gigs from orphan claims: app-side filter skips claims whose `gigs` join is null (orphan from before cascade was reliable), plus a one-time SQL cleanup file `schema_cleanup_orphan_claims.sql` that deletes any existing orphans AND re-asserts the `on delete cascade` FK so new ones can't appear after a gig delete. SQL was run on prod.
+- `8448e85` Fix stale count on /my-gigs after a gig is deleted: added `export const dynamic = 'force-dynamic'` + `export const revalidate = 0` to `app/my-gigs/page.tsx`. Tab badges were caching and showing pre-delete counts.
+- `4887c65` HANDOFF: log delete/archive work + mutual-cancel TODO
+- `be99d6c` Add gig delete + fix mobile archive (modal-based confirms): new POST /api/gigs/[id]/delete with Stripe-money guard, new SQL RLS DELETE policy for gig posters, new ConfirmActionModal replacing window.confirm() (was failing on mobile), Delete button on edit page + three-dot menu on flipper dashboard rows.
 
 ## Older commits
 
