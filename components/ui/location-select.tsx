@@ -116,24 +116,6 @@ export function LocationSelect({
 
   return (
     <div className="grid grid-cols-3 gap-4">
-      <div className="col-span-2">
-        <label htmlFor="city" className="field-label">City</label>
-        <select
-          id="city"
-          value={selectedCity}
-          onChange={(e) => onCityChange(e.target.value)}
-          disabled={disabled || !selectedState}
-          className="field-input"
-          required
-        >
-          <option value="">{selectedState ? 'Select a city...' : 'Pick a state first'}</option>
-          {cities.map((city) => (
-            <option key={city.value} value={city.value}>
-              {city.label}
-            </option>
-          ))}
-        </select>
-      </div>
       <div>
         <label htmlFor="state" className="field-label">State</label>
         <select
@@ -151,6 +133,24 @@ export function LocationSelect({
           {states.map((state) => (
             <option key={state.value} value={state.value}>
               {state.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="col-span-2">
+        <label htmlFor="city" className="field-label">City</label>
+        <select
+          id="city"
+          value={selectedCity}
+          onChange={(e) => onCityChange(e.target.value)}
+          disabled={disabled || !selectedState}
+          className="field-input"
+          required
+        >
+          <option value="">{selectedState ? 'Select a city...' : 'Pick a state first'}</option>
+          {cities.map((city) => (
+            <option key={city.value} value={city.value}>
+              {city.label}
             </option>
           ))}
         </select>

@@ -80,6 +80,20 @@ export default function GigFilterContent({
       <div className="card">
         <div className="card-body">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="filter-state" className="field-label">State</label>
+              <select
+                id="filter-state"
+                value={selectedState}
+                onChange={(e) => handleStateChange(e.target.value)}
+                className="field-input"
+              >
+                <option value="">All states</option>
+                {stateOptions.map((state) => (
+                  <option key={state} value={state}>{state}</option>
+                ))}
+              </select>
+            </div>
             <div className="sm:col-span-2">
               <label htmlFor="filter-city" className="field-label">City</label>
               <select
@@ -94,20 +108,6 @@ export default function GigFilterContent({
                 </option>
                 {cityOptions.map((city) => (
                   <option key={city} value={city}>{city}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="filter-state" className="field-label">State</label>
-              <select
-                id="filter-state"
-                value={selectedState}
-                onChange={(e) => handleStateChange(e.target.value)}
-                className="field-input"
-              >
-                <option value="">All states</option>
-                {stateOptions.map((state) => (
-                  <option key={state} value={state}>{state}</option>
                 ))}
               </select>
             </div>
