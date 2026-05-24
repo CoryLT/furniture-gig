@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "./button";
+import { compressImageForUpload } from "@/lib/imageCompression";
 
 interface PhotoUploadFormProps {
   onPhotoUploaded?: () => void;
@@ -63,8 +64,12 @@ export function PhotoUploadForm({
           ? "/api/upload-worker-gallery-photo"
           : "/api/upload-flipper-gallery-photo";
 
+      // Compress big photos (phones) before uploading. Vercel caps function
+      // bodies at 4.5MB.
+      const fileToUpload = await compressImageForUpload(file);
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", fileToUpload);
       if (caption.trim()) {
         formData.append("caption", caption.trim());
       }
@@ -74,7 +79,17 @@ export function PhotoUploadForm({
         body: formData,
       });
 
-      const data = await response.json();
+      // Vercel's 413 returns HTML, not JSON — guard the parse.
+      let data: { error?: string } = {};
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(
+          response.status === 413
+            ? "Image is too large to upload even after compression. Try a smaller photo."
+            : `Upload failed (server error ${response.status}).`
+        );
+      }
 
       if (!response.ok) {
         throw new Error(data.error || "Upload failed");

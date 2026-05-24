@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { PhotoUploadForm } from '@/components/ui/PhotoUploadForm';
 import { PhotoGallery, type GalleryPhoto } from '@/components/ui/PhotoGallery';
 import ProfilePaymentsSection from '@/components/profile/ProfilePaymentsSection';
+import { compressImageForUpload } from '@/lib/imageCompression';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -156,22 +157,37 @@ export default function ProfilePage() {
     setSuccess('');
 
     try {
+      // Compress big photos before upload. Vercel caps function bodies at 4.5MB.
+      const fileToUpload = await compressImageForUpload(file);
+
       const uploadFormData = new FormData();
-      uploadFormData.append('file', file);
+      uploadFormData.append('file', fileToUpload);
 
       const response = await fetch('/api/upload-avatar', {
         method: 'POST',
         body: uploadFormData,
       });
 
-      const data = await response.json();
+      // Vercel's 413 returns HTML, not JSON — guard the parse.
+      let data: { url?: string; error?: string } = {};
+      try {
+        data = await response.json();
+      } catch {
+        setError(
+          response.status === 413
+            ? 'Image is too large to upload even after compression. Try a smaller photo.'
+            : `Upload failed (server error ${response.status}).`
+        );
+        setUploading(false);
+        return;
+      }
 
       if (!response.ok) {
         setError('Upload failed: ' + (data.error || 'Unknown error'));
         return;
       }
 
-      setFormData((prev) => ({ ...prev, avatarUrl: data.url }));
+      setFormData((prev) => ({ ...prev, avatarUrl: data.url || '' }));
       setSuccess('Profile picture uploaded! Click Save Changes to keep it.');
     } catch (err) {
       setError('Upload error: ' + (err instanceof Error ? err.message : 'Unknown error'));

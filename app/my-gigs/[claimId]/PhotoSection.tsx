@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Upload, X, Image as ImageIcon } from 'lucide-react'
 import type { GigPhotoUploadRow } from '@/types/database'
+import { compressImageForUpload } from '@/lib/imageCompression'
 
 interface Props {
   gigId: string
@@ -52,15 +53,31 @@ export default function PhotoSection({ gigId, userId, photos: initialPhotos, rea
         continue
       }
 
+      // Compress big photos (phones) before uploading. Vercel caps function
+      // bodies at 4.5MB.
+      const fileToUpload = await compressImageForUpload(file)
+
       const fd = new FormData()
-      fd.append('file', file)
+      fd.append('file', fileToUpload)
       fd.append('gigId', gigId)
 
       const res = await fetch('/api/upload-gig-photo', {
         method: 'POST',
         body: fd,
       })
-      const json = await res.json()
+
+      // Vercel's 413 returns HTML, not JSON — guard the parse.
+      let json: { photo?: { id: string; url: string }; error?: string } = {}
+      try {
+        json = await res.json()
+      } catch {
+        setError(
+          res.status === 413
+            ? `"${file.name}" is too large to upload even after compression.`
+            : `Upload of "${file.name}" failed (server error ${res.status}).`
+        )
+        continue
+      }
 
       if (!res.ok || !json.photo) {
         setError(json.error || 'Upload failed. Please try a different image.')
@@ -69,7 +86,7 @@ export default function PhotoSection({ gigId, userId, photos: initialPhotos, rea
 
       setPhotos((prev) => [
         ...prev,
-        { id: json.photo.id, url: json.photo.url, caption: '', isNew: true },
+        { id: json.photo!.id, url: json.photo!.url, caption: '', isNew: true },
       ])
     }
 
