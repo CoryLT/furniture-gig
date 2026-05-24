@@ -666,6 +666,14 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 9. **Address/pickup details on gigs** (Bucket 1 #3). Gigs only have city/state. Want full address visible to picked worker only. Schema change + reveal-after-pick UI.
 10. **Apply `force-dynamic` audit to other server pages.** The flipper dashboard and gig detail pages needed `force-dynamic + revalidate=0` to stop showing stale claim data. Worth scanning other server pages that show claim/applicant state (worker `/my-gigs`, `/messages`, etc.) and adding the same if they exhibit similar staleness.
 11. **`types/database.ts` is out of sync** with several Stripe columns AND the new `listing_conversations`/`listing_messages`/`listing_reports` tables. Adding all of them would let us remove the `as any` casts sprinkled through all Stripe-touching AND listing-messaging files.
+12. **Mutual cancel flow for gigs (and tighten hard delete).** ⚠️ Known safety hole as of this session: the new `/api/gigs/[id]/delete` blocks delete on gigs where Stripe money has moved, but it does NOT block delete on gigs that have a claimed/active/pending worker without payment yet. Cory test-deleted a claimed gig and that's how this came up. He paused building the fix and wants it on the list.
+
+    Discussed and decided plan:
+    - Build a **mutual cancel** flow modeled after Upwork/TaskRabbit. Either flipper or worker can request to cancel a gig. The other side accepts or declines via a system message in the existing chat thread. On accept: claim flips to a new status (e.g. `cancelled_by_mutual_agreement`), Stripe authorization is released if one is held, gig goes back to `open` (or archived — flipper picks during request).
+    - Once mutual cancel completes, hard delete is allowed again on that gig.
+    - **Tighten the delete endpoint at the same time:** block hard delete when any claim row exists in `pending`, `active`, or `submitted_for_review` (Upwork/TaskRabbit pattern, "yes — block delete if ANY claim exists" was Cory's directional lean before pausing). Archive remains available in those cases.
+    - Touches: `gig_claims` (new status value + maybe a `cancel_requested_by` column), new endpoints `/api/gigs/[id]/cancel/request`, `/api/gigs/[id]/cancel/respond`, UI on both `/my-gigs/[claimId]` and `/flipper/gigs/[id]`, system message into the existing `gig_messages` table, Stripe authorization-release helper (already exists as `cancelPickAuthorization` in `lib/stripe-pick.ts`).
+    - Reference: see the conversation that pitched this (industry comparison + flow sketch) for context. ~60-90 min build per the discussion.
 
 ---
 
@@ -720,7 +728,9 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 Cory's most likely next moves, in rough order:
 
-1. **Terms of Service, Privacy Policy, Worker Agreement, Flipper Agreement.** Worker agreement is currently a placeholder (`legal_agreements` table). Flipper agreement doesn't exist yet — the current schema only gates workers. Cory wanted to draft all four this session but we paused at the intake questions and didn't draft anything yet. **Before drafting, the next session needs Cory to answer:**
+1. **Mutual cancel for gigs + tighten hard delete.** Known safety hole shipped this session: a claimed gig can be hard-deleted even when a worker is mid-claim (as long as no Stripe money has moved). Plan is to build an Upwork/TaskRabbit-style mutual cancel (either side requests, the other accepts/declines via system message in chat, claim → `cancelled_by_mutual_agreement`, Stripe auth released), and at the same time block hard delete when any claim is in `pending`/`active`/`submitted_for_review`. Full plan + file touches are in TODO #12.
+
+2. **Terms of Service, Privacy Policy, Worker Agreement, Flipper Agreement.** Worker agreement is currently a placeholder (`legal_agreements` table). Flipper agreement doesn't exist yet — the current schema only gates workers. Cory wanted to draft all four this session but we paused at the intake questions and didn't draft anything yet. **Before drafting, the next session needs Cory to answer:**
    - Legal entity behind FlipWork (sole prop vs. LLC). If LLC, the docs name "FlipWork LLC" so they don't have to be rewritten after formation.
    - State of operation (California is meaningfully harder due to AB5 gig-worker classification rules — worker agreement has to be much more careful about not implying employment).
    - Local-only vs. nationwide (affects how much state-specific hedging the docs need).
@@ -766,11 +776,15 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
+- `be99d6c` Add gig delete + fix mobile archive (modal-based confirms): new POST /api/gigs/[id]/delete with Stripe-money guard, new SQL RLS DELETE policy for gig posters, new ConfirmActionModal replacing window.confirm() (was failing on mobile), Delete button on edit page + three-dot menu on flipper dashboard rows. Known limitation called out in TODO #12: doesn't block delete when a non-paid claim is attached — mutual-cancel + delete-tightening is the planned follow-up.
+
+## Previous session's commits
+
 - `b4fcc2e` Marketplace: revert grid back to simple explicit columns (auto-fill experiment didn't work; not enough listings to tune)
 - `7dd6251` Marketplace polish round 2: card cap attempt, skeleton shimmer, empty-state CTA, detail page polish, subtler city chip
 - `c05157c` Marketplace polish round 1: drop big header, slim sticky toolbar, viewer-city auto-filter, tighter grid
 
-## Previous session's commits
+## Older commits
 
 - `275196b` Marketplace as front door: logo → /marketplace, post-auth lands on /marketplace, preserve ?next= through signup/login/Google
 - `01804bb` Marketplace messaging: Nav unread badge counts listing messages too
