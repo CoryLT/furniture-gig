@@ -10,6 +10,7 @@ interface GigFilterContentProps {
   workerState: string | null
   myClaimedIds: Set<string>
   hasLocation: boolean
+  currentUserId: string
 }
 
 export default function GigFilterContent({
@@ -17,6 +18,7 @@ export default function GigFilterContent({
   workerCity,
   workerState,
   myClaimedIds,
+  currentUserId,
 }: GigFilterContentProps) {
   // Pre-fill the filter with the user's home city/state if they have one
   const [selectedState, setSelectedState] = useState<string>(workerState ?? '')
@@ -168,6 +170,10 @@ export default function GigFilterContent({
               key={gig.id}
               gig={gig}
               isClaimed={myClaimedIds.has(gig.id)}
+              isOwnPost={
+                gig.poster_user_id === currentUserId ||
+                gig.created_by === currentUserId
+              }
             />
           ))}
         </div>

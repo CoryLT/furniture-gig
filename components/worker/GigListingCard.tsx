@@ -10,9 +10,10 @@ import type { GigRow } from '@/types/database'
 interface Props {
   gig: GigRow
   isClaimed: boolean
+  isOwnPost?: boolean
 }
 
-export default function GigListingCard({ gig, isClaimed }: Props) {
+export default function GigListingCard({ gig, isClaimed, isOwnPost = false }: Props) {
   const supabase = createClient()
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -75,7 +76,14 @@ export default function GigListingCard({ gig, isClaimed }: Props) {
               {gig.furniture_type}
             </p>
           </div>
-          <span className={gigStatusClass(gig.status)}>{gigStatusLabel(gig.status)}</span>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <span className={gigStatusClass(gig.status)}>{gigStatusLabel(gig.status)}</span>
+            {isOwnPost && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/30 whitespace-nowrap">
+                Your post
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Summary */}
@@ -111,7 +119,7 @@ export default function GigListingCard({ gig, isClaimed }: Props) {
             {formatCurrency(gig.pay_amount)}
           </span>
           <span className="text-xs text-accent flex items-center gap-1 group-hover:gap-1.5 transition-all">
-            {isClaimed ? 'View application' : 'View gig'}
+            {isOwnPost ? 'View as worker' : isClaimed ? 'View application' : 'View gig'}
             <ArrowRight className="w-3.5 h-3.5" />
           </span>
         </div>

@@ -17,19 +17,17 @@ export default async function GigsPage() {
   const workerState = workerProfile?.state?.trim() ?? null
   const hasLocation = !!(workerCity && workerState)
 
-  // Load ALL open gigs (we'll filter client-side by location)
-  // Exclude gigs the user posted themselves.
+  // Load ALL open gigs (we'll filter client-side by location).
+  // Cory's own gigs are INCLUDED on purpose — he wants to see what workers see.
+  // The card flags them with a "Your post" badge, and the gig detail page
+  // already prevents him from claiming his own gig.
   const { data: gigs } = await supabase
     .from('gigs')
     .select('*')
     .eq('status', 'open')
-    .or(`poster_user_id.neq.${user!.id},poster_user_id.is.null`)
     .order('created_at', { ascending: false })
 
-  // Extra safety filter (handles edge case where poster_user_id is null but created_by isn't)
-  const filteredGigs = (gigs ?? []).filter((g: { poster_user_id: string | null; created_by: string | null }) =>
-    g.poster_user_id !== user!.id && g.created_by !== user!.id
-  )
+  const filteredGigs = gigs ?? []
 
   // Load any active applications/claims this worker has (exclude rejected/cancelled)
   const { data: myClaims } = await supabase
@@ -47,6 +45,7 @@ export default async function GigsPage() {
       workerState={workerState}
       myClaimedIds={myClaimedIds}
       hasLocation={hasLocation}
+      currentUserId={user!.id}
     />
   )
 }
