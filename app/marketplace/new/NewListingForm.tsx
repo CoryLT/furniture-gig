@@ -215,7 +215,22 @@ export default function NewListingForm({ categories }: Props) {
           body: fd,
           signal: controller.signal,
         })
-        const json = await res.json()
+
+        // Vercel's 413 (too-large) error returns HTML, not JSON. Guard the
+        // parse so we always show the user a clean message.
+        let json: { image?: { id: string; url: string; file_path: string }; error?: string } = {}
+        try {
+          json = await res.json()
+        } catch {
+          if (res.status === 413) {
+            setError(
+              `"${file.name}" is too large to upload even after compression. Try a smaller photo.`
+            )
+          } else {
+            setError(`Upload of "${file.name}" failed (server error ${res.status}).`)
+          }
+          continue
+        }
 
         if (!res.ok || !json.image) {
           setError(json.error || 'Upload failed. Please try a different image.')
@@ -225,9 +240,9 @@ export default function NewListingForm({ categories }: Props) {
         setPhotos((prev) => [
           ...prev,
           {
-            id: json.image.id,
-            url: json.image.url,
-            file_path: json.image.file_path,
+            id: json.image!.id,
+            url: json.image!.url,
+            file_path: json.image!.file_path,
           },
         ])
       } catch (err) {

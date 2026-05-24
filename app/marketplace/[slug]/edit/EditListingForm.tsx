@@ -17,6 +17,7 @@ import {
   ArrowDown,
 } from 'lucide-react'
 import Link from 'next/link'
+import { compressImageForUpload } from '@/lib/imageCompression'
 import type {
   MarketplaceListingRow,
   MarketplacePhotoRow,
@@ -159,16 +160,46 @@ export default function EditListingForm({
       if (!file.type.startsWith('image/')) continue
       if (file.size > 25 * 1024 * 1024) continue
 
+      // Compress big photos (e.g. straight from a phone) before uploading.
+      // Vercel has a hard 4.5MB body limit on functions.
+      const fileToUpload = await compressImageForUpload(file)
+
       const fd = new FormData()
-      fd.append('file', file)
+      fd.append('file', fileToUpload)
       fd.append('listingId', listing.id)
       fd.append('sortOrder', String(photos.length))
 
-      const res = await fetch('/api/upload-marketplace-photo', {
-        method: 'POST',
-        body: fd,
-      })
-      const json = await res.json()
+      let res: Response
+      try {
+        res = await fetch('/api/upload-marketplace-photo', {
+          method: 'POST',
+          body: fd,
+        })
+      } catch (err) {
+        setError(
+          `Upload of "${file.name}" failed. ${
+            err instanceof Error ? err.message : ''
+          }`
+        )
+        continue
+      }
+
+      // Vercel's 413 (too-large) error returns HTML, not JSON. Guard the
+      // parse so we always show the user a clean message.
+      let json: { image?: { id: string; url: string; file_path: string }; error?: string } = {}
+      try {
+        json = await res.json()
+      } catch {
+        if (res.status === 413) {
+          setError(
+            `"${file.name}" is too large to upload even after compression. Try a smaller photo.`
+          )
+        } else {
+          setError(`Upload of "${file.name}" failed (server error ${res.status}).`)
+        }
+        continue
+      }
+
       if (!res.ok || !json.image) {
         setError(json.error || 'Upload failed.')
         continue
@@ -176,9 +207,9 @@ export default function EditListingForm({
       setPhotos((prev) => [
         ...prev,
         {
-          id: json.image.id,
-          url: json.image.url,
-          file_path: json.image.file_path,
+          id: json.image!.id,
+          url: json.image!.url,
+          file_path: json.image!.file_path,
         },
       ])
     }
