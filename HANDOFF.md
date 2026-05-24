@@ -664,7 +664,7 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
    - Existing infra at `/auth/agreements` already handles multiple required agreements; just needs TOS + Privacy seed and a server-side check that redirects logged-in users with unaccepted required agreements to `/auth/agreements`. A SQL file (`supabase/schema_legal_agreements.sql`) was scaffolded but not completed. Restart fresh.
 8. **Email notifications** (Bucket 1 #1 in MARKETPLACE_ROADMAP.md). Right now if someone applies to your gig, messages you on a listing, or buys/sells something, they have to log in and notice. Needs an email provider (Resend / Postmark / SES) and templated sends for the key events.
 9. **Address/pickup details on gigs** (Bucket 1 #3). Gigs only have city/state. Want full address visible to picked worker only. Schema change + reveal-after-pick UI.
-10. **Apply `force-dynamic` audit to other server pages.** The flipper dashboard and gig detail pages needed `force-dynamic + revalidate=0` to stop showing stale claim data. Worth scanning other server pages that show claim/applicant state (worker `/my-gigs`, `/messages`, etc.) and adding the same if they exhibit similar staleness.
+10. **Apply `force-dynamic` audit to other server pages.** The flipper dashboard, gig detail pages, AND `/my-gigs` (added this session) all have `force-dynamic + revalidate=0` now. Still worth scanning other server pages that show claim/applicant/message state (`/messages`, `/messages/[id]`, `/home`, etc.) and adding the same if they exhibit similar staleness.
 11. **`types/database.ts` is out of sync** with several Stripe columns AND the new `listing_conversations`/`listing_messages`/`listing_reports` tables. Adding all of them would let us remove the `as any` casts sprinkled through all Stripe-touching AND listing-messaging files.
 12. **Mutual cancel flow for gigs (and tighten hard delete).** ⚠️ Known safety hole as of this session: the new `/api/gigs/[id]/delete` blocks delete on gigs where Stripe money has moved, but it does NOT block delete on gigs that have a claimed/active/pending worker without payment yet. Cory test-deleted a claimed gig and that's how this came up. He paused building the fix and wants it on the list.
 
@@ -713,6 +713,7 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 - **Marketplace and gigs share auth/profiles but otherwise live separately.** Don't try to "unify" them at the schema layer (separate tables: `marketplace_listings` vs `gigs`, `listing_conversations` vs `gig_conversations`, etc.). The intentional design is parallel systems with a unified UI on top. The messaging code in particular benefits from this — it would have been MUCH worse to add a `kind` column to `gig_conversations` rather than introducing `listing_conversations`.
 - **The marketplace messaging SQL filename** is `schema_marketplace_messaging_idempotent.sql` — the `_idempotent` suffix because the original wasn't safely re-runnable and Cory hit an error mid-run that required a redo. The idempotent version is now the canonical file. If you ship more SQL for these tables, follow the same `drop policy if exists` pattern.
 - **Marketplace photo upload route already moderates images.** Don't add moderation a second time. If you're touching `/api/upload-marketplace-photo`, the gate is already in there; mirror the existing pattern.
+- **Orphan-claim defense is in place.** `/api/gigs/[id]/delete` cascades through FK to remove claims, but `app/my-gigs/page.tsx` ALSO filters out any claim whose `gigs` join comes back null — belt-and-suspenders against a stale claim row showing as a ghost count. If you build a new view of claims (e.g. flipper-side history pages, an admin claims list), apply the same filter. The matching SQL safety net is `supabase/schema_cleanup_orphan_claims.sql` which both deletes any existing orphans AND re-asserts the `on delete cascade` FK. Safe to re-run.
 
 ---
 
@@ -776,6 +777,9 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
+- `df33049` Fix ghost count on /my-gigs from orphan claims: app-side filter skips claims whose `gigs` join is null (orphan from before cascade was reliable), plus a one-time SQL cleanup file `schema_cleanup_orphan_claims.sql` that deletes any existing orphans AND re-asserts the `on delete cascade` FK so new ones can't appear after a gig delete. SQL was run on prod.
+- `8448e85` Fix stale count on /my-gigs after a gig is deleted: added `export const dynamic = 'force-dynamic'` + `export const revalidate = 0` to `app/my-gigs/page.tsx`. Tab badges were caching and showing pre-delete counts. This was the fix HANDOFF TODO #10 specifically called out for `/my-gigs`.
+- `4887c65` HANDOFF: log this session's delete/archive work + mutual-cancel TODO
 - `be99d6c` Add gig delete + fix mobile archive (modal-based confirms): new POST /api/gigs/[id]/delete with Stripe-money guard, new SQL RLS DELETE policy for gig posters, new ConfirmActionModal replacing window.confirm() (was failing on mobile), Delete button on edit page + three-dot menu on flipper dashboard rows. Known limitation called out in TODO #12: doesn't block delete when a non-paid claim is attached — mutual-cancel + delete-tightening is the planned follow-up.
 
 ## Previous session's commits
