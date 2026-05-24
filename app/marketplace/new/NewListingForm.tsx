@@ -124,6 +124,31 @@ export default function NewListingForm({ categories }: Props) {
       location_lng: null,
     }
 
+    // If we already created this listing earlier in the same flow,
+    // a "back to details" + re-save should UPDATE the existing row,
+    // not create a brand-new one. The update endpoint accepts all the
+    // same fields and is a no-op for ones that haven't changed.
+    if (savedListingId) {
+      const res = await fetch(`/api/marketplace/${savedListingId}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+
+      if (!res.ok) {
+        setError(json.error || 'Could not update the listing.')
+        setLoading(false)
+        return
+      }
+
+      // Slug may have changed if title was edited
+      if (json.slug) setSavedListingSlug(json.slug)
+      setStep('photos')
+      setLoading(false)
+      return
+    }
+
     const res = await fetch('/api/marketplace/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -431,7 +456,7 @@ export default function NewListingForm({ categories }: Props) {
                 className="w-full"
                 loading={loading}
               >
-                Continue to photos
+                {savedListingId ? 'Save changes' : 'Continue to photos'}
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </form>
@@ -444,6 +469,17 @@ export default function NewListingForm({ categories }: Props) {
       {/* ====================================================== */}
       {step === 'photos' && (
         <div className="space-y-5">
+          {/* Back to details */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setStep('details')}
+            disabled={uploading}
+          >
+            ← Back to details
+          </Button>
+
           {/* Upload */}
           <div className="card">
             <div className="card-body space-y-3">
