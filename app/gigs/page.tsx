@@ -29,35 +29,6 @@ export default async function GigsPage() {
 
   const filteredGigs = gigs ?? []
 
-  // Batch-fetch checklist items for all gigs so the cards can preview them.
-  // One query for all gigs, then group by gig_id.
-  const allGigIds = filteredGigs.map((g) => g.id)
-  const { data: checklistRaw } = allGigIds.length > 0
-    ? await supabase
-        .from('gig_checklist_items')
-        .select('id, gig_id, title, description, sort_order, required')
-        .in('gig_id', allGigIds)
-        .order('sort_order')
-    : { data: [] }
-
-  const checklistByGig: Record<
-    string,
-    { id: string; title: string; required: boolean }[]
-  > = {}
-  for (const item of (checklistRaw ?? []) as {
-    id: string
-    gig_id: string
-    title: string
-    required: boolean
-  }[]) {
-    if (!checklistByGig[item.gig_id]) checklistByGig[item.gig_id] = []
-    checklistByGig[item.gig_id].push({
-      id: item.id,
-      title: item.title,
-      required: item.required,
-    })
-  }
-
   // Load any active applications/claims this worker has (exclude rejected/cancelled)
   const { data: myClaims } = await supabase
     .from('gig_claims')
@@ -75,7 +46,6 @@ export default async function GigsPage() {
       myClaimedIds={myClaimedIds}
       hasLocation={hasLocation}
       currentUserId={user!.id}
-      checklistByGig={checklistByGig}
     />
   )
 }

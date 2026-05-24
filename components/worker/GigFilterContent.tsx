@@ -11,7 +11,6 @@ interface GigFilterContentProps {
   myClaimedIds: Set<string>
   hasLocation: boolean
   currentUserId: string
-  checklistByGig: Record<string, { id: string; title: string; required: boolean }[]>
 }
 
 export default function GigFilterContent({
@@ -20,7 +19,6 @@ export default function GigFilterContent({
   workerState,
   myClaimedIds,
   currentUserId,
-  checklistByGig,
 }: GigFilterContentProps) {
   // Pre-fill the filter with the user's home city/state if they have one
   const [selectedState, setSelectedState] = useState<string>(workerState ?? '')
@@ -176,7 +174,6 @@ export default function GigFilterContent({
                 gig.poster_user_id === currentUserId ||
                 gig.created_by === currentUserId
               }
-              checklist={checklistByGig[gig.id] ?? []}
             />
           ))}
         </div>
