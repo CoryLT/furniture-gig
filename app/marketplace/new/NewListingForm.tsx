@@ -13,6 +13,8 @@ import {
   Image as ImageIcon,
   Tag,
   DollarSign,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import type { MarketplaceCategoryRow } from '@/types/database'
 
@@ -240,9 +242,42 @@ export default function NewListingForm({ categories }: Props) {
   }
 
   async function removePhoto(photoId: string, filePath: string) {
+    if (!confirm('Remove this photo?')) return
     await supabase.storage.from('marketplace-photos').remove([filePath])
     await supabase.from('marketplace_photos').delete().eq('id', photoId)
     setPhotos((prev) => prev.filter((p) => p.id !== photoId))
+  }
+
+  // Move a photo up or down in the order. Updates local state
+  // optimistically, then persists to the DB. If the DB write fails,
+  // revert the local state.
+  async function movePhoto(index: number, direction: 'up' | 'down') {
+    if (!savedListingId) return
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= photos.length) return
+
+    const reordered = [...photos]
+    const [moved] = reordered.splice(index, 1)
+    reordered.splice(targetIndex, 0, moved)
+
+    const previousOrder = photos
+    setPhotos(reordered)
+
+    const res = await fetch(
+      `/api/marketplace/${savedListingId}/reorder-photos`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoIds: reordered.map((p) => p.id) }),
+      }
+    )
+
+    if (!res.ok) {
+      // Roll back
+      setPhotos(previousOrder)
+      const json = await res.json().catch(() => ({}))
+      setError(json.error || 'Could not save the new photo order.')
+    }
   }
 
   function handlePublish() {
@@ -543,10 +578,10 @@ export default function NewListingForm({ categories }: Props) {
                 </button>
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                  {photos.map((p) => (
+                  {photos.map((p, index) => (
                     <div
                       key={p.id}
-                      className="relative aspect-square rounded-md overflow-hidden border border-border bg-muted group"
+                      className="relative aspect-square rounded-md overflow-hidden border border-border bg-muted"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -554,21 +589,53 @@ export default function NewListingForm({ categories }: Props) {
                         alt=""
                         className="w-full h-full object-cover"
                       />
+
+                      {/* Cover badge on the first photo */}
+                      {index === 0 && (
+                        <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-accent text-accent-foreground text-[10px] font-medium">
+                          Cover
+                        </div>
+                      )}
+
+                      {/* Delete (always visible) */}
                       <button
                         type="button"
                         onClick={() => removePhoto(p.id, p.file_path)}
-                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center"
                         aria-label="Remove photo"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-4 h-4" />
                       </button>
+
+                      {/* Move up / down */}
+                      <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between gap-1">
+                        <button
+                          type="button"
+                          onClick={() => movePhoto(index, 'up')}
+                          disabled={index === 0}
+                          className="w-7 h-7 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label="Move photo earlier"
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => movePhoto(index, 'down')}
+                          disabled={index === photos.length - 1}
+                          className="w-7 h-7 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label="Move photo later"
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
 
               <p className="text-xs text-muted-foreground">
-                The first photo will be the cover image shown on the listing card.
+                The first photo is the cover image shown on the listing card.
+                Use the arrows to reorder.
               </p>
             </div>
           </div>
