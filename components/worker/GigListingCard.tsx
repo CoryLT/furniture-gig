@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel } from '@/lib/utils'
-import { MapPin, Calendar, Wrench, ArrowRight, Image as ImageIcon } from 'lucide-react'
+import { MapPin, Calendar, Wrench, ArrowRight, Image as ImageIcon, ListChecks, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
 import type { GigRow } from '@/types/database'
@@ -11,9 +11,15 @@ interface Props {
   gig: GigRow
   isClaimed: boolean
   isOwnPost?: boolean
+  checklist?: { id: string; title: string; required: boolean }[]
 }
 
-export default function GigListingCard({ gig, isClaimed, isOwnPost = false }: Props) {
+export default function GigListingCard({
+  gig,
+  isClaimed,
+  isOwnPost = false,
+  checklist = [],
+}: Props) {
   const supabase = createClient()
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -112,6 +118,30 @@ export default function GigListingCard({ gig, isClaimed, isOwnPost = false }: Pr
             </div>
           )}
         </div>
+
+        {/* Checklist preview */}
+        {checklist.length > 0 && (
+          <div className="rounded-md border border-border bg-muted/30 px-3 py-2 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+              <ListChecks className="w-3.5 h-3.5 text-accent" />
+              Checklist · {checklist.length} {checklist.length === 1 ? 'task' : 'tasks'}
+            </div>
+            <ul className="space-y-1">
+              {checklist.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-start gap-1.5 text-xs text-muted-foreground"
+                >
+                  <Check className="w-3 h-3 mt-0.5 shrink-0 text-muted-foreground/60" />
+                  <span className="leading-snug">
+                    {item.title}
+                    {item.required && <span className="text-destructive ml-0.5">*</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-1 border-t border-border">
