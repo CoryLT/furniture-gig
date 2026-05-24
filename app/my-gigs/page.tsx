@@ -36,7 +36,16 @@ export default async function MyGigsPage({
     .eq('worker_user_id', user!.id)
     .order('claimed_at', { ascending: false })
 
-  const allClaims = claims ?? []
+  const rawClaims = claims ?? []
+
+  // Filter out orphan claims (gig was deleted but the claim row somehow
+  // survived). These shouldn't exist if cascade FK is working, but they
+  // can show up if a gig was force-deleted via Supabase admin tools or
+  // an older buggy code path. Without this filter, the tab counts go
+  // up but nothing renders in the list — confusing for the user.
+  const allClaims = rawClaims.filter(
+    (c: { gigs: unknown }) => c.gigs !== null
+  )
 
   const active = allClaims.filter((c: { status: string }) =>
     ['active', 'submitted_for_review'].includes(c.status)
