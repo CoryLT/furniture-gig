@@ -1,26 +1,21 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+// ============================================================
+// DELETE /api/delete-gallery-photo
+// ============================================================
+// Deletes a single photo from a user's work-samples gallery
+// (either worker_photo_galleries or flipper_photo_galleries
+// depending on the `type` field in the request body).
+//
+// Removes the file from Supabase storage AND the row from the
+// database. Verifies ownership via auth.getUser() — RLS would
+// catch it anyway but checking here gives a cleaner 403.
+// ============================================================
+
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          },
-        },
-      }
-    );
+    const supabase = createClient();
 
     // Check if user is authenticated
     const {
@@ -51,7 +46,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Fetch the photo to verify ownership and get file path
+    // Pick the right table + owner column based on type
     const tableName =
       type === "worker"
         ? "worker_photo_galleries"
@@ -59,11 +54,12 @@ export async function DELETE(request: NextRequest) {
     const ownerField =
       type === "worker" ? "worker_user_id" : "flipper_user_id";
 
+    // Fetch the photo to verify ownership and get its storage path
     const { data: photo, error: fetchError } = await supabase
       .from(tableName)
-      .select("id, file_path, " + ownerField)
+      .select(`id, file_path, ${ownerField}`)
       .eq("id", photoId)
-      .single();
+      .single<Record<string, any>>();
 
     if (fetchError || !photo) {
       return NextResponse.json(
@@ -80,7 +76,8 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Delete from storage
+    // Delete from storage first. If this fails we still return an
+    // error and skip the DB delete — otherwise we'd orphan the file.
     const { error: storageError } = await supabase.storage
       .from("photo-galleries")
       .remove([photo.file_path]);
@@ -93,7 +90,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Delete from database
+    // Delete the DB row
     const { error: dbError } = await supabase
       .from(tableName)
       .delete()
