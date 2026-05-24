@@ -53,8 +53,9 @@ After you push, Cory must:
 - **Unified public profile at `/u/[username]`** — pulls from both tables, hero card with avatar, name, location, website, stats, bio, skills, and Instagram-style square photo grid
 - Old `/workers/[username]` and `/flippers/[username]` routes redirect to `/u/[username]`
 - Old `/profile/worker` and `/profile/flipper` pages still exist as dead code, nothing links to them — leave them alone
-- Post a gig, edit a gig, browse gigs (with city/state filter; own posted gigs filtered out)
+- Post a gig, edit a gig, browse gigs (with city/state filter; **own posted gigs ARE included** in the browse feed with a "Your post" badge — Cory wants to see what workers see)
 - Claim a gig (exclusive — DB unique constraint; **users can't claim their own gigs**, enforced at UI + DB level)
+- **Reference images visible everywhere they should be:** the worker browse cards show a thumbnail of the first reference image; the flipper's My Posted Gigs list (`/flipper/dashboard`) shows a 64px square thumbnail; the worker gig detail page AND the flipper gig detail page (`/flipper/gigs/[id]`) both render the full reference image grid via the shared `GigReferenceImages` component.
 - "My Gigs" workflow: checklist + photo uploads + submit for review
 - Admin review flow at `/admin`
 - Payouts tracking (manual PayPal, admin updates status)
@@ -131,7 +132,7 @@ In `supabase/schema_marketplace_messaging.sql` (and `schema_marketplace_messagin
 
 ---
 
-## Stripe Connect Phase 7: webhooks (DONE — shipped this session)
+## Stripe Connect Phase 7: webhooks (DONE — shipped a previous session)
 
 ### What's there
 - **`/api/stripe/webhook`** — POST endpoint that Stripe pings. Verifies signature with `STRIPE_WEBHOOK_SECRET`, inserts a row in `stripe_webhook_events` using event ID as PK (idempotency — duplicate deliveries 200-no-op), dispatches by event type, marks row processed/ignored/error.
@@ -167,7 +168,7 @@ In `supabase/schema_marketplace_messaging.sql` (and `schema_marketplace_messagin
 
 ---
 
-## Unified Dashboard at `/home` (DONE — shipped a previous session; superseded as landing by /marketplace this session)
+## Unified Dashboard at `/home` (DONE — shipped a previous session; superseded as landing by /marketplace)
 
 ### What's there
 - **`/home`** is the personalized dashboard for logged-in users. **No longer the auto-landing after auth** (that's `/marketplace` now), but still accessible from the hamburger nav ("Dashboard" link) and still protected by middleware.
@@ -597,7 +598,7 @@ A parallel system to the gig flow, for buying/selling furniture. The two systems
 
 ---
 
-## Marketplace as front door (DONE — shipped this session)
+## Marketplace as front door (DONE — shipped a previous session)
 
 Originally `/home` was the post-auth landing for logged-in users and `/` was a marketing landing page for logged-out users. Cory wanted the marketplace front-and-center for everyone, with the dashboard demoted to "available via the hamburger nav but not a destination."
 
@@ -714,55 +715,30 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 - **The marketplace messaging SQL filename** is `schema_marketplace_messaging_idempotent.sql` — the `_idempotent` suffix because the original wasn't safely re-runnable and Cory hit an error mid-run that required a redo. The idempotent version is now the canonical file. If you ship more SQL for these tables, follow the same `drop policy if exists` pattern.
 - **Marketplace photo upload route already moderates images.** Don't add moderation a second time. If you're touching `/api/upload-marketplace-photo`, the gate is already in there; mirror the existing pattern.
 - **Orphan-claim defense is in place.** `/api/gigs/[id]/delete` cascades through FK to remove claims, but `app/my-gigs/page.tsx` ALSO filters out any claim whose `gigs` join comes back null — belt-and-suspenders against a stale claim row showing as a ghost count. If you build a new view of claims (e.g. flipper-side history pages, an admin claims list), apply the same filter. The matching SQL safety net is `supabase/schema_cleanup_orphan_claims.sql` which both deletes any existing orphans AND re-asserts the `on delete cascade` FK. Safe to re-run.
+- **DO NOT BREAK: Supabase Site URL must be `https://myflipwork.com`** (NOT the vercel.app URL). It's set in Supabase Authentication → URL Configuration. If anyone ever resets it to the vercel.app domain, OAuth on iPhone breaks silently — Google redirects to vercel.app, the existing `*.vercel.app → myflipwork.com` 308 redirect strips the URL fragment, and the auth token vanishes. Users land on `/marketplace` signed out, no error.
+- **DO NOT BREAK: OAuth must NEVER route through the `*.vercel.app → myflipwork.com` 308 redirect** for the same reason as above (308s strip fragments). The Vercel 308 is still in place for catching stale bookmarks, which is fine. Just don't make Supabase emit OAuth redirects through it.
+- **Testing OAuth changes:** always test in a fresh incognito window on the actual `myflipwork.com` domain. Starting on a vercel.app URL produces the bad version of the flow.
+- **Vercel has a hard 4.5MB body limit** on serverless functions — bigger requests get a `413 FUNCTION_PAYLOAD_TOO_LARGE` at the gateway, which returns HTML (not JSON). Every client form should compress images >1MB via `lib/imageCompression.ts` before upload AND wrap `res.json()` in try/catch. There are 6 live upload paths all using this pattern — if you add a 7th, mirror it. The cedar-bed JPEG (4.6MB iPhone original) is a good reproducer.
 
 ---
 
 ## What's next (next session)
 
-**This session: killed two major bugs — the iPhone photo upload hang and the iPhone OAuth hang.** Both took some digging. Here's what happened:
+**This session: small focused UX polish around gig previews — no new systems, no schema changes, no SQL.** Four commits, all in `/gigs` and `/flipper/dashboard` territory:
 
-### Bug 1: Photo uploads hung forever on big iPhone photos
+1. **Reference images now visible on the flipper side too.** The flipper dashboard list shows a 64px thumbnail per gig (first image by `sort_order`, placeholder icon if none). The flipper gig detail page renders the full reference-image grid using the existing `GigReferenceImages` component. Image URLs are built on the server in one batched query.
+2. **Own posted gigs now appear in the worker browse feed**, mixed in by date with everyone else's, marked with a small "Your post" badge under the status pill. Footer link reads "View as worker" on own posts. The existing `isOwnPostedGig` branch on `/gigs/[slug]` already prevents claiming and shows a "You posted this gig" panel, so no extra detail-page work was needed. Cory wanted this so he can see his gig the way workers see it without using a second account.
+3. **Checklist preview attempt** — added a full task-list preview to each browse card, Cory looked at it and asked to back it out (he wanted the checklist visible only on the detail page next to the description, not duplicated on every card). The detail page already shows the checklist. Net: card stayed compact, change was a no-op for users.
 
-Reproducer was `cedar_raised_bed_6_x3_x_17.jpeg` — 4.6 MB iPhone JPEG. Spinner never stopped, no error. Previous session's 30s/60s timeouts didn't help because the request never reached our code in the first place.
-
-**Root cause:** Vercel has a hard 4.5 MB request body limit on serverless functions. Anything bigger gets a `413 FUNCTION_PAYLOAD_TOO_LARGE` at the gateway before our route runs. Compounding it: every client form was calling `await res.json()` unconditionally, but Vercel's 413 returns HTML, not JSON, so the parse threw an uncaught `SyntaxError: Unexpected token 'R'` (from "Request Entity Too Large") which made the spinner hang silently instead of showing an error.
-
-**Fix:**
-- Added `browser-image-compression@^2.0.2` and a shared helper `lib/imageCompression.ts` that shrinks any image >1 MB down to ~1 MB / 1920px on the longest side before sending. EXIF orientation preserved. Tiny files skip compression.
-- Wired it into all 6 live client upload forms: NewListingForm, EditListingForm, PhotoSection (gig proof), profile/page (avatar), GigImageUploader, PhotoUploadForm (gallery).
-- Wrapped every `res.json()` call in try/catch so a 413 (or any other non-JSON response) shows a clean "too large" message instead of hanging.
-- Also added `export const maxDuration = 60` to the marketplace upload route, just in case slow uploads ever do reach the function legitimately.
-
-Dead-code paths (`/profile/worker` and `/profile/flipper`) deliberately NOT touched per HANDOFF rule.
-
-Confirmed working with the original reproducer JPEG.
-
-### Bug 2: Google OAuth on iPhone hung on "Almost done…" then later silently failed
-
-Two-part bug — different symptoms, related root cause.
-
-**Part A (the hang):** User on `myflipwork.com` tapped Sign in with Google. After completing Google, they'd land on the `/auth/finishing` page and hang on "Almost done…" forever. Added a temporary on-screen debug box (no DevTools on a phone). The log showed every step completed cleanly — set-session returned 200, destination resolved correctly, `window.location.replace()` even fired (the post-replace debug line printed). Browser just refused to navigate. We initially blamed the user bookmarking the Vercel preview URL and set up 308 redirects from both `*.vercel.app` URLs to `myflipwork.com`. That partially worked but introduced Part B.
-
-**Part B (the regression after the redirect fix):** Once `*.vercel.app` → `myflipwork.com` was configured as a 308 redirect, OAuth started landing users on `/marketplace` silently signed-out — the "Almost done" screen didn't even appear. Reason: Supabase's **Site URL** in the Authentication → URL Configuration page was set to `https://furniture-gig-corylts-projects.vercel.app/`. That made Supabase tell Google "send the user back to the vercel.app URL after auth." Google obeyed. Then Vercel's 308 redirect kicked in and bounced the user from the vercel.app URL to `myflipwork.com` — and **308 redirects strip the URL fragment** (`#access_token=...`). Tokens lost. `/auth/finishing` ran with no hash and silently bailed to login → marketplace.
-
-**Real fix:** In Supabase dashboard → Authentication → URL Configuration:
-- Changed **Site URL** from `https://furniture-gig-corylts-projects.vercel.app/` → `https://myflipwork.com`
-- Confirmed `https://myflipwork.com/**` was in the Redirect URLs allowlist
-
-After the Site URL change, OAuth lands directly on `myflipwork.com/auth/finishing` with the token fragment intact. No Vercel redirect involved.
-
-**Cleanup applied this session:**
-- Bumped the cookie-commit wait in `/auth/finishing` from 150ms → 500ms (cheap insurance for iOS Safari being slow to persist large chunked auth cookies).
-- Debug panel removed.
-
-**Carry-over knowledge for next session — DO NOT BREAK:**
-- Supabase Site URL must be `https://myflipwork.com` (NOT the vercel.app URL).
-- The Vercel 308 redirects on both `*.vercel.app` URLs are still in place and useful for catching stale bookmarks, but OAuth must NEVER route through them or tokens get stripped.
-- If you ever need to change the OAuth flow, test from a fresh incognito window on the actual `myflipwork.com` domain. Starting on the Vercel URL produces the bad version of the flow.
+**Pattern carry-over for next session:** batch-fetching related rows (images, checklist items, etc.) for a list of gigs in a single query and grouping by `gig_id` is a much better pattern than the client-side N+1 fetch `GigListingCard` does for thumbnails on the worker browse cards. That worker-side N+1 is still there (each card runs its own thumbnail query in a `useEffect`). Not urgent — perf has been fine — but if `/gigs` ever gets slow, that's where to start.
 
 ---
 
-**Marketplace is the front door** and **marketplace messaging is live end-to-end** (previous sessions). The dashboard at `/home` still exists but is no longer the post-auth landing.
+**Previous session: killed two major iPhone bugs** — the photo upload hang and the OAuth hang. See "Previous session's commits" and the bugfix notes below for details. Tl;dr: Vercel 4.5MB body limit triggered 413s that returned non-JSON HTML, crashing every `res.json()` call silently. Fix was client-side image compression + try/catch around every res.json(). And Supabase Site URL was set to the vercel.app domain, which made OAuth redirect through the `*.vercel.app → myflipwork.com` 308 — and 308s strip URL fragments, so the auth token vanished. Fix was setting Supabase Site URL to `https://myflipwork.com` directly.
+
+---
+
+**Marketplace is the front door** and **marketplace messaging is live end-to-end**. The dashboard at `/home` still exists but is no longer the post-auth landing.
 
 **Payments system has its safety net** (Phase 7 webhooks). Phases 5, 6, 8, 9 still needed before going live with real money.
 
@@ -820,6 +796,13 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
+- `87f7a70` Remove checklist preview from browse-gigs card: backed out the checklist preview added two commits earlier. Cory wanted the checklist visible only on the gig detail page next to the description, not duplicated on every browse card. Cleanly removed the prop, the batch query in `app/gigs/page.tsx`, and the unused `ListChecks` / `Check` imports. Cards are back to compact mode.
+- `99e6b6f` Show full checklist preview on each browse-gigs card: batch-fetched all checklist items for visible gigs in one query, grouped by `gig_id`, passed through `GigFilterContent` → `GigListingCard`. Card renders the full task list in a small muted box with task count header and required (*) markers. Shipped, then reverted by `87f7a70` after Cory saw it.
+- `96e36bf` Show user's own posted gigs in browse, marked with 'Your post' badge: removed the `.or()` filter from `app/gigs/page.tsx` that hid own gigs. `GigListingCard` got an `isOwnPost` prop and shows a small "Your post" badge under the status pill when set. Footer link reads "View as worker" on own posts. The existing `isOwnPostedGig` branch on the gig detail page already prevents claiming and shows a "You posted this gig" panel with a button back to the flipper dashboard, so no extra work needed there.
+- `f4a7513` Show gig reference images in flipper dashboard list + flipper gig detail: `/flipper/dashboard` now shows a 64px square thumbnail per gig (first uploaded reference image by `sort_order`, or a placeholder `ImageIcon` if none). One batched query fetches all images for visible gigs, then we pick the lowest sort_order per gig and build public URLs once on the server. `/flipper/gigs/[id]` now renders the existing `GigReferenceImages` component below the gig header card — same UI workers see.
+
+## Previous session's commits
+
 - `a44d10f` Remove finishing-page debug box + bump cookie wait to 500ms for iOS Safari: cleaned up the temporary debug panel from `/auth/finishing` now that the iPhone OAuth bug is diagnosed and fixed. Also bumped the cookie-commit wait from 150ms → 500ms as cheap insurance for iOS Safari being slow to persist large chunked Supabase auth cookies.
 - `5b6a07a` DEBUG: on-screen log on /auth/finishing for mobile OAuth diagnosis: temporarily added an on-screen debug panel below the spinner to diagnose why iPhone OAuth hung on "Almost done…". Showed the entire flow completed successfully — root cause turned out to be domain mismatch (OAuth started on the Vercel preview URL, not the custom domain). This commit was reverted by `a44d10f`.
 - `7256073` Wire image compression into remaining 4 upload paths: applied `compressImageForUpload` + 413-safe JSON guard to `app/profile/page.tsx` (avatar), `app/my-gigs/[claimId]/PhotoSection.tsx` (gig proof photos), `components/admin/GigImageUploader.tsx` (gig reference images), `components/ui/PhotoUploadForm.tsx` (worker/flipper gallery). Two dead-code paths `/profile/worker` and `/profile/flipper` deliberately left alone per HANDOFF rule.
@@ -827,10 +810,10 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 - `5d9d085` Add browser-side image compression for marketplace photo upload: new `lib/imageCompression.ts` helper using `browser-image-compression@^2.0.2`. Shrinks any image >1 MB down to ~1 MB / 1920px on the longest side. Wired into `NewListingForm` first; other paths followed in `7256073`.
 - `fdc4a8d` Fix marketplace photo upload hang: add maxDuration=60 + step logging: initial wrong-theory attempt at the upload hang. Set Vercel `maxDuration = 60` on the marketplace upload route (still useful for the legit case of a slow upload), added timestamped `console.log` at every step. Logs later revealed zero entries existed — the request never reached the function. Real cause was the 4.5MB Vercel body limit (fixed in subsequent commits).
 
-**Configuration changes (no code) this session:**
-- Vercel Project → Settings → Domains: added `furniture-gig-corylts-projects.vercel.app` as a domain and configured BOTH `*.vercel.app` URLs (the team alias and the short alias `furniture-gig.vercel.app`) to issue a 308 Permanent Redirect to `myflipwork.com`. This was the real fix for the iPhone OAuth bug — the user was starting on the Vercel preview URL, which set cookies on the wrong host.
+**Configuration changes (no code) from the previous session:**
+- Vercel Project → Settings → Domains: added `furniture-gig-corylts-projects.vercel.app` as a domain and configured BOTH `*.vercel.app` URLs (the team alias and the short alias `furniture-gig.vercel.app`) to issue a 308 Permanent Redirect to `myflipwork.com`. Originally framed as the OAuth bug fix; ended up causing a regression because 308s strip URL fragments — see "DO NOT BREAK" notes in "Watch out for." The real OAuth fix was changing the Supabase Site URL.
 
-## Previous session's commits
+## Older commits
 
 - `5186236` Add visible delete + arrow-button reorder for listing photos: new API route `POST /api/marketplace/[id]/reorder-photos` (owner/admin only, defensively verifies every photo belongs to the listing), photo grid in both `NewListingForm.tsx` and `EditListingForm.tsx` got always-visible delete button + cover badge + up/down arrow buttons + disabled state at ends. Reorder uses optimistic UI with rollback. Removed misleading "Drag-to-reorder coming soon" copy.
 - `9796c9f` Fix indefinite hang on listing photo upload: added 30s AbortController timeout to the Sightengine fetch in `lib/moderation.ts` (returns existing `service_error` result on abort), added 60s AbortController timeout to the client fetch in `NewListingForm.tsx`, added per-photo try/catch so one bad photo doesn't lock the whole loop. (Didn't actually fix the hang — see this session's commits for the real fix.)
@@ -841,7 +824,7 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 - `c1f0f4d` Hide archived gigs by default; add 'Show archived' toggle on flipper dashboard: `FlipperGigList.tsx` got a `showArchived` state, archived gigs filter out by default, a `Show archived (N)` checkbox renders only when archived gigs exist. Also fixed the `Total Gigs` stat tile to exclude archived. Public marketplace was already filtered to `status='open'` so no change needed there.
 - `c90f9f0` Swap city/state order: State on left, City on right: one fix to the shared `components/ui/location-select.tsx` covers 9 pages (worker/flipper onboarding, profile editors, post-gig, edit-gig, new listing, edit listing, etc.) plus the marketplace filter `components/worker/GigFilterContent.tsx` which had its own copy. Reasoning: city dropdown was disabled until state was picked, so left→right tab/click flow was awkward.
 
-## Older commits
+## Even older commits
 
 - `df33049` Fix ghost count on /my-gigs from orphan claims: app-side filter skips claims whose `gigs` join is null (orphan from before cascade was reliable), plus a one-time SQL cleanup file `schema_cleanup_orphan_claims.sql` that deletes any existing orphans AND re-asserts the `on delete cascade` FK so new ones can't appear after a gig delete. SQL was run on prod.
 - `8448e85` Fix stale count on /my-gigs after a gig is deleted: added `export const dynamic = 'force-dynamic'` + `export const revalidate = 0` to `app/my-gigs/page.tsx`. Tab badges were caching and showing pre-delete counts.
@@ -856,7 +839,7 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 - `e8069db` Marketplace messaging: POST /api/listing-messages/start (find-or-create conversation)
 - `90b8014` SQL: idempotent version of marketplace messaging schema (safe to re-run)
 
-## Even older commits (Stripe Connect)
+## Stripe Connect early commits
 
 - `b6d74c8` Stripe Connect Phase 4: RLS fix + silent-failure guards
 - `85e0ec4` Stripe Connect Phase 4: flipper-side review page (not admin)
