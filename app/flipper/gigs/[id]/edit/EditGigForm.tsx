@@ -8,6 +8,7 @@ import { AlertTriangle, X } from 'lucide-react'
 import type { GigRow, GigImageRow } from '@/types/database'
 import GigImageUploader from '@/components/admin/GigImageUploader'
 import { LocationSelect } from '@/components/ui/location-select'
+import ConfirmActionModal from '@/components/shared/ConfirmActionModal'
 
 
 const FURNITURE_TYPES = [
@@ -47,6 +48,9 @@ export default function EditGigForm({ gig, hasActiveClaim, images }: Props) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [archiving, setArchiving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
@@ -104,11 +108,6 @@ export default function EditGigForm({ gig, hasActiveClaim, images }: Props) {
   }
 
   async function handleArchive() {
-    const confirmed = window.confirm(
-      'Archive this gig? It will be hidden from workers and from your dashboard. You can\'t undo this from the app yet.'
-    )
-    if (!confirmed) return
-
     setError('')
     setArchiving(true)
 
@@ -121,11 +120,39 @@ export default function EditGigForm({ gig, hasActiveClaim, images }: Props) {
       console.error('[edit-gig] archive error:', archiveError)
       setError(archiveError.message)
       setArchiving(false)
+      setArchiveOpen(false)
       return
     }
 
+    setArchiveOpen(false)
     router.push('/flipper/dashboard')
     router.refresh()
+  }
+
+  async function handleDelete() {
+    setError('')
+    setDeleting(true)
+
+    try {
+      const res = await fetch(`/api/gigs/${gig.id}/delete`, {
+        method: 'POST',
+      })
+      const body = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        setError(body?.error || 'Could not delete gig.')
+        setDeleting(false)
+        return
+      }
+
+      setDeleteOpen(false)
+      router.push('/flipper/dashboard')
+      router.refresh()
+    } catch (e) {
+      console.error('[edit-gig] delete error:', e)
+      setError('Could not delete gig. Try again.')
+      setDeleting(false)
+    }
   }
 
   return (
@@ -264,28 +291,76 @@ export default function EditGigForm({ gig, hasActiveClaim, images }: Props) {
       <GigImageUploader gigId={gig.id} images={images} onImagesChange={() => {}} />
 
       {/* Danger zone — separated visually from the main form */}
-      {gig.status !== 'archived' && (
-        <div className="card border-destructive/30">
-          <div className="card-body space-y-3">
+      <div className="card border-destructive/30">
+        <div className="card-body space-y-5">
+          {gig.status !== 'archived' && (
+            <div className="space-y-3">
+              <div>
+                <h2 className="font-sans font-semibold text-foreground">Archive this gig</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Hides the gig from workers and from your dashboard.
+                  Existing claims, photos, and history are kept.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setArchiveOpen(true)}
+                loading={archiving}
+                className="text-destructive hover:bg-destructive/5 border-destructive/30"
+              >
+                Archive this gig
+              </Button>
+            </div>
+          )}
+
+          <div className="space-y-3 border-t border-border pt-5">
             <div>
-              <h2 className="font-sans font-semibold text-foreground">Take this gig down</h2>
+              <h2 className="font-sans font-semibold text-foreground">Delete this gig</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Archiving hides this gig from workers and removes it from your dashboard.
-                Existing claims and history are kept.
+                Permanently removes the gig and everything tied to it (claims,
+                checklist, photos, messages). This cannot be undone. If money
+                has already moved on this gig, use Archive instead.
               </p>
             </div>
             <Button
               type="button"
-              variant="outline"
-              onClick={handleArchive}
-              loading={archiving}
-              className="text-destructive hover:bg-destructive/5 border-destructive/30"
+              variant="destructive"
+              onClick={() => setDeleteOpen(true)}
+              loading={deleting}
             >
-              Archive this gig
+              Delete this gig permanently
             </Button>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Confirmation modals */}
+      <ConfirmActionModal
+        open={archiveOpen}
+        title="Archive this gig?"
+        description="It will be hidden from workers and from your dashboard. Claims and history are kept. You can't unarchive from the app yet."
+        confirmLabel="Yes, archive"
+        confirmVariant="destructive"
+        loading={archiving}
+        onCancel={() => setArchiveOpen(false)}
+        onConfirm={handleArchive}
+      />
+
+      <ConfirmActionModal
+        open={deleteOpen}
+        title="Delete this gig permanently?"
+        description={
+          'This removes the gig and every claim, photo, checklist item, ' +
+          'message, and payout record attached to it.\n\nThis cannot be undone.'
+        }
+        typeToConfirm="DELETE"
+        confirmLabel="Delete permanently"
+        confirmVariant="destructive"
+        loading={deleting}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

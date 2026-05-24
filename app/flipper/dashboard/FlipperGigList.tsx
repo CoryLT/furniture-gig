@@ -1,9 +1,22 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel } from '@/lib/utils'
-import { MapPin, Calendar, Users, ArrowRight, AlertCircle } from 'lucide-react'
+import {
+  MapPin,
+  Calendar,
+  Users,
+  ArrowRight,
+  AlertCircle,
+  MoreVertical,
+  Edit,
+  Archive,
+  Trash2,
+} from 'lucide-react'
+import ConfirmActionModal from '@/components/shared/ConfirmActionModal'
+import { createClient } from '@/lib/supabase/client'
 
 export type FlipperGig = {
   id: string
@@ -46,8 +59,69 @@ export default function FlipperGigList({
   totalClaimsByGig,
   pendingClaimsByGig,
 }: Props) {
+  const router = useRouter()
+  const supabase = createClient()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [sort, setSort] = useState<SortKey>('newest')
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [archiveTarget, setArchiveTarget] = useState<FlipperGig | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<FlipperGig | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+
+  // Close the popover when clicking outside it.
+  useEffect(() => {
+    if (!openMenuId) return
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null)
+      }
+    }
+    window.addEventListener('mousedown', handleClickOutside)
+    return () => window.removeEventListener('mousedown', handleClickOutside)
+  }, [openMenuId])
+
+  async function handleArchive() {
+    if (!archiveTarget) return
+    setBusy(true)
+    setActionError(null)
+    const { error } = await supabase
+      .from('gigs')
+      .update({ status: 'archived' })
+      .eq('id', archiveTarget.id)
+    setBusy(false)
+    if (error) {
+      console.error('[flipper-list] archive error:', error)
+      setActionError(error.message || 'Could not archive gig.')
+      return
+    }
+    setArchiveTarget(null)
+    router.refresh()
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setBusy(true)
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/gigs/${deleteTarget.id}/delete`, {
+        method: 'POST',
+      })
+      const body = await res.json().catch(() => ({}))
+      setBusy(false)
+      if (!res.ok) {
+        setActionError(body?.error || 'Could not delete gig.')
+        return
+      }
+      setDeleteTarget(null)
+      router.refresh()
+    } catch (e) {
+      console.error('[flipper-list] delete error:', e)
+      setBusy(false)
+      setActionError('Could not delete gig. Try again.')
+    }
+  }
 
   const visibleGigs = useMemo(() => {
     // Filter step
@@ -157,20 +231,23 @@ export default function FlipperGigList({
           {visibleGigs.map((gig) => {
             const total = totalClaimsByGig[gig.id] ?? 0
             const pending = pendingClaimsByGig[gig.id] ?? 0
+            const menuOpen = openMenuId === gig.id
 
             return (
-              <Link
+              <div
                 key={gig.id}
-                href={`/flipper/gigs/${gig.id}`}
                 className={
                   pending > 0
-                    ? 'card hover:shadow-md transition-shadow group block border-accent/40 ring-1 ring-accent/20'
-                    : 'card hover:shadow-md transition-shadow group block'
+                    ? 'card hover:shadow-md transition-shadow group block border-accent/40 ring-1 ring-accent/20 relative'
+                    : 'card hover:shadow-md transition-shadow group block relative'
                 }
               >
                 <div className="card-body">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
+                    <Link
+                      href={`/flipper/gigs/${gig.id}`}
+                      className="flex-1 min-w-0 block"
+                    >
                       <div className="flex items-center gap-3 flex-wrap">
                         <h3 className="font-semibold text-foreground group-hover:text-accent transition-colors">
                           {gig.title}
@@ -205,20 +282,120 @@ export default function FlipperGigList({
                           {total} {total === 1 ? 'claim' : 'claims'}
                         </span>
                       </div>
-                    </div>
+                    </Link>
+
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className="font-mono font-semibold text-foreground">
-                        {formatCurrency(gig.pay_amount)}
-                      </span>
-                      <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
+                      <Link
+                        href={`/flipper/gigs/${gig.id}`}
+                        className="flex items-center gap-3 group"
+                        aria-label="Open gig"
+                      >
+                        <span className="font-mono font-semibold text-foreground">
+                          {formatCurrency(gig.pay_amount)}
+                        </span>
+                        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
+                      </Link>
+
+                      {/* Three-dot actions menu */}
+                      <div className="relative" ref={menuOpen ? menuRef : null}>
+                        <button
+                          type="button"
+                          aria-label="More actions"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setOpenMenuId(menuOpen ? null : gig.id)
+                          }}
+                          className="inline-flex items-center justify-center w-9 h-9 rounded-md border border-input bg-background hover:bg-secondary text-foreground transition-colors"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+
+                        {menuOpen && (
+                          <div className="absolute right-0 top-full mt-1 z-20 w-48 rounded-md bg-card border border-border shadow-lg py-1 text-sm">
+                            <Link
+                              href={`/flipper/gigs/${gig.id}/edit`}
+                              onClick={() => setOpenMenuId(null)}
+                              className="w-full text-left px-3 py-2 hover:bg-secondary flex items-center gap-2"
+                            >
+                              <Edit className="w-4 h-4 text-stone-600" />
+                              Edit
+                            </Link>
+                            {gig.status !== 'archived' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuId(null)
+                                  setActionError(null)
+                                  setArchiveTarget(gig)
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-secondary flex items-center gap-2"
+                              >
+                                <Archive className="w-4 h-4 text-stone-600" />
+                                Archive
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuId(null)
+                                setActionError(null)
+                                setDeleteTarget(gig)
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-secondary flex items-center gap-2 text-red-700"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </Link>
+              </div>
             )
           })}
         </div>
       )}
+
+      {/* Error toast shown below the list */}
+      {actionError && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 text-destructive text-sm px-3 py-2">
+          {actionError}
+        </div>
+      )}
+
+      <ConfirmActionModal
+        open={!!archiveTarget}
+        title="Archive this gig?"
+        description={
+          archiveTarget
+            ? `"${archiveTarget.title}" will be hidden from workers and from your dashboard. Claims and history are kept.`
+            : ''
+        }
+        confirmLabel="Yes, archive"
+        confirmVariant="destructive"
+        loading={busy}
+        onCancel={() => setArchiveTarget(null)}
+        onConfirm={handleArchive}
+      />
+
+      <ConfirmActionModal
+        open={!!deleteTarget}
+        title="Delete this gig permanently?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.title}" and every claim, photo, checklist item, message, and payout record attached to it will be removed.\n\nThis cannot be undone.`
+            : ''
+        }
+        typeToConfirm="DELETE"
+        confirmLabel="Delete permanently"
+        confirmVariant="destructive"
+        loading={busy}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }
