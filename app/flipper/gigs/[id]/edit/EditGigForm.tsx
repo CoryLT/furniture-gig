@@ -9,6 +9,7 @@ import type { GigRow, GigImageRow } from '@/types/database'
 import GigImageUploader from '@/components/admin/GigImageUploader'
 import { LocationSelect } from '@/components/ui/location-select'
 import ConfirmActionModal from '@/components/shared/ConfirmActionModal'
+import ChecklistEditor, { ChecklistDraftItem } from '@/components/shared/ChecklistEditor'
 
 
 const FURNITURE_TYPES = [
@@ -27,9 +28,10 @@ interface Props {
   gig: GigRow
   hasActiveClaim: boolean
   images: GigImageRow[]
+  initialChecklist: ChecklistDraftItem[]
 }
 
-export default function EditGigForm({ gig, hasActiveClaim, images }: Props) {
+export default function EditGigForm({ gig, hasActiveClaim, images, initialChecklist }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -46,6 +48,7 @@ export default function EditGigForm({ gig, hasActiveClaim, images }: Props) {
   })
   const [skills, setSkills] = useState<string[]>(gig.required_skills ?? [])
   const [skillInput, setSkillInput] = useState('')
+  const [checklist, setChecklist] = useState<ChecklistDraftItem[]>(initialChecklist)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [archiving, setArchiving] = useState(false)
@@ -102,6 +105,51 @@ export default function EditGigForm({ gig, hasActiveClaim, images }: Props) {
       setError(updateError.message)
       setLoading(false)
       return
+    }
+
+    // Sync checklist items. Strategy is simple and safe:
+    //   1. Delete every existing item for this gig
+    //   2. Insert the current editor state as fresh rows
+    // This avoids fiddly per-row diffing. It's safe because completions
+    // are tied to checklist_item_id, but those rows live in
+    // gig_task_completions and are only created when a worker checks
+    // off a step. If a flipper edits the checklist mid-claim, any
+    // existing completions for the old items get orphaned — that's
+    // acceptable for now (only the flipper can edit, and they own
+    // their gig).
+    const { error: deleteError } = await supabase
+      .from('gig_checklist_items')
+      .delete()
+      .eq('gig_id', gig.id)
+
+    if (deleteError) {
+      console.error('[edit-gig] checklist delete error:', deleteError)
+      setError('Could not update the checklist. Try again.')
+      setLoading(false)
+      return
+    }
+
+    const checklistRows = checklist
+      .map((item, index) => ({
+        gig_id: gig.id,
+        title: item.title.trim(),
+        description: item.description.trim(),
+        sort_order: index,
+        required: item.required,
+      }))
+      .filter((row) => row.title.length > 0)
+
+    if (checklistRows.length > 0) {
+      const { error: insertError } = await supabase
+        .from('gig_checklist_items')
+        .insert(checklistRows)
+
+      if (insertError) {
+        console.error('[edit-gig] checklist insert error:', insertError)
+        setError('Could not save the checklist. Try again.')
+        setLoading(false)
+        return
+      }
     }
 
     router.push(`/flipper/gigs/${gig.id}`)
@@ -208,6 +256,12 @@ export default function EditGigForm({ gig, hasActiveClaim, images }: Props) {
                 onChange={handleChange} className="field-input"
                 placeholder="One sentence overview of the project" required />
             </div>
+
+            <ChecklistEditor
+              items={checklist}
+              onChange={setChecklist}
+              disabled={loading}
+            />
 
             <div>
               <label htmlFor="description" className="field-label">Full Description</label>

@@ -8,6 +8,7 @@ import { slugify } from '@/lib/utils'
 import { X, ChevronRight, Check } from 'lucide-react'
 import { LocationSelect } from '@/components/ui/location-select'
 import GigImageUploader from '@/components/admin/GigImageUploader'
+import ChecklistEditor, { ChecklistDraftItem } from '@/components/shared/ChecklistEditor'
 
 
 const FURNITURE_TYPES = [
@@ -45,6 +46,7 @@ export default function PostGigForm() {
   })
   const [skills, setSkills] = useState<string[]>([])
   const [skillInput, setSkillInput] = useState('')
+  const [checklist, setChecklist] = useState<ChecklistDraftItem[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -108,6 +110,29 @@ export default function PostGigForm() {
       setError(insertError?.message ?? 'Could not save the gig.')
       setLoading(false)
       return
+    }
+
+    // Save checklist items (if any). We skip empty titles defensively.
+    const checklistRows = checklist
+      .map((item, index) => ({
+        gig_id: newGig.id,
+        title: item.title.trim(),
+        description: item.description.trim(),
+        sort_order: index,
+        required: item.required,
+      }))
+      .filter((row) => row.title.length > 0)
+
+    if (checklistRows.length > 0) {
+      const { error: checklistError } = await supabase
+        .from('gig_checklist_items')
+        .insert(checklistRows)
+
+      if (checklistError) {
+        // Don't block the flow — the gig is already saved. Just log it
+        // and let the flipper add the checklist later from edit.
+        console.error('[post-gig] checklist insert error:', checklistError)
+      }
     }
 
     // Gig is saved — move to the photo step so they can add reference images.
@@ -187,6 +212,12 @@ export default function PostGigForm() {
                   onChange={handleChange} className="field-input"
                   placeholder="One sentence overview of the project" required />
               </div>
+
+              <ChecklistEditor
+                items={checklist}
+                onChange={setChecklist}
+                disabled={loading}
+              />
 
               <div>
                 <label htmlFor="description" className="field-label">Full Description</label>

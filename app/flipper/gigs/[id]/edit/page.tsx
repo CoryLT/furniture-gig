@@ -40,5 +40,19 @@ export default async function EditGigPage({ params }: { params: { id: string } }
 
   const images = (imagesData ?? []) as GigImageRow[]
 
-  return <EditGigForm gig={gig} hasActiveClaim={hasActiveClaim} images={images} />
+  // Load existing checklist items so the editor can show / edit them.
+  const { data: checklistData } = await supabase
+    .from('gig_checklist_items')
+    .select('id, title, description, required, sort_order')
+    .eq('gig_id', gig.id)
+    .order('sort_order')
+
+  const checklist = (checklistData ?? []).map((row: any) => ({
+    id: row.id as string,
+    title: row.title as string,
+    description: (row.description as string) ?? '',
+    required: (row.required as boolean) ?? true,
+  }))
+
+  return <EditGigForm gig={gig} hasActiveClaim={hasActiveClaim} images={images} initialChecklist={checklist} />
 }
