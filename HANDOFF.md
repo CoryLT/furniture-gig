@@ -737,24 +737,28 @@ Dead-code paths (`/profile/worker` and `/profile/flipper`) deliberately NOT touc
 
 Confirmed working with the original reproducer JPEG.
 
-### Bug 2: Google OAuth on iPhone hung on "Almost done…"
+### Bug 2: Google OAuth on iPhone hung on "Almost done…" then later silently failed
 
-User on `myflipwork.com` tapped Sign in with Google. After completing Google, they'd land on the `/auth/finishing` page and either redirect to the landing page (sometimes) or hang on "Almost done…" forever (other times).
+Two-part bug — different symptoms, related root cause.
 
-**Diagnosis approach:** Added a temporary on-screen debug box to `/auth/finishing` since you can't get DevTools on a phone. The log showed every step completed cleanly — set-session returned 200, destination resolved correctly, `window.location.replace()` even fired (the post-replace debug line printed). Browser just refused to navigate.
+**Part A (the hang):** User on `myflipwork.com` tapped Sign in with Google. After completing Google, they'd land on the `/auth/finishing` page and hang on "Almost done…" forever. Added a temporary on-screen debug box (no DevTools on a phone). The log showed every step completed cleanly — set-session returned 200, destination resolved correctly, `window.location.replace()` even fired (the post-replace debug line printed). Browser just refused to navigate. We initially blamed the user bookmarking the Vercel preview URL and set up 308 redirects from both `*.vercel.app` URLs to `myflipwork.com`. That partially worked but introduced Part B.
 
-**Root cause:** The user had bookmarked the Vercel preview URL (`furniture-gig-corylts-projects.vercel.app`) and was starting there, not on `myflipwork.com`. OAuth used `window.location.origin` as the redirect, so cookies got set on the vercel.app host. Then the next-hop navigation to `/marketplace` confused iOS Safari about which cookies applied where.
+**Part B (the regression after the redirect fix):** Once `*.vercel.app` → `myflipwork.com` was configured as a 308 redirect, OAuth started landing users on `/marketplace` silently signed-out — the "Almost done" screen didn't even appear. Reason: Supabase's **Site URL** in the Authentication → URL Configuration page was set to `https://furniture-gig-corylts-projects.vercel.app/`. That made Supabase tell Google "send the user back to the vercel.app URL after auth." Google obeyed. Then Vercel's 308 redirect kicked in and bounced the user from the vercel.app URL to `myflipwork.com` — and **308 redirects strip the URL fragment** (`#access_token=...`). Tokens lost. `/auth/finishing` ran with no hash and silently bailed to login → marketplace.
 
-**Fix:**
-- Configured Vercel-side 308 redirects from both `furniture-gig.vercel.app` AND `furniture-gig-corylts-projects.vercel.app` to `myflipwork.com`. This was done in Vercel dashboard — Project → Settings → Domains → Edit each one, "Redirect to Another Domain" → 308 Permanent Redirect → `myflipwork.com`. No code change for this part.
-- On the client side, bumped the cookie-commit wait in `/auth/finishing` from 150ms → 500ms as cheap insurance against iOS Safari being slow to persist large chunked Supabase auth cookies.
-- Removed the on-screen debug box from `/auth/finishing`.
+**Real fix:** In Supabase dashboard → Authentication → URL Configuration:
+- Changed **Site URL** from `https://furniture-gig-corylts-projects.vercel.app/` → `https://myflipwork.com`
+- Confirmed `https://myflipwork.com/**` was in the Redirect URLs allowlist
 
-Confirmed working end-to-end on iPhone Safari.
+After the Site URL change, OAuth lands directly on `myflipwork.com/auth/finishing` with the token fragment intact. No Vercel redirect involved.
 
-### Important gotcha for future Vercel-domain work
+**Cleanup applied this session:**
+- Bumped the cookie-commit wait in `/auth/finishing` from 150ms → 500ms (cheap insurance for iOS Safari being slow to persist large chunked auth cookies).
+- Debug panel removed.
 
-The `furniture-gig-corylts-projects.vercel.app` URL is a **system-generated team alias**. It doesn't always show up in the Domains list by default — Cory had to manually add it via "Add Existing." Vercel let him add it because his project is in a Hobby team. If you ever change Vercel plans or team setup, double-check that BOTH `*.vercel.app` URLs still redirect to `myflipwork.com`.
+**Carry-over knowledge for next session — DO NOT BREAK:**
+- Supabase Site URL must be `https://myflipwork.com` (NOT the vercel.app URL).
+- The Vercel 308 redirects on both `*.vercel.app` URLs are still in place and useful for catching stale bookmarks, but OAuth must NEVER route through them or tokens get stripped.
+- If you ever need to change the OAuth flow, test from a fresh incognito window on the actual `myflipwork.com` domain. Starting on the Vercel URL produces the bad version of the flow.
 
 ---
 
