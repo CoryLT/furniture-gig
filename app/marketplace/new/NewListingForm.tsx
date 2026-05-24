@@ -197,10 +197,11 @@ export default function NewListingForm({ categories }: Props) {
       fd.append('listingId', savedListingId)
       fd.append('sortOrder', String(photos.length))
 
-      // Per-photo timeout (60s) so a single hung upload can't lock the
-      // entire loop and leave the spinner running forever.
+      // Per-photo timeout (70s) so a single hung upload can't lock the
+      // entire loop. Slightly longer than Vercel's 60s function max so the
+      // server has a chance to return an error before we abort.
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 60_000)
+      const timeoutId = setTimeout(() => controller.abort(), 70_000)
 
       try {
         const res = await fetch('/api/upload-marketplace-photo', {

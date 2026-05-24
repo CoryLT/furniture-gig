@@ -16,17 +16,30 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { moderateImage, logModerationCheck } from '@/lib/moderation'
 
+// Tell Vercel this route is allowed up to 60 seconds. Default on Hobby
+// plan is 10s which is shorter than our 30s moderation timeout — without
+// this the function gets killed mid-call and the client hangs.
+export const maxDuration = 60
+
 const UPLOAD_FAILED_GENERIC = 'Upload failed. Please try a different image.'
 
 export async function POST(request: NextRequest) {
+  const t0 = Date.now()
+  const log = (msg: string) =>
+    console.log(`[upload-marketplace-photo] +${Date.now() - t0}ms ${msg}`)
+
+  log('route entry')
   const supabase = createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
+    log('no user → 401')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  log(`auth ok user=${user.id}`)
 
   const formData = await request.formData()
+  log('formData parsed')
   const file = formData.get('file') as File
   const listingId = formData.get('listingId') as string | null
   const sortOrderRaw = formData.get('sortOrder') as string | null
@@ -44,6 +57,7 @@ export async function POST(request: NextRequest) {
   if (file.size > 25 * 1024 * 1024) {
     return NextResponse.json({ error: 'File size must be less than 25MB' }, { status: 400 })
   }
+  log(`file ok name=${file.name} size=${file.size} type=${file.type}`)
 
   // Verify the user owns this listing (or is admin)
   const { data: listing } = await supabase
@@ -68,9 +82,12 @@ export async function POST(request: NextRequest) {
   if (!isOwner && !isAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
+  log('ownership ok')
 
   // --- Moderation gate ---
+  log('moderation start')
   const moderationResult = await moderateImage(file)
+  log(`moderation done ok=${moderationResult.ok}`)
   if (!moderationResult.ok) {
     await logModerationCheck({
       supabase: supabase as never,
@@ -88,9 +105,11 @@ export async function POST(request: NextRequest) {
   const ext = file.name.split('.').pop() || 'jpg'
   const path = `${listingId}/${Date.now()}.${ext}`
 
+  log('storage upload start')
   const { error: uploadError } = await supabase.storage
     .from('marketplace-photos')
     .upload(path, file, { cacheControl: '3600' })
+  log(`storage upload done err=${uploadError ? uploadError.message : 'none'}`)
 
   if (uploadError) {
     console.error('[upload-marketplace-photo] upload error:', uploadError)
@@ -98,6 +117,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Insert DB row
+  log('db insert start')
   const { data: record, error: dbError } = await supabase
     .from('marketplace_photos')
     // @ts-expect-error supabase insert generics
@@ -109,6 +129,7 @@ export async function POST(request: NextRequest) {
     })
     .select()
     .single<{ id: string }>()
+  log(`db insert done err=${dbError ? dbError.message : 'none'}`)
 
   if (dbError || !record) {
     console.error('[upload-marketplace-photo] db error:', dbError)
@@ -131,6 +152,7 @@ export async function POST(request: NextRequest) {
     .from('marketplace-photos')
     .getPublicUrl(path)
 
+  log('returning success')
   return NextResponse.json({
     success: true,
     image: {
