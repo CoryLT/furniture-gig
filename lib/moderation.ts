@@ -83,19 +83,31 @@ export async function moderateImage(file: File): Promise<ModerationResult> {
   formData.append('api_secret', apiSecret)
 
   let data: Record<string, unknown>
+  // Sightengine occasionally hangs — wrap the call in an AbortController so
+  // we never wait more than 30s. The route treats 'service_error' as a
+  // failed upload and the client moves on to the next photo or shows an
+  // error message.
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30_000)
   try {
     const res = await fetch(SIGHTENGINE_URL, {
       method: 'POST',
       body: formData,
+      signal: controller.signal,
     })
     data = (await res.json()) as Record<string, unknown>
   } catch (err) {
+    const aborted = err instanceof DOMException && err.name === 'AbortError'
     return {
       ok: false,
       reason: 'service_error',
       rawScores: null,
-      errorMessage: err instanceof Error ? err.message : 'Network error',
+      errorMessage: aborted
+        ? 'Moderation service timed out after 30 seconds'
+        : err instanceof Error ? err.message : 'Network error',
     }
+  } finally {
+    clearTimeout(timeoutId)
   }
 
   if (data.status !== 'success') {

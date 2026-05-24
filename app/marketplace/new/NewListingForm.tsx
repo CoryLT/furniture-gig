@@ -195,25 +195,44 @@ export default function NewListingForm({ categories }: Props) {
       fd.append('listingId', savedListingId)
       fd.append('sortOrder', String(photos.length))
 
-      const res = await fetch('/api/upload-marketplace-photo', {
-        method: 'POST',
-        body: fd,
-      })
-      const json = await res.json()
+      // Per-photo timeout (60s) so a single hung upload can't lock the
+      // entire loop and leave the spinner running forever.
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 60_000)
 
-      if (!res.ok || !json.image) {
-        setError(json.error || 'Upload failed. Please try a different image.')
+      try {
+        const res = await fetch('/api/upload-marketplace-photo', {
+          method: 'POST',
+          body: fd,
+          signal: controller.signal,
+        })
+        const json = await res.json()
+
+        if (!res.ok || !json.image) {
+          setError(json.error || 'Upload failed. Please try a different image.')
+          continue
+        }
+
+        setPhotos((prev) => [
+          ...prev,
+          {
+            id: json.image.id,
+            url: json.image.url,
+            file_path: json.image.file_path,
+          },
+        ])
+      } catch (err) {
+        const aborted = err instanceof DOMException && err.name === 'AbortError'
+        setError(
+          aborted
+            ? `Upload of "${file.name}" took too long and was cancelled. Try again or use a smaller image.`
+            : `Upload of "${file.name}" failed. ${err instanceof Error ? err.message : ''}`
+        )
+        // Keep going — the next photo might still upload fine.
         continue
+      } finally {
+        clearTimeout(timeoutId)
       }
-
-      setPhotos((prev) => [
-        ...prev,
-        {
-          id: json.image.id,
-          url: json.image.url,
-          file_path: json.image.file_path,
-        },
-      ])
     }
 
     setUploading(false)
