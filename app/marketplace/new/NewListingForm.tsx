@@ -17,6 +17,7 @@ import {
   ArrowDown,
 } from 'lucide-react'
 import type { MarketplaceCategoryRow } from '@/types/database'
+import { compressImageForUpload } from '@/lib/imageCompression'
 
 interface Props {
   categories: MarketplaceCategoryRow[]
@@ -192,8 +193,13 @@ export default function NewListingForm({ categories }: Props) {
         continue
       }
 
+      // Compress big photos (e.g. straight from a phone) down to ~1MB before
+      // sending. Vercel has a hard 4.5MB body limit on functions — bigger
+      // uploads die at the gateway with no error reaching our code.
+      const fileToUpload = await compressImageForUpload(file)
+
       const fd = new FormData()
-      fd.append('file', file)
+      fd.append('file', fileToUpload)
       fd.append('listingId', savedListingId)
       fd.append('sortOrder', String(photos.length))
 
