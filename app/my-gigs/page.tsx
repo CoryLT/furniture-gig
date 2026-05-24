@@ -3,6 +3,12 @@ import Link from 'next/link'
 import { formatCurrency, formatDate, claimStatusClass, claimStatusLabel } from '@/lib/utils'
 import { MapPin, Calendar, ArrowRight } from 'lucide-react'
 
+// Counts here change whenever a flipper accepts/rejects/cancels/deletes a gig
+// the worker is attached to. Without these directives, Next.js will serve a
+// stale cached count even after the underlying claim is gone.
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 type TabKey = 'active' | 'applications' | 'history'
 
 const TABS: { key: TabKey; label: string }[] = [
