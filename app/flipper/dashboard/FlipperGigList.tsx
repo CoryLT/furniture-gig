@@ -63,6 +63,7 @@ export default function FlipperGigList({
   const supabase = createClient()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [sort, setSort] = useState<SortKey>('newest')
+  const [showArchived, setShowArchived] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<FlipperGig | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<FlipperGig | null>(null)
@@ -123,9 +124,21 @@ export default function FlipperGigList({
     }
   }
 
+  // How many archived gigs the user has — we show this in the toggle label
+  // so they know whether the toggle is worth flipping.
+  const archivedCount = useMemo(
+    () => gigs.filter((g) => g.status === 'archived').length,
+    [gigs]
+  )
+
   const visibleGigs = useMemo(() => {
     // Filter step
     let list = gigs.filter((g) => {
+      // Hide archived gigs unless the user explicitly toggled them on.
+      // This runs before the status-tab filter so archived stays out of
+      // 'All', 'Open', etc. by default.
+      if (g.status === 'archived' && !showArchived) return false
+
       switch (filter) {
         case 'all':
           return true
@@ -179,7 +192,7 @@ export default function FlipperGigList({
     }
 
     return list
-  }, [gigs, filter, sort, pendingClaimsByGig, totalClaimsByGig])
+  }, [gigs, filter, sort, showArchived, pendingClaimsByGig, totalClaimsByGig])
 
   return (
     <div className="space-y-4">
@@ -205,20 +218,34 @@ export default function FlipperGigList({
           })}
         </div>
 
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          Sort by
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
-            className="text-xs rounded-md border border-border bg-background px-2 py-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-          >
-            {SORTS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex items-center gap-4">
+          {archivedCount > 0 && (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+                className="rounded border-border accent-accent"
+              />
+              Show archived ({archivedCount})
+            </label>
+          )}
+
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            Sort by
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className="text-xs rounded-md border border-border bg-background px-2 py-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+            >
+              {SORTS.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       {/* List */}

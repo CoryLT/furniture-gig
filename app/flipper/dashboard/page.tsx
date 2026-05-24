@@ -51,8 +51,8 @@ export default async function FlipperDashboardPage() {
     {}
   )
 
-  // Stats
-  const totalGigs = gigs.length
+  // Stats — exclude archived from total count (they're hidden by default)
+  const totalGigs = gigs.filter((g) => g.status !== 'archived').length
   const activeGigs = gigs.filter((g) =>
     ['open', 'claimed', 'in_review'].includes(g.status)
   ).length
