@@ -14,6 +14,7 @@ import {
   Edit,
   Archive,
   Trash2,
+  Image as ImageIcon,
 } from 'lucide-react'
 import ConfirmActionModal from '@/components/shared/ConfirmActionModal'
 import { createClient } from '@/lib/supabase/client'
@@ -34,6 +35,7 @@ interface Props {
   gigs: FlipperGig[]
   totalClaimsByGig: Record<string, number>
   pendingClaimsByGig: Record<string, number>
+  thumbnailByGig?: Record<string, string>
 }
 
 type FilterKey = 'all' | 'needs_review' | 'open' | 'in_progress' | 'completed'
@@ -58,6 +60,7 @@ export default function FlipperGigList({
   gigs,
   totalClaimsByGig,
   pendingClaimsByGig,
+  thumbnailByGig = {},
 }: Props) {
   const router = useRouter()
   const supabase = createClient()
@@ -259,6 +262,7 @@ export default function FlipperGigList({
             const total = totalClaimsByGig[gig.id] ?? 0
             const pending = pendingClaimsByGig[gig.id] ?? 0
             const menuOpen = openMenuId === gig.id
+            const thumb = thumbnailByGig[gig.id]
 
             return (
               <div
@@ -273,8 +277,24 @@ export default function FlipperGigList({
                   <div className="flex items-start justify-between gap-4">
                     <Link
                       href={`/flipper/gigs/${gig.id}`}
-                      className="flex-1 min-w-0 block"
+                      className="flex-1 min-w-0 flex items-start gap-3"
                     >
+                      {/* Thumbnail (or placeholder) */}
+                      <div className="w-16 h-16 rounded-md overflow-hidden bg-muted border border-border shrink-0 flex items-center justify-center">
+                        {thumb ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={thumb}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <ImageIcon className="w-5 h-5 text-muted-foreground" />
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 flex-wrap">
                         <h3 className="font-semibold text-foreground group-hover:text-accent transition-colors">
                           {gig.title}
@@ -308,6 +328,7 @@ export default function FlipperGigList({
                           <Users className="w-3.5 h-3.5" />
                           {total} {total === 1 ? 'claim' : 'claims'}
                         </span>
+                      </div>
                       </div>
                     </Link>
 

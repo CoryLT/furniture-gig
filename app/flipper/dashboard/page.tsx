@@ -31,6 +31,26 @@ export default async function FlipperDashboardPage() {
         .in('gig_id', gigIds)
     : { data: [] }
 
+  // Load gig images so we can show a thumbnail per gig.
+  // One batched query, then we pick the lowest sort_order image per gig.
+  const { data: imagesRaw } = gigIds.length > 0
+    ? await supabase
+        .from('gig_images')
+        .select('gig_id, file_path, sort_order')
+        .in('gig_id', gigIds)
+        .order('sort_order')
+    : { data: [] }
+
+  // Build a public-URL lookup, first image per gig wins (because we ordered by sort_order)
+  const thumbnailByGig: Record<string, string> = {}
+  for (const img of (imagesRaw ?? []) as { gig_id: string; file_path: string }[]) {
+    if (!thumbnailByGig[img.gig_id]) {
+      thumbnailByGig[img.gig_id] = supabase.storage
+        .from('gig-images')
+        .getPublicUrl(img.file_path).data.publicUrl
+    }
+  }
+
   // Total claims per gig
   const totalClaimsByGig = (claims ?? []).reduce<Record<string, number>>(
     (acc, c: any) => {
@@ -217,6 +237,7 @@ export default async function FlipperDashboardPage() {
             gigs={gigs}
             totalClaimsByGig={totalClaimsByGig}
             pendingClaimsByGig={pendingClaimsByGig}
+            thumbnailByGig={thumbnailByGig}
           />
         )}
       </div>

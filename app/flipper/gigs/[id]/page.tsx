@@ -5,6 +5,8 @@ import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel, claimStatus
 import { MapPin, Calendar, Wrench, ArrowLeft, User, Pencil } from 'lucide-react'
 import OpenChatButton from '@/components/shared/OpenChatButton'
 import ApplicantActions from './ApplicantActions'
+import GigReferenceImages from '@/components/shared/GigReferenceImages'
+import type { GigImageRow } from '@/types/database'
 
 // Always fetch fresh — never cache this page
 export const dynamic = 'force-dynamic'
@@ -43,6 +45,15 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
     .single()
 
   if (!gig) notFound()
+
+  // Load reference images for this gig (same data as the worker sees)
+  const { data: imagesData } = await supabase
+    .from('gig_images')
+    .select('*')
+    .eq('gig_id', gig.id)
+    .order('sort_order')
+
+  const images = (imagesData ?? []) as GigImageRow[]
 
   // Load claims (no join — we fetch worker profiles separately to avoid
   // any silent embed-join failures from RLS)
@@ -226,6 +237,9 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
           </div>
         )}
       </div>
+
+      {/* Reference images you uploaded */}
+      <GigReferenceImages images={images} />
 
       {/* Submitted for review (worker is done, flipper needs to approve) */}
       {submittedClaim && (
