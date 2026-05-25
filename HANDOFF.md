@@ -6,7 +6,7 @@ You're picking up Cory's furniture-flipping gig platform. Read this whole thing 
 
 ## 🚀 SOFT-LAUNCH STATUS (as of May 25, 2026)
 
-**FlipWork is LIVE. Real Stripe, real money, real users.** First end-to-end live transaction completed successfully tonight. Worker received payout, flipper card was charged, webhooks fired correctly, everything worked.
+**FlipWork is LIVE and Facebook-group ready.** First end-to-end live transaction completed successfully a few sessions ago. As of this session, the public landing experience has been polished for a marketing push: founder note + photo, founding-member counter, "you're early" empty states, welcome modal on first login, and the admin side rebuilt as a real analytics dashboard.
 
 Critical context to know when picking up:
 - **Stripe is in LIVE mode.** No more sandbox/test. Every payment now is real.
@@ -17,6 +17,8 @@ Critical context to know when picking up:
 - **NC d/b/a "FlipWork" is filed** (Wake County, May 25, 2026, $26 paid). State will record in 1-3 business days and email a PDF certificate. Save it.
 - **NC LLC annual report is OUTSTANDING** — Groovy Greens, LLC is "Current-Active" but the 2025 annual report ($200) was not filed. Cory is waiting on cash. Hard deadline: before NC moves status to "Admin. Dissolved" (realistically summer 2026). After that the LLC veil is gone.
 - **Supabase is on Pro + Custom Domain add-on ($35/mo total).** Upgraded May 25, 2026 to hide the ugly `mopzoybaeyeaaaaiyrdk.supabase.co` URL that flashed during Google OAuth. Auth now lives at **`auth.myflipwork.com`** (Google OAuth callback = `https://auth.myflipwork.com/auth/v1/callback`). Pro tier also gets you daily backups (7-day retention) and prevents the project from pausing on inactivity. DNS records (CNAME `auth` → `mopzoybaeyeaaaaiyrdk.supabase.co` + TXT `_acme-challenge.auth` for SSL) live in Vercel DNS for myflipwork.com — don't delete them. Old supabase.co callback URL is still in Google OAuth's "Authorized redirect URIs" as a fallback for now; can be cleaned up after a week of confirmed working. The regular Supabase API/database calls still go through the supabase.co URL — only the auth flow uses the custom domain, which is normal.
+- **Founding-member system is LIVE.** First 25 worker and first 25 flipper signups auto-get a `founding_member=true` flag via a `BEFORE INSERT` trigger on each profile table. The landing page shows a live counter ("X worker + Y flipper founding spots left") via the `founding_member_counts()` RPC. Existing signups were backfilled in `created_at` order. Cap of 25 lives in `public.founding_member_cap()` if you ever want to bump it. See "Founding member system" section below.
+- **Welcome modal lives on `/home`** for any user whose `users.dismissed_welcome_modal_at` is null. Backfill marked all pre-existing users as already-dismissed so only true newcomers see it. Photo of Cory (`/public/cory-founder.jpg`) is shown in the modal AND in the landing-page founder note — same file. See "Welcome modal + founder note" section below.
 
 ---
 
@@ -92,6 +94,11 @@ After you push, Cory must:
 - **Flipper dashboard with filter/sort + needs-review highlights** — banner appears when any gig has pending applicants, dedicated stat tile, filter chips (All / Needs review / Open / In progress / Completed), sort dropdown (Newest / Oldest / Due soon / Most applicants), pending gigs always float to top under "All". Note: does NOT yet surface "work submitted, awaiting your review" — that's a known gap (see What's Next).
 - **AI support chat at `/support`** — Haiku 4.5 agent for logged-in users. Answers FAQs, looks up the user's own gigs/payouts/Stripe status, escalates serious issues. Admin queue at `/admin/support`. See "AI support chat" section below.
 - **Terms of Service + Privacy Policy v1.0 LIVE** — full ~10k-word documents seeded into `legal_agreements` table. Public read at `/legal/terms` and `/legal/privacy` (no login required, search-engine friendly). Logged-in users hitting `/marketplace` get force-redirected to `/auth/agreements` if anything required is unaccepted. New signups already hit the agreements flow naturally. Operating entity = Groovy Greens, LLC (NC) d/b/a FlipWork. Governing law = NC. Mandatory binding arbitration + class action waiver. See "Legal docs (TOS + Privacy)" section below.
+- **Founder note + photo on landing page** — `app/page.tsx` has a "Why I built FlipWork" section in Cory's voice, with his actual headshot at `/public/cory-founder.jpg` (Carhartt-hat photo, cropped tight, EXIF stripped). Sits between the two-sided pitch and marketplace teaser, in a narrower `max-w-3xl` container so it reads like a personal note. The link at the bottom of the card points to `/support` (the AI agent) NOT to Cory's inbox — privacy preserved.
+- **"You're early" empty states** — `MarketplaceFeed.tsx`, `GigFilterContent.tsx`, and `/home`'s brand-new-user welcome card now show messaging that reframes empty boards as "FlipWork just launched" with a clear CTA, instead of "Nothing here yet" which read as broken.
+- **Founding member system** — first 25 worker signups and first 25 flipper signups auto-get a `founding_member=true` flag (boolean + timestamp on each profile table). Trigger fires `BEFORE INSERT` on `worker_profiles` / `flipper_profiles`, checks current count, flags the row if under cap. `FoundingMemberBadge` component shows on public profiles (small gold pill, two sizes). Landing page shows live counter via `founding_member_counts()` RPC (SECURITY DEFINER, grants execute to anon — logged-out visitors can see the count without seeing the underlying profile data). Cap = 25, defined in `public.founding_member_cap()`. See "Founding member system" section below.
+- **Welcome modal on first `/home` visit** — `components/shared/WelcomeModal.tsx` overlays the dashboard for any user with `users.dismissed_welcome_modal_at = null`. Warm personal welcome from Cory (no em dashes — those are an AI tell), photo + name + "Founder, FlipWork" signature, single "Let's go!" CTA. POSTs to `/api/welcome/dismiss` to mark dismissed, then closes locally. Backfill marked all pre-existing users as already-dismissed so only true newcomers see it.
+- **Admin side fully rebuilt** — `/admin` is now an analytics dashboard (4 hero stat tiles, 30-day money chart, ops tiles, attention-required card, recent activity feed). The old "post a gig" / "edit any gig" admin tools are GONE from the UI — `/admin/gigs` is read-only now (just a sortable list, no actions). The underlying routes `/admin/gigs/new` and `/admin/gigs/[id]/edit` still exist (untouched, so nothing breaks if you visit them directly), they're just not linked from anywhere. All gig posting/editing happens on the user side now: `/flipper/post-gig`, `/flipper/dashboard`, `/flipper/gigs/[id]/edit`.
 
 ---
 
@@ -329,6 +336,69 @@ Only one row was affected (Cory's own worker profile) — he's been the only tes
 2. **Vercel env var edit form is misleading.** The value shown in the edit text area is sometimes a hover preview of what was just typed, not what's actually saved. Don't trust the visual — verify by hitting `/api/stripe/health` after every change.
 3. **Vercel doesn't auto-redeploy on env var changes.** Same gotcha as always — env var update + redeploy with cache OFF is two steps, not one. If you change an env var, IMMEDIATELY trigger a redeploy with "Use existing Build Cache" unchecked. Otherwise the new value isn't running.
 4. **When the runtime error message is identical character-for-character across multiple changes**, the issue is almost always: (a) the deployment didn't actually rebuild, (b) you're looking at a cached browser response, or (c) the new value is wrong in a way you haven't noticed (e.g. you saved the same wrong value twice). Diagnostic logging beats guessing every time.
+
+---
+
+## Launch-polish package (DONE — shipped this session, May 25, 2026)
+
+This was the pre-Facebook-group-launch polish pass. No new core systems, but a lot of small high-leverage UX work to turn a working-but-empty app into one that explains itself, builds trust, and creates urgency to sign up. All shipped in 6 commits.
+
+### What landed
+
+**Empty states reframed as "you're early"** (`185cdfd`)
+- Truly-empty marketplace now reads "FlipWork just launched. The marketplace is still filling in. Be one of the first to list a piece" with a Post a listing CTA.
+- Truly-empty gigs board reads "FlipWork just launched. Gigs are still rolling in. Check back soon — or be one of the first to post a project."
+- The brand-new-user welcome card on `/home` now opens with "You're early — FlipWork just launched" before the existing CTAs.
+- Filtered-to-nothing states are kept separate from truly-empty — different copy, different CTAs.
+
+**Founder note on landing page** (`e048b1f`, photo added in `f3ccb25`)
+- "Why I built FlipWork" section in `app/page.tsx`. Cory's voice, three short paragraphs about why he built it (FB Marketplace scams + Craigslist sketchiness), explicit "everything you see is real" line, support-team link at the bottom (NOT his inbox — privacy decision).
+- Photo at `/public/cory-founder.jpg` — 600x600, ~88KB JPEG, EXIF stripped, tight crop on his head and shoulders against trees so no identifying background.
+- Sits in a narrower `max-w-3xl` container so it reads like a personal note vs a marketing block.
+
+**Test gig cleanup** (`200c96b`)
+- `supabase/cleanup_test_gigs_20260525.sql` deleted 10 admin-created test gigs by title match. 2 gigs that had touched real Stripe money were archived instead of deleted (money records preserved). The whole site was full of "asdfg" and "tttttt" before.
+
+**Admin side rebuilt as analytics** (`87aac67`)
+- `/admin` was a quick-links page with a "New gig" button. It's now a real analytics dashboard:
+  - 4 hero stat tiles (total users + this week, total gigs + this week, total $ moved through platform, platform fees earned at 2%)
+  - 30-day money flow chart (hand-rolled SVG, same style as the `/home` ActivityChart)
+  - 4 ops tiles (open gigs, active claims, live listings, all-settled-yes/no)
+  - "Needs your attention" card that only renders when there's something to address (escalated support, flagged images, flagged listings)
+  - Recent activity feed of 20 events across signups / gigs / listings / payments
+- `/admin/gigs` is now read-only. Title links to the public gig page so admin can see what users see, but no per-row Edit, no New gig button.
+- The underlying `/admin/gigs/new` and `/admin/gigs/[id]/edit` routes still exist (untouched code) but nothing in the UI links to them.
+
+**Founding member system** (`1ca7cb4`)
+- `supabase/founding_members_20260525.sql`:
+  - Adds `founding_member` boolean + `founding_member_at` timestamptz to `worker_profiles` and `flipper_profiles`
+  - `founding_member_cap()` function returns 25 (one place to change)
+  - Backfilled the first 25 of each by `created_at` order
+  - `BEFORE INSERT` triggers on both profile tables: on new row, if `count(founding_member=true) < cap`, set `founding_member = true` automatically. SECURITY DEFINER + explicit search_path for safety.
+  - `founding_member_counts()` RPC: SECURITY DEFINER, grants execute to anon + authenticated. Returns `(workers_taken, flippers_taken, cap)`. This is what lets the logged-out landing page show the counter without exposing the profile tables.
+- `components/shared/FoundingMemberBadge.tsx` — small gold/amber pill with a Sparkle icon. Two sizes (sm, md). Reusable.
+- Public profile (`/u/[username]`) shows the badge under @username if either the worker_profiles or flipper_profiles row has `founding_member = true`.
+- Landing page (`app/page.tsx`) shows a live counter pill under the hero CTAs: "X worker + Y flipper founding spots left". Hidden once both sides hit the cap.
+
+**Welcome modal on first `/home` visit** (`a5fc2b2`, photo in `f3ccb25`)
+- `supabase/welcome_modal_20260525.sql` adds `users.dismissed_welcome_modal_at timestamptz`. Backfill marked every user who signed up >5 minutes before migration as already-dismissed.
+- `components/shared/WelcomeModal.tsx` — client component, fixed-position overlay with backdrop blur. Warm welcome message in Cory's voice (no em dashes), photo + name + "Founder, FlipWork" signature, single "Let's go!" CTA. On click, POSTs to `/api/welcome/dismiss` and closes locally. Network failure still closes locally (worst case they see it once more).
+- `app/api/welcome/dismiss/route.ts` — POST endpoint, sets the column to `now()` for the authenticated user.
+- Wired into `app/home/page.tsx` — expanded the existing user-row fetch to include the column, mounted `<WelcomeModal />` conditionally at the top of the return tree.
+
+### Pattern carry-over for next session
+
+1. **`auth.uid()` in the Supabase SQL Editor doesn't work** — see "Watch out for". When handing Cory a one-off admin SQL, always use email or hardcoded user_id, never `auth.uid()`.
+2. **Profile-table flags + a backfill + a trigger** is the right pattern for any future "early users get X" feature (e.g. if you add a "verified flipper" badge, an early-adopter tier, etc.). Reference the founding-member SQL as the template.
+3. **`SECURITY DEFINER` + `grant execute to anon` on an RPC** is how the landing page (logged-out!) reads aggregate data without exposing the underlying tables. Reuse this pattern for any other "public counter" need.
+4. **Founder photo file:** if you add a third place that needs Cory's photo, reuse `/public/cory-founder.jpg`. Don't make a second copy.
+
+### Three things that did NOT happen
+
+These were considered and consciously deferred:
+- **Photo on the welcome modal was a separate commit from the modal itself.** The modal shipped with a text-only signature first because the landing page had an unmatched `<img src="/cory-founder.jpg">` reference (the photo file was missing for a session). The photo file was added later, and the modal updated to use the same path.
+- **No "share FlipWork" button on the welcome modal.** Was floated as an option ("highest-ROI choice for evangelism") but Cory chose a simpler "Let's go!" dismiss-only flow. Could be added later if growth stalls.
+- **No Facebook-group post copy drafted yet.** Cory was offered draft FB-group posts at the end of the session and chose to update HANDOFF.md instead.
 
 ---
 
@@ -973,37 +1043,56 @@ The TOS currently says "(Mailing address available on request)" because Cory doe
 - **Testing OAuth changes:** always test in a fresh incognito window on the actual `myflipwork.com` domain. Starting on a vercel.app URL produces the bad version of the flow.
 - **Vercel has a hard 4.5MB body limit** on serverless functions — bigger requests get a `413 FUNCTION_PAYLOAD_TOO_LARGE` at the gateway, which returns HTML (not JSON). Every client form should compress images >1MB via `lib/imageCompression.ts` before upload AND wrap `res.json()` in try/catch. There are 6 live upload paths all using this pattern — if you add a 7th, mirror it. The cedar-bed JPEG (4.6MB iPhone original) is a good reproducer.
 - **⚠️ OPEN BUG (left at end of session): marketplace card thumbnails show blank gray boxes on `/marketplace`** for at least 3 listings that DO have photos uploaded. The detail page for those same listings (`/marketplace/<slug>`) renders the photos fine. So photos exist in `marketplace_photos`, the storage bucket public-URL flow works, RLS allows public reads (`status in ('active', 'sold')`) — but the listing-page batched query somehow isn't surfacing them. Schemas and queries between `/marketplace` and the detail page look identical. A diagnostic `console.log('[marketplace] photo query', ...)` is currently in `app/marketplace/page.tsx` to dump `requested_listing_ids`, `returned_photo_count`, and the first few rows. Next session: get Cory to load `/marketplace` while logged in, then read the Vercel function logs to see what Supabase actually returns. Most likely culprits: (a) a sneaky type mismatch between `listing.id` and `marketplace_photos.listing_id` in the `.in()` filter, (b) some pre-existing data state where photos are orphaned to listings that aren't in the visible top-60, (c) something weird about the `.order('sort_order')` + tied `sort_order=0` values changing the result set. Remove the diagnostic log once fixed.
+- **🚨 `auth.uid()` in the Supabase SQL Editor returns NULL silently.** It only resolves inside a Supabase API request context with a real session. If you write an SQL snippet that uses `auth.uid()` and tell Cory to paste it into the editor, the WHERE clause matches zero rows and the update LOOKS LIKE it succeeded ("Success. No rows returned"). Always use a concrete identifier (email or user_id) when handing Cory a one-off admin SQL. This bit us debugging the welcome modal dismissal — wasted 5 minutes thinking the modal was broken when the SQL had simply done nothing.
+- **Admin posting UI is hidden, not deleted.** `/admin/gigs/new` and `/admin/gigs/[id]/edit` still exist as routes. They're untouched code. No nav surface in the app links to them, but if someone bookmarks them or types the URL they still work. If you ever truly delete these, do a full grep first — there's also a `/admin/payouts` page and an admin gigs read-only page that need to stay intact.
+- **Founder photo at `/public/cory-founder.jpg`** is used by BOTH the landing page founder note AND the welcome modal. Same file, same path. Don't rename it without updating both consumers (`app/page.tsx` and `components/shared/WelcomeModal.tsx`). The image has had EXIF stripped (no GPS leaks) and is intentionally a tight head-and-shoulders crop with no identifying background.
+- **Welcome modal won't show for existing users.** The SQL backfill in `supabase/welcome_modal_20260525.sql` deliberately marks every user who signed up >5 minutes before the migration as already-dismissed. To test the modal yourself, reset YOUR row with `update public.users set dismissed_welcome_modal_at = null where email = '<your-email>';` (NOT `auth.uid()` — see above). Then hard-refresh `/home` (Ctrl+Shift+R) — soft refresh may show cached HTML.
 
 ---
 
 ## What's next (next session)
 
-**This session: launch-prep UX cleanup — new landing page, post-auth routing, legal links in nav.** Four commits, no schema changes, no SQL. All focused on making the app's front door explain itself to first-time visitors.
+**This session: launch-polish package for the Facebook-group push.** Six commits, two SQL migrations, no new core systems. All focused on turning a working-but-empty app into one that explains itself and creates urgency to sign up. See "Launch-polish package" section above for the full breakdown. Headline items:
+
+1. **Empty states reframed as "you're early"** across marketplace, gigs board, and `/home` welcome card.
+2. **Founder note on landing page** with Cory's actual photo.
+3. **10 test gigs deleted + 2 archived** via `supabase/cleanup_test_gigs_20260525.sql`.
+4. **`/admin` rebuilt as analytics dashboard** (hero tiles, money chart, activity feed). Admin gig-posting UI hidden.
+5. **Founding member system** — first 25 of each role get auto-flagged, badge shows on profiles, live counter on landing page.
+6. **Welcome modal on first `/home` visit** with photo + warm copy + "Let's go!" CTA.
+
+**SQL migrations to be aware of:** `supabase/cleanup_test_gigs_20260525.sql`, `supabase/founding_members_20260525.sql`, `supabase/welcome_modal_20260525.sql`. Cory has already run all three.
+
+**Diagnostic temporarily added in a previous session:** `app/marketplace/page.tsx` STILL has a `console.log('[marketplace] photo query', ...)` to debug the open card-thumbnail bug (see "Watch out for" entry). Remove once that's fixed — it's been there a few sessions now.
+
+**Pattern carry-over for next session:** when handing Cory a one-off admin SQL, NEVER use `auth.uid()` — it returns null silently in the SQL Editor. Match on email or hardcoded user_id. See "Watch out for" entry.
+
+**Roadmap signal worth remembering:** Cory still wants `/home` to become a real social feed (posts, follow/follower, activity feed, groups, before/after threads). NOT a "next sprint" item — but the current dashboard is fine and a social-feed pivot would be a meaningful rebuild.
+
+---
+
+**Two sessions ago: launch-prep UX cleanup — new landing page, post-auth routing, legal links in nav.** Four commits, no schema changes, no SQL. All focused on making the app's front door explain itself to first-time visitors.
 
 1. **Real marketing landing page at `/`.** Replaces the "redirect to /marketplace" front door that's been in place for a few sessions. The marketplace feed was a confusing first impression for new visitors — they couldn't tell what FlipWork even did. New page has a hero ("Hire a flipper. Or become one."), a 3-step "How it works", side-by-side "for posters / for workers" cards, a marketplace teaser, and a final CTA. See "New landing page" section above for the full file map.
 2. **Post-login destination flipped from `/marketplace` → `/home`.** Three files (email login server action, client login page, OAuth set-session route). `?next=` safe deep-links still take priority — only the no-next fallback changes.
 3. **Logged-in nav logo points to `/home`** instead of `/marketplace`. Matches the new landing flow (logo = take me home, where "home" is wherever you start after login). Admin logo unchanged.
 4. **Terms + Privacy links added to the logged-in hamburger menu.** Logged-in users previously had no way to find the legal docs from inside the app. Small side-by-side `Terms · Privacy` row at the bottom of the dropdown above Logout. Same visual style as the landing-page footer.
 
-**Diagnostic temporarily added:** `app/marketplace/page.tsx` has a `console.log('[marketplace] photo query', ...)` to debug the open card-thumbnail bug (see "Watch out for" entry). Remove once that's fixed.
-
-**Pattern carry-over for next session:** the landing page is single-file (`app/page.tsx`, ~230 lines) on purpose — easier to iterate. If it grows, split into section components in a `components/landing/` folder. Don't add an app-wide footer to logged-in pages without checking with Cory — that was a deliberate "modern apps drop the footer" call.
-
-**Roadmap signal worth remembering:** Cory mentioned wanting `/home` to become a real social feed (posts, follow/follower, activity feed, groups, before/after threads). That's a future direction — NOT a "next sprint" item, but worth keeping in mind when touching `/home`. The current dashboard architecture is fine for now; the social-feed pivot would be a meaningful rebuild.
+**Pattern carry-over from that session:** the landing page is single-file (`app/page.tsx`, ~230 lines — now ~270 after this session's founder-note addition) on purpose — easier to iterate. If it grows past ~400 lines, split into section components in a `components/landing/` folder. Don't add an app-wide footer to logged-in pages without checking with Cory — that was a deliberate "modern apps drop the footer" call.
 
 ---
 
-**Two sessions ago: launch-prep cleanup + full TOS/Privacy Policy v1.0 shipped.** Three commits, focused on closing one of the two biggest pre-launch blockers (legal docs) plus a repo-hygiene cleanup:
+**Three sessions ago: launch-prep cleanup + full TOS/Privacy Policy v1.0 shipped.** Three commits, focused on closing one of the two biggest pre-launch blockers (legal docs) plus a repo-hygiene cleanup:
 
 1. **Cleaned up 23 empty junk files** at the repo root that had been there since `9b1d2b2` (the worker city filter commit). Pure mechanical fix. Verified via `git show` that all were 0 bytes from creation, never had content. Single commit: `85c2f24`.
-2. **Full TOS + Privacy Policy v1.0 shipped end-to-end.** Source markdown in `legal/*.md`, generator at `scripts/generate_legal_sql.py`, SQL migrations, public read pages at `/legal/terms` and `/legal/privacy`, and runtime gate wired into `/marketplace` so existing logged-in users get caught. See "Legal docs (TOS + Privacy)" section. Also generated the **Cory's non-code TODOs walkthrough section** with step-by-step instructions for the NC LLC good-standing check, NC d/b/a filing, Stripe business name update, and lawyer review.
-3. **Hot-fix:** when Cory first visited `/legal/terms`, the page showed "document not available." Root cause was the original schema's RLS policy requiring `auth.uid() is not null` for SELECT — blocking logged-out viewers from reading public legal docs. Patched via `supabase/schema_legal_agreements_public_read.sql`. Cory ran the SQL and both pages now render correctly.
+2. **Full TOS + Privacy Policy v1.0 shipped end-to-end.** Source markdown in `legal/*.md`, generator at `scripts/generate_legal_sql.py`, SQL migrations, public read pages at `/legal/terms` and `/legal/privacy`, and runtime gate wired into `/marketplace` so existing logged-in users get caught. See "Legal docs (TOS + Privacy)" section.
+3. **Hot-fix:** when Cory first visited `/legal/terms`, the page showed "document not available." Root cause was the original schema's RLS policy requiring `auth.uid() is not null` for SELECT — blocking logged-out viewers from reading public legal docs. Patched via `supabase/schema_legal_agreements_public_read.sql`.
 
 **Pattern carry-over from that session:** the source-markdown-to-DB-via-generator pattern (`legal/*.md` → `scripts/generate_legal_sql.py` → `supabase/schema_legal_agreements_v1.sql` → DB row) is a clean way to keep large blocks of content versioned in git AND in the DB. Could be reused for support FAQs, email templates, or anything else that's "text in the DB but humans want to edit it like a file."
 
 ---
 
-**Three sessions ago: small focused UX polish around gig previews — no new systems, no schema changes, no SQL.** Four commits, all in `/gigs` and `/flipper/dashboard` territory:
+**Four sessions ago: small focused UX polish around gig previews — no new systems, no schema changes, no SQL.** Four commits, all in `/gigs` and `/flipper/dashboard` territory:
 
 1. **Reference images now visible on the flipper side too.** The flipper dashboard list shows a 64px thumbnail per gig (first image by `sort_order`, placeholder icon if none). The flipper gig detail page renders the full reference-image grid using the existing `GigReferenceImages` component. Image URLs are built on the server in one batched query.
 2. **Own posted gigs now appear in the worker browse feed**, mixed in by date with everyone else's, marked with a small "Your post" badge under the status pill. Footer link reads "View as worker" on own posts. The existing `isOwnPostedGig` branch on `/gigs/[slug]` already prevents claiming and shows a "You posted this gig" panel, so no extra detail-page work was needed. Cory wanted this so he can see his gig the way workers see it without using a second account.
@@ -1013,7 +1102,7 @@ The TOS currently says "(Mailing address available on request)" because Cory doe
 
 ---
 
-**Four sessions ago: killed two major iPhone bugs** — the photo upload hang and the OAuth hang. See "Older commits" and the bugfix notes below for details. Tl;dr: Vercel 4.5MB body limit triggered 413s that returned non-JSON HTML, crashing every `res.json()` call silently. Fix was client-side image compression + try/catch around every res.json(). And Supabase Site URL was set to the vercel.app domain, which made OAuth redirect through the `*.vercel.app → myflipwork.com` 308 — and 308s strip URL fragments, so the auth token vanished. Fix was setting Supabase Site URL to `https://myflipwork.com` directly.
+**Five sessions ago: killed two major iPhone bugs** — the photo upload hang and the OAuth hang. See "Older commits" and the bugfix notes below for details. Tl;dr: Vercel 4.5MB body limit triggered 413s that returned non-JSON HTML, crashing every `res.json()` call silently. Fix was client-side image compression + try/catch around every res.json(). And Supabase Site URL was set to the vercel.app domain, which made OAuth redirect through the `*.vercel.app → myflipwork.com` 308 — and 308s strip URL fragments, so the auth token vanished. Fix was setting Supabase Site URL to `https://myflipwork.com` directly.
 
 ---
 
@@ -1069,40 +1158,57 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
+- `f3ccb25` Founder photo: add cory-founder.jpg + show it in welcome modal. Adds the actual JPEG to `/public/cory-founder.jpg` (the landing page founder note had been 404'ing on it) and updates `WelcomeModal.tsx` to show the same photo in a small circle next to "Cory / Founder, FlipWork" signature.
+- `a5fc2b2` Welcome modal: one-time popup on first /home visit. Three new files: `supabase/welcome_modal_20260525.sql` (adds `users.dismissed_welcome_modal_at`, backfills existing users as already-dismissed), `app/api/welcome/dismiss/route.ts` (POST to mark dismissed), `components/shared/WelcomeModal.tsx` (the actual modal). Wired into `app/home/page.tsx` — modal mounts when `dismissed_welcome_modal_at` is null. Warm copy in Cory's voice with photo + name + "Founder, FlipWork" signature, single "Let's go!" CTA.
+- `8f39459` Landing: add Cory's photo to the founder note. (Photo file added in a later commit `f3ccb25` — this commit just added the `<img>` reference, which then 404'd until the file landed.)
+- `1ca7cb4` Founding Member badge: badge + auto-grant trigger + landing counter. `supabase/founding_members_20260525.sql` adds `founding_member` + `founding_member_at` columns to both profile tables, backfills first 25 of each by created_at, BEFORE INSERT triggers auto-grant to new rows when under the cap, `founding_member_counts()` RPC (SECURITY DEFINER, grants execute to anon) lets the logged-out landing page count without exposing profile data. `components/shared/FoundingMemberBadge.tsx` is a small gold pill with a Sparkle icon. Public profile renders the badge under @username if either profile table flag is true. Landing page hero shows live "X worker + Y flipper founding spots left" counter.
+- `87aac67` Admin: replace landing with analytics dashboard, make /admin/gigs read-only. `/admin` is now a real dashboard (4 hero tiles, 30-day money chart, ops tiles, attention-required card, recent activity feed). `/admin/gigs` lost the New gig button and per-row Edit buttons — it's a read-only data table now. Underlying `/admin/gigs/new` and `/admin/gigs/[id]/edit` routes still exist but nothing links to them.
+- `200c96b` SQL: cleanup of 12 admin test gigs. `supabase/cleanup_test_gigs_20260525.sql` deleted 10 admin-created test gigs by title match. 2 gigs with real Stripe payment data were ARCHIVED instead (money records preserved). Cascade FKs cleaned up associated claims, checklist items, photo uploads, gig_conversations, gig_messages. Safe to re-run.
+- `e048b1f` Landing: add founder note between two-sided pitch and marketplace teaser. New "Why I built FlipWork" section in `app/page.tsx`, narrower `max-w-3xl` container, three short paragraphs in Cory's voice, support-team link at the bottom (NOT his inbox).
+- `185cdfd` Empty states: reframe as "you're early" for marketplace, gigs, and new-user welcome. Three small copy changes in `MarketplaceFeed.tsx`, `GigFilterContent.tsx`, and `app/home/page.tsx` to make truly-empty states sound intentional instead of broken. No logic changes.
+
+### What got accomplished this session beyond the commits
+
+- **Test gig audit and cleanup.** 12 random/test gigs were polluting the marketplace and gigs board. Cory shared the list, we agreed to nuke them, SQL cleanup ran in production. 10 hard-deleted, 2 archived (Stripe money already touched). Site is now Facebook-group-presentable.
+- **Modal verification.** Cory initially trusted the modal was working, then I pushed back ("the cost of a stranger seeing a broken modal is higher than 30 seconds of testing"). We found the bug: the SQL I gave him to reset his own dismissed-flag used `auth.uid()` which returns null silently in the Supabase SQL Editor. Replaced with email-match SQL, modal verified working. See "Watch out for" entry.
+- **Founder photo cropped and shipped.** Cory's Carhartt-hat selfie cropped tight (head + shoulders, no identifying background), EXIF stripped, saved at `/public/cory-founder.jpg`. Used in two surfaces now (landing founder note + welcome modal).
+- **HANDOFF.md updated** with this session's work.
+
+### Lessons learned this session (read before debugging anything DB-related)
+
+**The `auth.uid()` in Supabase SQL Editor trap.** I handed Cory a SQL snippet that used `update users set X = null where id = auth.uid()` to reset his own welcome modal dismissal flag. He ran it, refreshed, modal didn't pop. He almost shrugged it off ("I'm sure it's fine"). It was NOT fine — `auth.uid()` returns null in the SQL Editor (no session context), so the WHERE clause matched zero rows, update silently did nothing. Always match on email or hardcoded user_id when handing Cory admin SQL.
+
+**Test the experience yourself, even when you think you're sure.** When Cory said "no popup happened" my first instinct was right (existing users are backfilled as dismissed, so logging in as himself wouldn't show it). But I should have caught the `auth.uid()` bug pre-handoff. Going forward: any SQL that has to work in the Supabase SQL Editor needs to be tested mentally against the "no session context" case.
+
+**Cory's instincts about marketing copy are good.** He spotted em dashes as an AI tell and asked for a rewrite. He asked about the test-account thing eating a founding-member spot before I thought to warn him. Trust his pattern-matching — when he flags something, dig in.
+
+## Previous session's commits
+
 - `e3c4ce7` Re-trigger deploy after deletion of `082a5d6`: tiny comment in `app/api/stripe/health/route.ts`. The previous diagnostic deployment was deleted before completing, so this just kicks Vercel to build the same diagnostic code that was already in `082a5d6`.
 - `082a5d6` Add env var diagnostic to `/api/stripe/health`: returns first 10 chars + length of `STRIPE_SECRET_KEY_LIVE`, legacy `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, plus all env var names containing "STRIPE". Admin-only. This is what finally surfaced the real bug — `STRIPE_SECRET_KEY_LIVE` literally contained a `whsec_...` value (Cory had been pasting the webhook signing secret into the secret key field). **Decision pending:** Cory may want this diagnostic block stripped — `/api/stripe/health` is admin-gated so the leak is contained, but trimming it back to a basic ok/not-ok response is a 30-second cleanup commit.
 - `a2072ed` Disable caching on all Stripe API routes: added `export const dynamic = 'force-dynamic'` + `revalidate = 0` to all `app/api/stripe/**/route.ts` files. Done while debugging the auth error — we suspected (incorrectly, as it turned out) that Next.js was serving cached error responses. Keep this pattern for any new Stripe routes regardless.
 - `71cbf5f` Rename `STRIPE_SECRET_KEY` → `STRIPE_SECRET_KEY_LIVE`: touched 7 files (`lib/stripe.ts` + 6 route handlers). Done mid-debugging to bypass anything that might be shadowing the old name (no evidence anything was, but renaming was a clean nuclear option). The rename stuck because it's a useful sanity-belt — guarantees no code path can accidentally read a stale test-mode value. **Anything new that needs the Stripe secret key reads `STRIPE_SECRET_KEY_LIVE` now.**
 - `bbd9edb` Force cold start of cached Stripe client after live-mode cutover: build marker comment in `lib/stripe.ts`. Was an attempted fix for the auth bug (thinking module-level `new Stripe(...)` was holding the old key in a warm function instance). Didn't help, but the comment is harmless.
-- `89a3ce8` Add SQL to reset test-mode Stripe data after live-mode cutover: `supabase/schema_reset_test_mode_connect.sql`. Clears `worker_profiles.stripe_account_id` + 4 status flags, `users.stripe_customer_id`, and `payout_records` Stripe IDs. Three-step format (preview / reset / verify), safe to re-run. Only one row was affected (Cory) — he's been the only test user. Re-run safely if any other test-mode users surface later.
+- `89a3ce8` Add SQL to reset test-mode Stripe data after live-mode cutover: `supabase/schema_reset_test_mode_connect.sql`. Clears `worker_profiles.stripe_account_id` + 4 status flags, `users.stripe_customer_id`, and `payout_records` Stripe IDs. Three-step format (preview / reset / verify), safe to re-run.
 
-### What got accomplished this session beyond the commits
+### Notes from previous session (Stripe go-live)
 
-- **Stripe Phase 9 (go-live) is DONE.** First real $1 transaction completed end-to-end. Worker received payout, flipper card charged, webhooks fired correctly, all state transitions verified in production.
-- **Live Stripe API keys** swapped into Vercel (publishable, secret, webhook signing secret all in `STRIPE_SECRET_KEY_LIVE`/`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`/`STRIPE_WEBHOOK_SECRET`).
+- **Stripe Phase 9 (go-live) is DONE.** First real $1 transaction completed end-to-end. Worker received payout, flipper card charged, webhooks fired correctly.
+- **Live Stripe API keys** swapped into Vercel.
 - **Live webhook destination** created at `dashboard.stripe.com/webhooks` — "Connected accounts" scope, all 8 event types subscribed.
-- **NC d/b/a "FlipWork"** filed with Wake County Register of Deeds — $26 paid, pending recording (1-3 business days).
-- **Groovy Greens, LLC good-standing** verified at sosnc.gov. 2025 annual report ($200) is outstanding — Cory is deferring until cash is available.
-- **Database cleaned** of test-mode Stripe IDs (one affected row, Cory's worker profile).
-- **Diagnostic endpoint built** at `/api/stripe/health` — admin-only sanity check that returns Stripe account status + env var prefixes + length. Critical for any future Stripe debugging — hit this FIRST before guessing.
+- **NC d/b/a "FlipWork"** filed with Wake County Register of Deeds.
+- **Database cleaned** of test-mode Stripe IDs.
+- **Diagnostic endpoint built** at `/api/stripe/health`.
 
-### Lessons learned this session (read before debugging Stripe stuff again)
-
-The Stripe auth bug took ~3 hours to find because we kept guessing. The root cause was Cory copy/pasting the webhook signing secret (`whsec_...`) into the `STRIPE_SECRET_KEY_LIVE` field. The Vercel edit UI made this hard to catch — it showed a hover-preview of an `sk_live_...` value rather than what was actually saved.
-
-**For future Stripe debugging:** ALWAYS hit `/api/stripe/health` as admin first to see what's actually in the env vars. The masked error from Stripe (`Invalid API Key provided: whsec_Fd*****xKbL`) was telling us exactly what was wrong from the very first failure, but we kept treating it as a generic "bad key" rather than reading the prefix.
-
-**For future Stripe setup:** the API Secret Key (`sk_live_...`, ~107 chars, at `dashboard.stripe.com/apikeys`) and the Webhook Signing Secret (`whsec_...`, ~38 chars, at `dashboard.stripe.com/webhooks` → destination → Signing secret) are two completely different things despite both being called "secrets" by Stripe. Mixing them up will produce exactly the cryptic auth-error symptom we saw.
-
-## Previous session's commits
-
-- `56a5e77` Add Terms + Privacy links to logged-in hamburger menu: side-by-side `Terms · Privacy` row in `components/shared/Nav.tsx`, tucked between Support and Logout with a separator above and below. Small font, low-emphasis (`text-muted-foreground`), matches the landing-page footer style. Closes a real gap — logged-in users previously had no way to reach the legal docs from inside the app.
-- `96b2a13` Logged-in nav logo points to `/home` instead of `/marketplace`: single-line change to `logoHref` in `components/shared/Nav.tsx`. Admin logo (`/admin`) unchanged. Matches the new "logo = home base" pattern now that `/home` is the post-login landing.
-- `61f25ef` Add temporary diagnostic logs to marketplace photo query: server-side `console.log('[marketplace] photo query', ...)` in `app/marketplace/page.tsx` dumping `requested_listing_ids`, `returned_photo_count`, and the first 3 rows. Added because card thumbnails are blank on `/marketplace` for listings that DO have photos (detail page shows them fine). REMOVE after the bug is fixed. See "Watch out for" entry.
-- `57dae08` Post-login destination: send users to `/home`, not `/marketplace`: three files (`app/auth/login/actions.ts`, `app/auth/login/page.tsx`, `app/api/auth/set-session/route.ts`). `?next=` safe deep-links still take priority — only the no-next fallback changes. The `agreements-gate.ts` fallback was deliberately left as `/marketplace` (it's a "drop them somewhere sensible after the gate" target, not a login destination).
-- `986c159` New marketing landing page at `/` for logged-out visitors: replaces the bare `redirect('/marketplace')` that had been the front door. Logged-in users now redirect to `/home`; logged-out users see the new landing page. Sections: hero with "Hire a flipper. Or become one.", 3-step "How it works", two-sided "For posters / For workers" cards, marketplace teaser, final CTA, footer with Terms/Privacy. Reuses `PublicTopBar`, `Button`, and brand fonts/colors. Single-file (~230 lines) on purpose. See "New landing page" section above.
+The Stripe auth bug took ~3 hours to find because of guessing. Root cause was Cory pasting the webhook signing secret (`whsec_...`) into the `STRIPE_SECRET_KEY_LIVE` field. **For future Stripe debugging:** ALWAYS hit `/api/stripe/health` as admin first to see what's actually in the env vars.
 
 ## Two-sessions-ago commits
+
+- `56a5e77` Add Terms + Privacy links to logged-in hamburger menu: side-by-side `Terms · Privacy` row in `components/shared/Nav.tsx`, tucked between Support and Logout with a separator above and below.
+- `96b2a13` Logged-in nav logo points to `/home` instead of `/marketplace`: single-line change to `logoHref` in `components/shared/Nav.tsx`. Admin logo (`/admin`) unchanged.
+- `61f25ef` Add temporary diagnostic logs to marketplace photo query: server-side `console.log('[marketplace] photo query', ...)` in `app/marketplace/page.tsx`. Added because card thumbnails are blank on `/marketplace` for listings that DO have photos. REMOVE after the bug is fixed. See "Watch out for" entry.
+- `57dae08` Post-login destination: send users to `/home`, not `/marketplace`: three files. `?next=` safe deep-links still take priority — only the no-next fallback changes.
+- `986c159` New marketing landing page at `/` for logged-out visitors: replaces the bare `redirect('/marketplace')` that had been the front door. Logged-in users now redirect to `/home`; logged-out users see the new landing page.
 
 - `7e91e09` Fix /legal/terms and /legal/privacy showing as 'not available': the original schema's RLS SELECT policy on `legal_agreements` was `using (auth.uid() is not null and active = true)`, which blocked logged-out visitors — but the whole point of public legal pages is that logged-out visitors can read them. Created `supabase/schema_legal_agreements_public_read.sql` which drops the auth-required policy and replaces with `using (active = true)`. Admin-management policy on the same table untouched. Cory ran the SQL and confirmed both pages now render.
 - `6bceccd` Add full TOS + Privacy Policy v1.0 + public legal pages + agreements gate: the big one. ~10k-word Terms of Service + ~7k-word Privacy Policy seeded into the DB. Source markdown at `legal/*.md` (edit these to update), generator at `scripts/generate_legal_sql.py` (regenerates SQL from markdown using `$LEGAL$` dollar-quote tag), SQL migration at `supabase/schema_legal_agreements_v1.sql`. Public pages at `/legal/terms` and `/legal/privacy` via shared `components/shared/LegalDocPage.tsx` (force-dynamic, pulls from DB). New `lib/agreements-gate.ts` exports `requireAgreementsAccepted()` — wired into `app/marketplace/page.tsx` so existing logged-in users hit the gate naturally. Bumped agreement scroll area from `h-72` to `h-[60vh] min-h-[20rem]` so the new long docs are readable. Decisions baked in: Groovy Greens, LLC (NC) d/b/a FlipWork; NC governing law / Wake County venue; 18+ US-only; mandatory binding arbitration + class action waiver under AAA Consumer Rules with 30-day opt-out; strong independent-contractor classification for workers; $100 or 12-mo fees liability cap. See "Legal docs (TOS + Privacy)" section above for the full file map and editing instructions. See "Cory's non-code TODOs" section for the d/b/a filing walkthrough, LLC good-standing check, and lawyer review guidance.
