@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Send, Plus, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface ConvSummary {
   id: string
@@ -265,13 +267,34 @@ export default function SupportClient({ initialConversations }: Props) {
                 className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+                  className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
                     m.role === 'user'
-                      ? 'bg-stone-900 text-white'
-                      : 'bg-stone-100 text-stone-900'
+                      ? 'bg-stone-900 text-white whitespace-pre-wrap'
+                      : 'bg-stone-100 text-stone-900 chat-markdown'
                   } ${m.pending ? 'opacity-60' : ''}`}
                 >
-                  {m.content}
+                  {m.role === 'user' ? (
+                    m.content
+                  ) : (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        // Render links so they're clickable and open in new tab
+                        a: ({ href, children }) => (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline text-stone-900 hover:text-amber-700"
+                          >
+                            {children}
+                          </a>
+                        ),
+                      }}
+                    >
+                      {m.content}
+                    </ReactMarkdown>
+                  )}
                 </div>
               </div>
             ))

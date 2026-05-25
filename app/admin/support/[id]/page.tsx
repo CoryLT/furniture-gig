@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import AdminSupportActions from './AdminSupportActions'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -135,17 +137,23 @@ export default async function AdminSupportConversationPage({
             className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+              className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
                 m.role === 'user'
-                  ? 'bg-stone-900 text-white'
-                  : 'bg-stone-100 text-stone-900'
+                  ? 'bg-stone-900 text-white whitespace-pre-wrap'
+                  : 'bg-stone-100 text-stone-900 chat-markdown'
               }`}
             >
               <div className="text-[10px] uppercase tracking-wide opacity-60 mb-1">
                 {m.role === 'user' ? userName || 'User' : 'AI'}{' '}
                 · {new Date(m.created_at).toLocaleString()}
               </div>
-              {m.content}
+              {m.role === 'user' ? (
+                m.content
+              ) : (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {m.content}
+                </ReactMarkdown>
+              )}
             </div>
           </div>
         ))}
