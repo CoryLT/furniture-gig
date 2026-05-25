@@ -2,12 +2,12 @@ import Stripe from 'stripe'
 
 // Build marker: 2026-05-25 live-mode cutover — forces cold start of cached Stripe client.
 
-if (!process.env.STRIPE_SECRET_KEY) {
+if (!process.env.STRIPE_SECRET_KEY_LIVE) {
   // Don't throw at import time — let routes handle missing env gracefully.
-  console.warn('STRIPE_SECRET_KEY is not set. Stripe routes will fail until it is configured.')
+  console.warn('STRIPE_SECRET_KEY_LIVE is not set. Stripe routes will fail until it is configured.')
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', {
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY_LIVE ?? '', {
   apiVersion: '2024-06-20',
   typescript: true,
   appInfo: {

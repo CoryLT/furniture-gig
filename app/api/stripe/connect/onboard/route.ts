@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!process.env.STRIPE_SECRET_KEY_LIVE) {
     return NextResponse.json({ error: 'Stripe is not configured.' }, { status: 500 })
   }
 

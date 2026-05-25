@@ -28,10 +28,10 @@ export async function GET() {
   }
 
   // Confirm Stripe secret key is set
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!process.env.STRIPE_SECRET_KEY_LIVE) {
     return NextResponse.json({
       ok: false,
-      reason: 'STRIPE_SECRET_KEY not set in environment',
+      reason: 'STRIPE_SECRET_KEY_LIVE not set in environment',
     }, { status: 500 })
   }
 
@@ -54,7 +54,7 @@ export async function GET() {
       },
       platform_fee_percent: getPlatformFeePercent(),
       sample_payment_breakdown_for_100_dollar_gig: sampleBreakdown,
-      key_type: process.env.STRIPE_SECRET_KEY.startsWith('sk_test_') ? 'test' : 'live',
+      key_type: process.env.STRIPE_SECRET_KEY_LIVE.startsWith('sk_test_') ? 'test' : 'live',
     })
   } catch (err: any) {
     return NextResponse.json({
