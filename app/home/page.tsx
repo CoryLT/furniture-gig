@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '@/components/shared/Nav'
 import ActivityChart from '@/components/home/ActivityChart'
+import { WelcomeModal } from '@/components/shared/WelcomeModal'
 import { lastNDays, isoDayOf, buildBuckets } from '@/lib/home-dashboard'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import {
@@ -34,10 +35,14 @@ export default async function HomePage() {
   // Admin: punt to admin dashboard, they don't need this view
   const { data: userRow } = await supabase
     .from('users')
-    .select('role')
+    .select('role, dismissed_welcome_modal_at')
     .eq('id', user.id)
     .maybeSingle()
   if ((userRow as any)?.role === 'admin') redirect('/admin')
+
+  // Show the welcome modal to anyone who hasn't dismissed it yet
+  const showWelcomeModal =
+    (userRow as any)?.dismissed_welcome_modal_at == null
 
   // ============================================================
   // Profiles (for greeting + nav)
@@ -491,6 +496,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {showWelcomeModal && <WelcomeModal />}
       <Nav role="flipper" userName={navName} userUsername={navUsername} />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
         {/* Greeting */}
