@@ -192,9 +192,14 @@ All read-only DB lookups use service-role client BUT manually filter by `userId`
 - No email notification to Cory when something escalates yet — he checks `/admin/support` manually. The badge on `/admin` is the visible signal. Email notifications are a future enhancement (would tie into the broader notifications TODO #8).
 - The `users` table has a `role` column that's either `'admin'`, `'worker'`, or `'flipper'`. Admin checks use `where users.role = 'admin'`.
 
+### Markdown rendering (DONE — shipped this session)
+
+AI replies render through `react-markdown` + `remark-gfm` inside a `.chat-markdown` CSS class. Bold, lists, links (open in new tab), code, blockquotes all work. User messages stay plain text (no point parsing what they typed).
+
+**Important**: the system prompt has a "Formatting" section that tells the AI to use backticks for URL paths (`` `/profile/payments` ``) instead of bold. This is because markdown can't parse `**` wrapping text starting with `/` — it renders as literal asterisks. If you find the AI emitting raw `**asterisks**` in production, check the prompt's Formatting section first.
+
 ### TODOs / future enhancements
-- Markdown rendering in chat bubbles (the AI sometimes uses `**bold**` syntax that displays as literal asterisks). Either add a markdown renderer or tell the AI not to use markdown in the prompt.
-- Email notification to admin on escalation
+- Email notification to admin on escalation (right now Cory checks `/admin/support` manually; the badge on `/admin` is the visible signal)
 - Streaming responses for snappier UX (currently waits for full reply)
 - Allow admin to reply IN the conversation as a human takeover (currently admin only views + resolves; user has no way to see admin replies)
 
@@ -864,7 +869,12 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
+- `52aaf60` Teach support AI: use backticks for paths, not bold: live-testing the AI support chat showed it was emitting `**/profile/payments**` which markdown couldn't parse (asterisks wrapping text starting with `/` confuse the parser, so it rendered as literal asterisks). Added a "Formatting" section to the system prompt instructing the AI to use backticks for paths/UI references, save bold for actual emphasis, no markdown headers in chat replies, and short paragraphs. Single-file change to `lib/support-prompt.ts`.
+- `21107bd` Render markdown in support chat bubbles: added `react-markdown@^10.1.0` + `remark-gfm@^4.0.1`. AI replies now render bold, lists, links (opens in new tab), code, blockquotes properly. User messages stay as plain text. Added `.chat-markdown` CSS class in `app/globals.css` to style markdown elements inside chat bubbles. Same renderer added to `/admin/support/[id]` so admin sees the same view users see.
 - `d3c36ce` Add AI support chat agent (Haiku 4.5): full AI support feature — `/support` page for users, `/admin/support` queue for admin, 5 tools (4 read-only DB lookups + 1 escalation), system prompt teaching the agent FlipWork rules. New tables `support_conversations` + `support_messages` with RLS. Hard caps: 5 chats/day/user, 50 messages/chat. Added `@anthropic-ai/sdk@^0.98.0` dependency and `ANTHROPIC_API_KEY` env var on Vercel. Cory tested live in production with "how do i get paid?" and got a clean correct answer. See "AI support chat" section above.
+
+### Note on Vercel deploy queue
+Cory hit a deploy queue jam this session — 4 commits in rapid succession stacked up behind a manual redeploy and stopped processing. Fix was to cancel the queued deploys via the `⋯` menu on each row and redeploy the latest commit. Vercel's free/hobby tier serializes builds (one at a time). LESSON for future sessions: batch related changes into fewer commits to avoid stacking the queue. Don't push 4 commits in 10 minutes.
 
 ## Previous session's commits
 
