@@ -89,6 +89,33 @@ export default async function PublicProfilePage({
       ])
     : [{ data: [] }, { data: [] }]
 
+  // Who is viewing this page? (null if logged out)
+  const {
+    data: { user: viewer },
+  } = await supabase.auth.getUser()
+
+  // Is the viewer already following this profile?
+  let viewerIsFollowing = false
+  if (viewer && userId && viewer.id !== userId) {
+    const { data: followRow } = await supabase
+      .from('follows')
+      .select('id')
+      .eq('follower_user_id', viewer.id)
+      .eq('followed_user_id', userId)
+      .maybeSingle()
+    viewerIsFollowing = !!followRow
+  }
+
+  // If the viewer IS the profile owner, fetch their follower count.
+  // Private: only the owner sees this number.
+  let ownFollowerCount: number | null = null
+  if (viewer && userId && viewer.id === userId) {
+    const { data: countResult } = await supabase.rpc('follower_count', {
+      target_user_id: userId,
+    })
+    ownFollowerCount = (countResult as number | null) ?? 0
+  }
+
   return (
     <PublicProfileClient
       profile={merged}
@@ -96,6 +123,9 @@ export default async function PublicProfilePage({
       completedCount={completedCount}
       workerPhotos={workerPhotosResult.data || []}
       flipperPhotos={flipperPhotosResult.data || []}
+      viewerUserId={viewer?.id || null}
+      viewerIsFollowing={viewerIsFollowing}
+      ownFollowerCount={ownFollowerCount}
     />
   )
 }

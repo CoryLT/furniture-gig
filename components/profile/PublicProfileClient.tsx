@@ -17,6 +17,7 @@ import {
 import { type GalleryPhoto } from '@/components/ui/PhotoGallery'
 import Nav from '@/components/shared/Nav'
 import { FoundingMemberBadge } from '@/components/shared/FoundingMemberBadge'
+import { FollowButton } from '@/components/profile/FollowButton'
 
 interface MergedProfile {
   user_id: string
@@ -38,6 +39,9 @@ interface PublicProfileClientProps {
   completedCount: number
   workerPhotos: any[]
   flipperPhotos: any[]
+  viewerUserId: string | null
+  viewerIsFollowing: boolean
+  ownFollowerCount: number | null
 }
 
 export function PublicProfileClient({
@@ -46,13 +50,16 @@ export function PublicProfileClient({
   completedCount,
   workerPhotos: initialWorkerPhotos,
   flipperPhotos: initialFlipperPhotos,
+  viewerUserId,
+  viewerIsFollowing,
+  ownFollowerCount,
 }: PublicProfileClientProps) {
   const supabase = createClient()
 
   const [workerPhotos, setWorkerPhotos] = useState<GalleryPhoto[]>([])
   const [flipperPhotos, setFlipperPhotos] = useState<GalleryPhoto[]>([])
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const [loadingUser, setLoadingUser] = useState(true)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(viewerUserId)
+  const [loadingUser, setLoadingUser] = useState(viewerUserId === null)
 
   useEffect(() => {
     // Build public URLs for both photo sets
@@ -192,16 +199,38 @@ export function PublicProfileClient({
                   )}
                 </div>
 
-                {/* Edit button if it's your own profile */}
-                {isOwnProfile && (
-                  <div className="pt-2">
+                {/* Edit button if it's your own profile, otherwise Follow button */}
+                {isOwnProfile ? (
+                  <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-3">
                     <Link
                       href="/profile"
                       className="inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary/50 transition-colors"
                     >
                       Edit your profile
                     </Link>
+                    {ownFollowerCount !== null && (
+                      <Link
+                        href="/connections"
+                        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        title="Only you can see this"
+                      >
+                        <span className="font-semibold text-foreground">
+                          {ownFollowerCount}
+                        </span>
+                        {ownFollowerCount === 1 ? 'follower' : 'followers'}
+                        <span className="text-xs opacity-60">(private)</span>
+                      </Link>
+                    )}
                   </div>
+                ) : (
+                  isLoggedIn && (
+                    <div className="pt-2">
+                      <FollowButton
+                        followedUserId={profile.user_id}
+                        initialFollowing={viewerIsFollowing}
+                      />
+                    </div>
+                  )
                 )}
               </div>
             </div>
