@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Armchair, Menu } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
+import { NotificationBell } from '@/components/shared/NotificationBell'
 
 interface NavProps {
   role: 'worker' | 'admin' | 'flipper'
@@ -285,7 +286,8 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
           FlipWork
         </Link>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {role !== 'admin' && <NotificationBell />}
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
