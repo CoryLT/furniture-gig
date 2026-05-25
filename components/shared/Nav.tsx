@@ -348,6 +348,24 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
                   Support
                 </Link>
                 <hr className="my-1" />
+                <div className="px-4 py-2 flex items-center gap-3 text-xs text-muted-foreground">
+                  <Link
+                    href="/legal/terms"
+                    className="hover:text-foreground transition-colors"
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    Terms
+                  </Link>
+                  <span className="text-stone-300">·</span>
+                  <Link
+                    href="/legal/privacy"
+                    className="hover:text-foreground transition-colors"
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    Privacy
+                  </Link>
+                </div>
+                <hr className="my-1" />
                 <button
                   onClick={() => {
                     handleLogout()
