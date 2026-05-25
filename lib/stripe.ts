@@ -1,5 +1,7 @@
 import Stripe from 'stripe'
 
+// Build marker: 2026-05-25 live-mode cutover — forces cold start of cached Stripe client.
+
 if (!process.env.STRIPE_SECRET_KEY) {
   // Don't throw at import time — let routes handle missing env gracefully.
   console.warn('STRIPE_SECRET_KEY is not set. Stripe routes will fail until it is configured.')
