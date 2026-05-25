@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Armchair, Hammer, DollarSign, CheckCircle2, ShoppingBag } from 'lucide-react'
+import { Armchair, Hammer, DollarSign, CheckCircle2, ShoppingBag, MessageCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import PublicTopBar from '@/components/shared/PublicTopBar'
 import { Button } from '@/components/ui/button'
@@ -134,6 +134,43 @@ export default async function HomePage() {
                   <Button variant="default" size="default">
                     Find work
                   </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* FOUNDER NOTE */}
+        <section className="border-t border-border">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+            <div className="card p-8 sm:p-10">
+              <h2 className="font-serif text-2xl sm:text-3xl text-foreground mb-5">
+                Why I built FlipWork
+              </h2>
+              <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <p>
+                  I'm Cory. I flip furniture in Raleigh, NC.
+                </p>
+                <p>
+                  I built FlipWork because I got tired of running my business
+                  on Facebook Marketplace and Craigslist. Facebook is
+                  impossible to escape but full of scams. Craigslist works,
+                  but hiring help off it feels sketchy every single time.
+                </p>
+                <p>
+                  So I built somewhere better — a real place for buyers,
+                  sellers, and the workers who do the flipping. It's brand
+                  new, so we're still filling in. But every listing, every
+                  gig, and every dollar paid is real.
+                </p>
+              </div>
+              <div className="mt-6 pt-6 border-t border-border">
+                <Link
+                  href="/support"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-foreground hover:text-accent transition"
+                >
+                  <MessageCircle className="w-4 h-4" strokeWidth={1.75} />
+                  Questions? Our support team is one click away.
                 </Link>
               </div>
             </div>
