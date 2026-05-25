@@ -48,6 +48,8 @@ export default async function PublicProfilePage({
     bio: flipper?.bio || worker?.bio || '',
     website: flipper?.website || '',
     skills: (worker?.skills as string[]) || [],
+    isFoundingMember:
+      worker?.founding_member === true || flipper?.founding_member === true,
   }
 
   // Pull their open gigs (as a poster) and completed count

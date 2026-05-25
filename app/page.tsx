@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Armchair, Hammer, DollarSign, CheckCircle2, ShoppingBag, MessageCircle } from 'lucide-react'
+import { Armchair, Hammer, DollarSign, CheckCircle2, ShoppingBag, MessageCircle, Sparkle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import PublicTopBar from '@/components/shared/PublicTopBar'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,22 @@ export default async function HomePage() {
   if (user) {
     redirect('/home')
   }
+
+  // Founding member counts for the landing-page counter.
+  // We call a SECURITY DEFINER function so anonymous visitors can see
+  // counts without exposing the underlying profile tables.
+  const { data: foundingRaw } = await supabase.rpc('founding_member_counts')
+  const founding = (foundingRaw as Array<{
+    workers_taken: number
+    flippers_taken: number
+    cap: number
+  }> | null)?.[0]
+  const workersTaken = founding?.workers_taken ?? 0
+  const flippersTaken = founding?.flippers_taken ?? 0
+  const cap = founding?.cap ?? 25
+  const workerSpotsLeft = Math.max(0, cap - workersTaken)
+  const flipperSpotsLeft = Math.max(0, cap - flippersTaken)
+  const showFoundingCounter = workerSpotsLeft > 0 || flipperSpotsLeft > 0
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -55,6 +71,27 @@ export default async function HomePage() {
                 </Button>
               </Link>
             </div>
+
+            {/* Founding member counter */}
+            {showFoundingCounter && (
+              <div className="mt-8 flex justify-center">
+                <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-full bg-amber-50 border border-amber-200">
+                  <Sparkle className="w-4 h-4 fill-amber-500 stroke-amber-700" strokeWidth={1.5} />
+                  <span className="text-xs sm:text-sm font-medium text-amber-900">
+                    {workerSpotsLeft > 0 && flipperSpotsLeft > 0 ? (
+                      <>
+                        {workerSpotsLeft} worker + {flipperSpotsLeft} flipper
+                        founding spots left
+                      </>
+                    ) : workerSpotsLeft > 0 ? (
+                      <>{workerSpotsLeft} founding worker spots left</>
+                    ) : (
+                      <>{flipperSpotsLeft} founding flipper spots left</>
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 

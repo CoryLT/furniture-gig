@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { type GalleryPhoto } from '@/components/ui/PhotoGallery'
 import Nav from '@/components/shared/Nav'
+import { FoundingMemberBadge } from '@/components/shared/FoundingMemberBadge'
 
 interface MergedProfile {
   user_id: string
@@ -28,6 +29,7 @@ interface MergedProfile {
   bio: string
   website: string
   skills: string[]
+  isFoundingMember?: boolean
 }
 
 interface PublicProfileClientProps {
@@ -162,6 +164,11 @@ export function PublicProfileClient({
                     <p className="text-base text-muted-foreground mt-1">{secondaryName}</p>
                   )}
                   <p className="text-sm text-muted-foreground mt-1">@{profile.username}</p>
+                  {profile.isFoundingMember && (
+                    <div className="mt-2 flex justify-center sm:justify-start">
+                      <FoundingMemberBadge size="md" />
+                    </div>
+                  )}
                 </div>
 
                 {/* Meta line */}
