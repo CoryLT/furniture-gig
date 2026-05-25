@@ -181,26 +181,44 @@ export default async function HomePage() {
         <section className="border-t border-border">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
             <div className="card p-8 sm:p-10">
-              <h2 className="font-serif text-2xl sm:text-3xl text-foreground mb-5">
-                Why I built FlipWork
-              </h2>
-              <div className="space-y-4 text-muted-foreground leading-relaxed">
-                <p>
-                  I'm Cory. I flip furniture in Raleigh, NC.
-                </p>
-                <p>
-                  I built FlipWork because I got tired of running my business
-                  on Facebook Marketplace and Craigslist. Facebook is
-                  impossible to escape but full of scams. Craigslist works,
-                  but hiring help off it feels sketchy every single time.
-                </p>
-                <p>
-                  So I built somewhere better — a real place for buyers,
-                  sellers, and the workers who do the flipping. It's brand
-                  new, so we're still filling in. But every listing, every
-                  gig, and every dollar paid is real.
-                </p>
+              <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-start">
+                {/* Photo */}
+                <div className="flex-shrink-0 mx-auto sm:mx-0">
+                  <img
+                    src="/cory-founder.jpg"
+                    alt="Cory, founder of FlipWork"
+                    width={120}
+                    height={120}
+                    className="w-28 h-28 sm:w-32 sm:h-32 rounded-full object-cover border-2 border-border shadow-sm"
+                  />
+                </div>
+
+                {/* Text */}
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-serif text-2xl sm:text-3xl text-foreground mb-5 text-center sm:text-left">
+                    Why I built FlipWork
+                  </h2>
+                  <div className="space-y-4 text-muted-foreground leading-relaxed">
+                    <p>
+                      I'm Cory. I flip furniture in Raleigh, NC.
+                    </p>
+                    <p>
+                      I built FlipWork because I got tired of running my
+                      business on Facebook Marketplace and Craigslist.
+                      Facebook is impossible to escape but full of scams.
+                      Craigslist works, but hiring help off it feels sketchy
+                      every single time.
+                    </p>
+                    <p>
+                      So I built somewhere better — a real place for buyers,
+                      sellers, and the workers who do the flipping. It's
+                      brand new, so we're still filling in. But every
+                      listing, every gig, and every dollar paid is real.
+                    </p>
+                  </div>
+                </div>
               </div>
+
               <div className="mt-6 pt-6 border-t border-border">
                 <Link
                   href="/support"
