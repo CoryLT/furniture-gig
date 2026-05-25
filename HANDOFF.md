@@ -719,42 +719,79 @@ A parallel system to the gig flow, for buying/selling furniture. The two systems
 
 ---
 
-## Marketplace as front door (DONE — shipped a previous session)
+## Marketplace as front door (SUPERSEDED — see "New landing page" below)
 
-Originally `/home` was the post-auth landing for logged-in users and `/` was a marketing landing page for logged-out users. Cory wanted the marketplace front-and-center for everyone, with the dashboard demoted to "available via the hamburger nav but not a destination."
+⚠️ **This was true for a while but is no longer the case.** A real marketing landing page now lives at `/` for logged-out visitors, and logged-in users land on `/home` (the dashboard) after login. The marketplace is still accessible — it's just no longer the auto-landing for anyone.
 
-### What changed
-- **`/` redirects to `/marketplace` for everyone**, logged in or out. The marketing-landing version of `app/page.tsx` is gone. (`/home` is still accessible if you navigate there directly or click "Dashboard" in the hamburger.)
-- **Logo links to `/marketplace`** for workers/flippers. Admin logo still links to `/admin`.
-- **Post-auth lands on `/marketplace`** by default. Every login/signup path updated: `app/auth/login/page.tsx`, `app/auth/login/actions.ts` (dead code but kept consistent), `app/api/auth/set-session/route.ts` (Google OAuth), `app/auth/agreements/page.tsx` (`homeForRole` helper).
-- **`?next=` is preserved through every auth path.** If a user lands on `/auth/login` or `/auth/signup` with `?next=/marketplace/<slug>`, that path survives:
+Keeping this section for context on the safe-`next` pipeline (which is still active and important).
+
+Originally `/home` was the post-auth landing for logged-in users and `/` was a marketing landing page for logged-out users. For a phase, Cory wanted the marketplace front-and-center for everyone, with the dashboard demoted to "available via the hamburger nav but not a destination." That phase ended when Cory decided the marketplace was a confusing first impression for new visitors and asked for a real landing page that explains FlipWork. See "New landing page" section below.
+
+### What changed (for the front-door era)
+- **`/` redirected to `/marketplace` for everyone**, logged in or out. (NOW: `/` is the landing page, redirects logged-in users to `/home`.)
+- **Logo linked to `/marketplace`** for workers/flippers. (NOW: logo links to `/home`.)
+- **Post-auth landed on `/marketplace`** by default. (NOW: lands on `/home`.)
+- **`?next=` is preserved through every auth path.** STILL TRUE — this is the part to actually carry forward. If a user lands on `/auth/login` or `/auth/signup` with `?next=/marketplace/<slug>`, that path survives:
   - login form → either branch respects `?next=` (with safety checks)
   - signup → onboarding → agreements (each forwards `?next=`)
   - Google OAuth: signup/login encodes `?next=` into the `redirectTo` URL going TO Google. `/auth/finishing` reads it back from `window.location.search` and POSTs it to `/api/auth/set-session`. `set-session` validates and uses it as the destination.
-- **Middleware bounces to login WITH `?next=`.** Any protected-route hit without a session now redirects to `/auth/login?next=<original-path>` so the user lands back on their original destination after auth. (Previously, the original destination was lost.)
+- **Middleware bounces to login WITH `?next=`.** STILL TRUE. Any protected-route hit without a session now redirects to `/auth/login?next=<original-path>` so the user lands back on their original destination after auth.
 
-### Safety rules baked into every `safeNext` check
+### Safety rules baked into every `safeNext` check (STILL TRUE)
 - Must start with `/` (no external URLs)
 - Must NOT start with `/auth` (would loop)
 - Must NOT start with `/admin` (workers/flippers can't be redirected into admin-only pages)
 - Admin login does the inverse: `?next=` only honored if it points at `/admin`.
 
-### Key files touched
-- `app/page.tsx` — root, just redirects
-- `app/auth/login/page.tsx` — reads `?next=`, honors it for both email and Google login
+### Key files touched (auth pipeline)
+- `app/page.tsx` — root (NOW: landing page for logged-out, redirect to `/home` for logged-in)
+- `app/auth/login/page.tsx` — reads `?next=`, honors it; default fallback now `/home`
 - `app/auth/signup/page.tsx` — reads `?next=`, forwards to onboarding via query param; reciprocal sign-in link carries `?next=` too
 - `app/auth/onboarding/page.tsx` — reads `?next=`, forwards to agreements
-- `app/auth/agreements/page.tsx` — already honored `?next=`; just changed default fallback to `/marketplace`
+- `app/auth/agreements/page.tsx` — already honored `?next=`; default fallback is still `/marketplace` (intentional — agreements page should drop people somewhere they can do something, and `/marketplace` is fine here)
 - `app/auth/finishing/page.tsx` — reads `?next=` from `window.location.search`, passes through `/api/auth/set-session` body
-- `app/api/auth/set-session/route.ts` — accepts `next` in body, validates as safe, swaps both `'/home'` defaults to `postAuthDestination`
-- `app/api/auth/login/actions.ts` (dead code) — kept consistent
-- `components/shared/Nav.tsx` — `logoHref` changed for non-admins
-- `middleware.ts` — bounce-to-login includes `?next=<original-path>`
+- `app/api/auth/set-session/route.ts` — accepts `next` in body, validates as safe; default fallback now `/home`
+- `app/auth/login/actions.ts` (dead code) — kept consistent, default `/home`
+- `components/shared/Nav.tsx` — `logoHref` is now `/home` for non-admins
+- `middleware.ts` — bounce-to-login includes `?next=<original-path>` (UNCHANGED)
+
+---
+
+## New landing page (DONE — shipped this session)
+
+Replaces the "marketplace as front door" era. `/` is now an actual marketing landing page that explains FlipWork. Logged-in users are redirected past it to `/home`; logged-out users see the pitch.
+
+### Why
+The marketplace feed (gray product cards with prices) was a confusing first impression for first-time visitors. New people landed on listings with no idea what FlipWork actually is — they couldn't tell if it was Facebook Marketplace, Etsy, or something else. The gig/labor side was completely invisible. Cory wanted a landing page that explains the two-sided nature of the platform and funnels people to sign up.
+
+### What's there
+- **Hero**: "Hire a flipper. Or become one." headline, supporting paragraph, two CTAs (Sign up free + Browse the marketplace)
+- **How it works** — three-step explainer: Post or apply → Match and work → Get paid. Uses the existing `card` class and amber accent.
+- **Two side-by-side cards**: "Got a piece to flip?" (for posters) and "Want to flip for money?" (for workers). Each has its own CTA with a `?as=` query param (flipper / worker) for future signup-flow branching if we want it.
+- **Marketplace teaser** — small section linking to `/marketplace` so people who DID come for browsing aren't stranded.
+- **Final CTA** + footer with Terms / Privacy links.
+
+### Key file
+- `app/page.tsx` — the entire landing page in one file. Server component. Reads the session and redirects to `/home` for logged-in users before rendering. Reuses `PublicTopBar` for the top nav (which already shows Log in / Sign up buttons for logged-out users), the existing `Button` component, and brand fonts/colors so the page feels native.
+
+### Logo destination
+- Logged-out logo → `/` (the landing page, via `PublicTopBar`)
+- Logged-in non-admin logo → `/home` (the dashboard, via `Nav.tsx`'s `logoHref`)
+- Admin logo → `/admin` (unchanged)
+
+### Terms + Privacy in the logged-in nav
+While in the area, also added a small `Terms · Privacy` row to the bottom of the hamburger menu (above Logout). Logged-in users previously had no way to find the legal docs from inside the app. Side-by-side small-text style matches the landing page footer. The new landing page footer already had them.
 
 ### Quirks worth knowing
-- **`/home` still exists** and is intentionally still in the protected-routes list in `middleware.ts`. The "Dashboard" link in the hamburger nav still points there. Just no path leads there automatically anymore. If you delete `/home`, audit the nav link.
-- **The flipper-specific dashboard at `/flipper/dashboard`** is unchanged — it's still its own page, reachable via the "My Posted Gigs" hamburger link.
-- **Verified end-to-end** by Cory after deploy: logo, post-auth landing, listing → signup → land back on listing.
+- **`?as=flipper` / `?as=worker` on the signup CTA links is just future-proofing.** The signup page doesn't read it yet. If you want to do role-aware signup copy, that's the hook. Otherwise it's harmless.
+- **There's no app-wide footer for logged-in pages.** Deliberate. The Terms/Privacy links live in the hamburger menu instead. Modern apps generally drop the footer once you're inside.
+- **Don't add a logged-in footer "for completeness" without checking with Cory first.** It was a deliberate decision to keep the app layout clean.
+
+---
+
+## Marketplace as front door — original section (for reference only)
+
+(See above. Section preserved here only because the auth pipeline notes still apply.)
 
 ---
 
@@ -942,22 +979,38 @@ The TOS currently says "(Mailing address available on request)" because you don'
 - **DO NOT BREAK: OAuth must NEVER route through the `*.vercel.app → myflipwork.com` 308 redirect** for the same reason as above (308s strip fragments). The Vercel 308 is still in place for catching stale bookmarks, which is fine. Just don't make Supabase emit OAuth redirects through it.
 - **Testing OAuth changes:** always test in a fresh incognito window on the actual `myflipwork.com` domain. Starting on a vercel.app URL produces the bad version of the flow.
 - **Vercel has a hard 4.5MB body limit** on serverless functions — bigger requests get a `413 FUNCTION_PAYLOAD_TOO_LARGE` at the gateway, which returns HTML (not JSON). Every client form should compress images >1MB via `lib/imageCompression.ts` before upload AND wrap `res.json()` in try/catch. There are 6 live upload paths all using this pattern — if you add a 7th, mirror it. The cedar-bed JPEG (4.6MB iPhone original) is a good reproducer.
+- **⚠️ OPEN BUG (left at end of session): marketplace card thumbnails show blank gray boxes on `/marketplace`** for at least 3 listings that DO have photos uploaded. The detail page for those same listings (`/marketplace/<slug>`) renders the photos fine. So photos exist in `marketplace_photos`, the storage bucket public-URL flow works, RLS allows public reads (`status in ('active', 'sold')`) — but the listing-page batched query somehow isn't surfacing them. Schemas and queries between `/marketplace` and the detail page look identical. A diagnostic `console.log('[marketplace] photo query', ...)` is currently in `app/marketplace/page.tsx` to dump `requested_listing_ids`, `returned_photo_count`, and the first few rows. Next session: get Cory to load `/marketplace` while logged in, then read the Vercel function logs to see what Supabase actually returns. Most likely culprits: (a) a sneaky type mismatch between `listing.id` and `marketplace_photos.listing_id` in the `.in()` filter, (b) some pre-existing data state where photos are orphaned to listings that aren't in the visible top-60, (c) something weird about the `.order('sort_order')` + tied `sort_order=0` values changing the result set. Remove the diagnostic log once fixed.
 
 ---
 
 ## What's next (next session)
 
-**This session: launch-prep cleanup + full TOS/Privacy Policy v1.0 shipped.** Three commits, focused on closing one of the two biggest pre-launch blockers (legal docs) plus a repo-hygiene cleanup:
+**This session: launch-prep UX cleanup — new landing page, post-auth routing, legal links in nav.** Four commits, no schema changes, no SQL. All focused on making the app's front door explain itself to first-time visitors.
+
+1. **Real marketing landing page at `/`.** Replaces the "redirect to /marketplace" front door that's been in place for a few sessions. The marketplace feed was a confusing first impression for new visitors — they couldn't tell what FlipWork even did. New page has a hero ("Hire a flipper. Or become one."), a 3-step "How it works", side-by-side "for posters / for workers" cards, a marketplace teaser, and a final CTA. See "New landing page" section above for the full file map.
+2. **Post-login destination flipped from `/marketplace` → `/home`.** Three files (email login server action, client login page, OAuth set-session route). `?next=` safe deep-links still take priority — only the no-next fallback changes.
+3. **Logged-in nav logo points to `/home`** instead of `/marketplace`. Matches the new landing flow (logo = take me home, where "home" is wherever you start after login). Admin logo unchanged.
+4. **Terms + Privacy links added to the logged-in hamburger menu.** Logged-in users previously had no way to find the legal docs from inside the app. Small side-by-side `Terms · Privacy` row at the bottom of the dropdown above Logout. Same visual style as the landing-page footer.
+
+**Diagnostic temporarily added:** `app/marketplace/page.tsx` has a `console.log('[marketplace] photo query', ...)` to debug the open card-thumbnail bug (see "Watch out for" entry). Remove once that's fixed.
+
+**Pattern carry-over for next session:** the landing page is single-file (`app/page.tsx`, ~230 lines) on purpose — easier to iterate. If it grows, split into section components in a `components/landing/` folder. Don't add an app-wide footer to logged-in pages without checking with Cory — that was a deliberate "modern apps drop the footer" call.
+
+**Roadmap signal worth remembering:** Cory mentioned wanting `/home` to become a real social feed (posts, follow/follower, activity feed, groups, before/after threads). That's a future direction — NOT a "next sprint" item, but worth keeping in mind when touching `/home`. The current dashboard architecture is fine for now; the social-feed pivot would be a meaningful rebuild.
+
+---
+
+**Two sessions ago: launch-prep cleanup + full TOS/Privacy Policy v1.0 shipped.** Three commits, focused on closing one of the two biggest pre-launch blockers (legal docs) plus a repo-hygiene cleanup:
 
 1. **Cleaned up 23 empty junk files** at the repo root that had been there since `9b1d2b2` (the worker city filter commit). Pure mechanical fix. Verified via `git show` that all were 0 bytes from creation, never had content. Single commit: `85c2f24`.
 2. **Full TOS + Privacy Policy v1.0 shipped end-to-end.** Source markdown in `legal/*.md`, generator at `scripts/generate_legal_sql.py`, SQL migrations, public read pages at `/legal/terms` and `/legal/privacy`, and runtime gate wired into `/marketplace` so existing logged-in users get caught. See "Legal docs (TOS + Privacy)" section. Also generated the **Cory's non-code TODOs walkthrough section** with step-by-step instructions for the NC LLC good-standing check, NC d/b/a filing, Stripe business name update, and lawyer review.
 3. **Hot-fix:** when Cory first visited `/legal/terms`, the page showed "document not available." Root cause was the original schema's RLS policy requiring `auth.uid() is not null` for SELECT — blocking logged-out viewers from reading public legal docs. Patched via `supabase/schema_legal_agreements_public_read.sql`. Cory ran the SQL and both pages now render correctly.
 
-**Pattern carry-over for next session:** the source-markdown-to-DB-via-generator pattern (`legal/*.md` → `scripts/generate_legal_sql.py` → `supabase/schema_legal_agreements_v1.sql` → DB row) is a clean way to keep large blocks of content versioned in git AND in the DB. Could be reused for support FAQs, email templates, or anything else that's "text in the DB but humans want to edit it like a file."
+**Pattern carry-over from that session:** the source-markdown-to-DB-via-generator pattern (`legal/*.md` → `scripts/generate_legal_sql.py` → `supabase/schema_legal_agreements_v1.sql` → DB row) is a clean way to keep large blocks of content versioned in git AND in the DB. Could be reused for support FAQs, email templates, or anything else that's "text in the DB but humans want to edit it like a file."
 
 ---
 
-**Previous session: small focused UX polish around gig previews — no new systems, no schema changes, no SQL.** Four commits, all in `/gigs` and `/flipper/dashboard` territory:
+**Three sessions ago: small focused UX polish around gig previews — no new systems, no schema changes, no SQL.** Four commits, all in `/gigs` and `/flipper/dashboard` territory:
 
 1. **Reference images now visible on the flipper side too.** The flipper dashboard list shows a 64px thumbnail per gig (first image by `sort_order`, placeholder icon if none). The flipper gig detail page renders the full reference-image grid using the existing `GigReferenceImages` component. Image URLs are built on the server in one batched query.
 2. **Own posted gigs now appear in the worker browse feed**, mixed in by date with everyone else's, marked with a small "Your post" badge under the status pill. Footer link reads "View as worker" on own posts. The existing `isOwnPostedGig` branch on `/gigs/[slug]` already prevents claiming and shows a "You posted this gig" panel, so no extra detail-page work was needed. Cory wanted this so he can see his gig the way workers see it without using a second account.
@@ -967,17 +1020,19 @@ The TOS currently says "(Mailing address available on request)" because you don'
 
 ---
 
-**Two sessions ago: killed two major iPhone bugs** — the photo upload hang and the OAuth hang. See "Two-sessions-ago commits" and the bugfix notes below for details. Tl;dr: Vercel 4.5MB body limit triggered 413s that returned non-JSON HTML, crashing every `res.json()` call silently. Fix was client-side image compression + try/catch around every res.json(). And Supabase Site URL was set to the vercel.app domain, which made OAuth redirect through the `*.vercel.app → myflipwork.com` 308 — and 308s strip URL fragments, so the auth token vanished. Fix was setting Supabase Site URL to `https://myflipwork.com` directly.
+**Four sessions ago: killed two major iPhone bugs** — the photo upload hang and the OAuth hang. See "Older commits" and the bugfix notes below for details. Tl;dr: Vercel 4.5MB body limit triggered 413s that returned non-JSON HTML, crashing every `res.json()` call silently. Fix was client-side image compression + try/catch around every res.json(). And Supabase Site URL was set to the vercel.app domain, which made OAuth redirect through the `*.vercel.app → myflipwork.com` 308 — and 308s strip URL fragments, so the auth token vanished. Fix was setting Supabase Site URL to `https://myflipwork.com` directly.
 
 ---
 
-**Marketplace is the front door** and **marketplace messaging is live end-to-end**. The dashboard at `/home` still exists but is no longer the post-auth landing.
+**Marketplace is no longer the front door.** A real marketing landing page is in place at `/`, logged-in users land on `/home`. The marketplace is accessible via nav/CTAs but no longer the auto-landing for anyone.
 
-**Payments system has its safety net** (Phase 7 webhooks). Phases 5, 6, 8, 9 still needed before going live with real money.
+**Marketplace messaging is live end-to-end** and **payments have their safety net** (Stripe Connect Phase 7 webhooks). Phases 5, 6, 8, 9 still needed before going live with real money.
 
-**Streak counter** was pitched but deferred again — would require a new `user_activity_log` table with triggers backfilling events from claims/payouts/messages/gigs, plus a streak counter and richer activity feed on `/home`. Still the obvious "addicting to check" next move for the dashboard if Cory ever wants it.
+**Streak counter** was pitched but deferred again — would require a new `user_activity_log` table with triggers backfilling events from claims/payouts/messages/gigs, plus a streak counter and richer activity feed on `/home`. Still the obvious "addicting to check" next move for the dashboard if Cory ever wants it — though note that Cory has signaled a bigger pivot for `/home` (social feed direction) that would supersede this.
 
 Cory's most likely next moves, in rough order:
+
+0. **Close out the open marketplace image bug** (see "Watch out for" entry). The diagnostic log is already in place; just need Cory to load the page logged-in and grab the Vercel function logs. Should be a 30-min fix once we see the actual returned data shape.
 
 1. **Mutual cancel for gigs + tighten hard delete.** Known safety hole shipped a previous session: a claimed gig can be hard-deleted even when a worker is mid-claim (as long as no Stripe money has moved). Plan is to build an Upwork/TaskRabbit-style mutual cancel (either side requests, the other accepts/declines via system message in chat, claim → `cancelled_by_mutual_agreement`, Stripe auth released), and at the same time block hard delete when any claim is in `pending`/`active`/`submitted_for_review`. Full plan + file touches are in the TODOs section above (#12).
 
@@ -999,7 +1054,7 @@ Cory's most likely next moves, in rough order:
 
 10. **Stripe Connect Phase 8: Edge cases.** Flipper's card declines at capture time, worker's Connect account gets restricted after approval, auth expires before work is done, flipper requests refund after capture, gig is canceled after authorization. Webhooks now detect most of these; the work here is the UI/notification side.
 
-11. **Streak counter + activity log for `/home`** — deferred again, still the next obvious dashboard enhancement.
+11. **`/home` social feed pivot** — Cory's signaled direction for the dashboard. NOT a near-term task, but worth tracking. Would involve: posts/feed table, follow/follower relationships, activity feed pulling from claims/payouts/messages/gigs, possibly groups (by city or style?). This would supersede the "streak counter + activity log" task that's been on the backlog for several sessions. When this becomes real work, do design discussion FIRST — it's a meaningful rebuild of the post-auth experience.
 
 12. **Address/pickup details on gigs** (Bucket 1 #3) — paired with messaging; reveal-after-pick.
 
@@ -1021,11 +1076,19 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
+- `56a5e77` Add Terms + Privacy links to logged-in hamburger menu: side-by-side `Terms · Privacy` row in `components/shared/Nav.tsx`, tucked between Support and Logout with a separator above and below. Small font, low-emphasis (`text-muted-foreground`), matches the landing-page footer style. Closes a real gap — logged-in users previously had no way to reach the legal docs from inside the app.
+- `96b2a13` Logged-in nav logo points to `/home` instead of `/marketplace`: single-line change to `logoHref` in `components/shared/Nav.tsx`. Admin logo (`/admin`) unchanged. Matches the new "logo = home base" pattern now that `/home` is the post-login landing.
+- `61f25ef` Add temporary diagnostic logs to marketplace photo query: server-side `console.log('[marketplace] photo query', ...)` in `app/marketplace/page.tsx` dumping `requested_listing_ids`, `returned_photo_count`, and the first 3 rows. Added because card thumbnails are blank on `/marketplace` for listings that DO have photos (detail page shows them fine). REMOVE after the bug is fixed. See "Watch out for" entry.
+- `57dae08` Post-login destination: send users to `/home`, not `/marketplace`: three files (`app/auth/login/actions.ts`, `app/auth/login/page.tsx`, `app/api/auth/set-session/route.ts`). `?next=` safe deep-links still take priority — only the no-next fallback changes. The `agreements-gate.ts` fallback was deliberately left as `/marketplace` (it's a "drop them somewhere sensible after the gate" target, not a login destination).
+- `986c159` New marketing landing page at `/` for logged-out visitors: replaces the bare `redirect('/marketplace')` that had been the front door. Logged-in users now redirect to `/home`; logged-out users see the new landing page. Sections: hero with "Hire a flipper. Or become one.", 3-step "How it works", two-sided "For posters / For workers" cards, marketplace teaser, final CTA, footer with Terms/Privacy. Reuses `PublicTopBar`, `Button`, and brand fonts/colors. Single-file (~230 lines) on purpose. See "New landing page" section above.
+
+## Previous session's commits
+
 - `7e91e09` Fix /legal/terms and /legal/privacy showing as 'not available': the original schema's RLS SELECT policy on `legal_agreements` was `using (auth.uid() is not null and active = true)`, which blocked logged-out visitors — but the whole point of public legal pages is that logged-out visitors can read them. Created `supabase/schema_legal_agreements_public_read.sql` which drops the auth-required policy and replaces with `using (active = true)`. Admin-management policy on the same table untouched. Cory ran the SQL and confirmed both pages now render.
 - `6bceccd` Add full TOS + Privacy Policy v1.0 + public legal pages + agreements gate: the big one. ~10k-word Terms of Service + ~7k-word Privacy Policy seeded into the DB. Source markdown at `legal/*.md` (edit these to update), generator at `scripts/generate_legal_sql.py` (regenerates SQL from markdown using `$LEGAL$` dollar-quote tag), SQL migration at `supabase/schema_legal_agreements_v1.sql`. Public pages at `/legal/terms` and `/legal/privacy` via shared `components/shared/LegalDocPage.tsx` (force-dynamic, pulls from DB). New `lib/agreements-gate.ts` exports `requireAgreementsAccepted()` — wired into `app/marketplace/page.tsx` so existing logged-in users hit the gate naturally. Bumped agreement scroll area from `h-72` to `h-[60vh] min-h-[20rem]` so the new long docs are readable. Decisions baked in: Groovy Greens, LLC (NC) d/b/a FlipWork; NC governing law / Wake County venue; 18+ US-only; mandatory binding arbitration + class action waiver under AAA Consumer Rules with 30-day opt-out; strong independent-contractor classification for workers; $100 or 12-mo fees liability cap. See "Legal docs (TOS + Privacy)" section above for the full file map and editing instructions. See "Cory's non-code TODOs" section for the d/b/a filing walkthrough, LLC good-standing check, and lawyer review guidance.
 - `85c2f24` Clean up 23 empty junk files at repo root: leftover from `9b1d2b2` (worker city filter commit) — JSX fragments like `setTitle(e.target.value)}` got somehow split out as filenames. All were 0 bytes from creation (verified via `git show 9b1d2b2`). Pure mechanical cleanup. No functional change.
 
-## Previous session's commits
+## Two-sessions-ago commits
 
 - `52aaf60` Teach support AI: use backticks for paths, not bold: live-testing the AI support chat showed it was emitting `**/profile/payments**` which markdown couldn't parse (asterisks wrapping text starting with `/` confuse the parser, so it rendered as literal asterisks). Added a "Formatting" section to the system prompt instructing the AI to use backticks for paths/UI references, save bold for actual emphasis, no markdown headers in chat replies, and short paragraphs. Single-file change to `lib/support-prompt.ts`.
 - `21107bd` Render markdown in support chat bubbles: added `react-markdown@^10.1.0` + `remark-gfm@^4.0.1`. AI replies now render bold, lists, links (opens in new tab), code, blockquotes properly. User messages stay as plain text. Added `.chat-markdown` CSS class in `app/globals.css` to style markdown elements inside chat bubbles. Same renderer added to `/admin/support/[id]` so admin sees the same view users see.
@@ -1034,7 +1097,7 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 ### Note on Vercel deploy queue (from the AI-support-chat session)
 Cory hit a deploy queue jam in that session — 4 commits in rapid succession stacked up behind a manual redeploy and stopped processing. Fix was to cancel the queued deploys via the `⋯` menu on each row and redeploy the latest commit. Vercel's free/hobby tier serializes builds (one at a time). LESSON for future sessions: batch related changes into fewer commits to avoid stacking the queue. Don't push 4 commits in 10 minutes.
 
-## Two-sessions-ago commits
+## Three-sessions-ago commits
 
 - `87f7a70` Remove checklist preview from browse-gigs card: backed out the checklist preview added two commits earlier. Cory wanted the checklist visible only on the gig detail page next to the description, not duplicated on every browse card. Cleanly removed the prop, the batch query in `app/gigs/page.tsx`, and the unused `ListChecks` / `Check` imports. Cards are back to compact mode.
 - `99e6b6f` Show full checklist preview on each browse-gigs card: batch-fetched all checklist items for visible gigs in one query, grouped by `gig_id`, passed through `GigFilterContent` → `GigListingCard`. Card renders the full task list in a small muted box with task count header and required (*) markers. Shipped, then reverted by `87f7a70` after Cory saw it.
