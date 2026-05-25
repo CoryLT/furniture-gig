@@ -44,11 +44,23 @@ export default async function MarketplacePage() {
   let photosByListing = new Map<string, MarketplacePhotoRow>()
 
   if (listingIds.length > 0) {
-    const { data: photosData } = await supabase
+    const { data: photosData, error: photosError } = await supabase
       .from('marketplace_photos')
       .select('*')
       .in('listing_id', listingIds)
       .order('sort_order')
+
+    // TEMP DIAGNOSTIC — remove after we figure out why card thumbnails are blank
+    console.log('[marketplace] photo query', {
+      requested_listing_ids: listingIds,
+      returned_photo_count: photosData?.length ?? 0,
+      first_few_photos: (photosData ?? []).slice(0, 3).map((p: any) => ({
+        listing_id: p.listing_id,
+        file_path: p.file_path,
+        sort_order: p.sort_order,
+      })),
+      error: photosError?.message ?? null,
+    })
 
     const photos = (photosData ?? []) as MarketplacePhotoRow[]
     // First photo per listing wins (already sorted by sort_order asc)
