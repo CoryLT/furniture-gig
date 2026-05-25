@@ -34,7 +34,26 @@ export async function GET() {
     return NextResponse.json({
       ok: false,
       reason: 'STRIPE_SECRET_KEY_LIVE not set in environment',
+      diagnostic: {
+        STRIPE_SECRET_KEY_LIVE: 'undefined',
+        STRIPE_SECRET_KEY_present: !!process.env.STRIPE_SECRET_KEY,
+        STRIPE_WEBHOOK_SECRET_present: !!process.env.STRIPE_WEBHOOK_SECRET,
+        all_stripe_env_var_names: Object.keys(process.env).filter((k) => k.toUpperCase().includes('STRIPE')),
+      },
     }, { status: 500 })
+  }
+
+  // DIAGNOSTIC: show first 10 characters of every Stripe-related env var.
+  // SAFE because secret keys are 100+ chars; first 10 reveals only the prefix.
+  const diagnostic = {
+    STRIPE_SECRET_KEY_LIVE_prefix: (process.env.STRIPE_SECRET_KEY_LIVE ?? '').slice(0, 10),
+    STRIPE_SECRET_KEY_LIVE_length: (process.env.STRIPE_SECRET_KEY_LIVE ?? '').length,
+    STRIPE_SECRET_KEY_legacy_prefix: (process.env.STRIPE_SECRET_KEY ?? '').slice(0, 10),
+    STRIPE_SECRET_KEY_legacy_length: (process.env.STRIPE_SECRET_KEY ?? '').length,
+    STRIPE_WEBHOOK_SECRET_prefix: (process.env.STRIPE_WEBHOOK_SECRET ?? '').slice(0, 10),
+    STRIPE_WEBHOOK_SECRET_length: (process.env.STRIPE_WEBHOOK_SECRET ?? '').length,
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_prefix: (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '').slice(0, 10),
+    all_stripe_env_var_names: Object.keys(process.env).filter((k) => k.toUpperCase().includes('STRIPE')),
   }
 
   try {
@@ -64,6 +83,7 @@ export async function GET() {
       reason: 'Stripe API call failed',
       error_type: err?.type ?? 'unknown',
       message: err?.message ?? String(err),
+      diagnostic,
     }, { status: 500 })
   }
 }
