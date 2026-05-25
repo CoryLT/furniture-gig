@@ -64,8 +64,23 @@ export function WelcomeModal() {
             </p>
 
             <p>Let&apos;s build something good.</p>
+          </div>
 
-            <p className="font-serif text-base text-foreground">Cory</p>
+          <div className="flex items-center gap-3 pt-4 border-t border-border">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/cory-founder.jpg"
+              alt="Cory, founder of FlipWork"
+              className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+            />
+            <div>
+              <p className="font-serif text-base text-foreground leading-tight">
+                Cory
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Founder, FlipWork
+              </p>
+            </div>
           </div>
 
           <div className="pt-2">
