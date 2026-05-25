@@ -12,7 +12,9 @@ import {
   Clock,
   ShoppingBag,
 } from 'lucide-react'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -64,7 +66,33 @@ type ListingRow = {
 const REAL_MONEY_STATUSES = ['authorized', 'captured', 'transferred', 'refunded']
 
 export default async function AdminDashboard() {
-  const supabase = createClient()
+  // Verify the caller is actually an admin before bypassing RLS.
+  // We check role using the user's own session (which CAN read its own row),
+  // then if they pass, switch to the service-role client so RLS doesn't hide
+  // platform-wide rows (like other users) from the admin dashboard.
+  const userClient = createClient()
+  const {
+    data: { user },
+  } = await userClient.auth.getUser()
+
+  if (!user) {
+    redirect('/auth/login?next=/admin')
+  }
+
+  const { data: me } = await userClient
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (!me || (me as { role?: string }).role !== 'admin') {
+    redirect('/home')
+  }
+
+  // From here on, use the service-role client. It bypasses RLS so the
+  // dashboard sees real platform-wide totals instead of just rows the
+  // current admin's own session can see.
+  const supabase = createAdminClient()
 
   // 30-day window for time-bounded metrics
   const thirtyDaysAgo = new Date()
