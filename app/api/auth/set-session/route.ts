@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     // Compute the safe post-auth destination for non-admin users:
     //   - If a ?next= was passed AND it's a safe internal path → that
-    //   - Otherwise → /marketplace
+    //   - Otherwise → /home (dashboard)
     const safeNext =
       typeof next === 'string' &&
       next.startsWith('/') &&
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       !next.startsWith('/admin')
         ? next
         : null
-    const postAuthDestination = safeNext ?? '/marketplace'
+    const postAuthDestination = safeNext ?? '/home'
 
     const [, b64Segment] = access_token.split('.')
     if (!b64Segment) {

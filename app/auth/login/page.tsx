@@ -62,8 +62,8 @@ export default function LoginPage() {
       // Admins only follow ?next= if it's an /admin path
       router.push(safeNext && safeNext.startsWith('/admin') ? safeNext : '/admin')
     } else {
-      // Workers/flippers follow any safe ?next=; otherwise marketplace
-      router.push(safeNext && !safeNext.startsWith('/admin') ? safeNext : '/marketplace')
+      // Workers/flippers follow any safe ?next=; otherwise dashboard
+      router.push(safeNext && !safeNext.startsWith('/admin') ? safeNext : '/home')
     }
   }
 

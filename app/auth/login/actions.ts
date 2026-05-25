@@ -46,6 +46,6 @@ export async function loginAction(formData: FormData) {
   if (isAdmin) {
     redirect(safeRedirect && safeRedirect.startsWith('/admin') ? safeRedirect : '/admin')
   } else {
-    redirect(safeRedirect && !safeRedirect.startsWith('/admin') ? safeRedirect : '/marketplace')
+    redirect(safeRedirect && !safeRedirect.startsWith('/admin') ? safeRedirect : '/home')
   }
 }
