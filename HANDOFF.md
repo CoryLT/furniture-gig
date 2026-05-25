@@ -16,6 +16,7 @@ Critical context to know when picking up:
 - **All Stripe route handlers are now `force-dynamic` + `revalidate=0`.** Done during live-mode debugging — keep this pattern when adding new Stripe routes.
 - **NC d/b/a "FlipWork" is filed** (Wake County, May 25, 2026, $26 paid). State will record in 1-3 business days and email a PDF certificate. Save it.
 - **NC LLC annual report is OUTSTANDING** — Groovy Greens, LLC is "Current-Active" but the 2025 annual report ($200) was not filed. Cory is waiting on cash. Hard deadline: before NC moves status to "Admin. Dissolved" (realistically summer 2026). After that the LLC veil is gone.
+- **Supabase is on Pro + Custom Domain add-on ($35/mo total).** Upgraded May 25, 2026 to hide the ugly `mopzoybaeyeaaaaiyrdk.supabase.co` URL that flashed during Google OAuth. Auth now lives at **`auth.myflipwork.com`** (Google OAuth callback = `https://auth.myflipwork.com/auth/v1/callback`). Pro tier also gets you daily backups (7-day retention) and prevents the project from pausing on inactivity. DNS records (CNAME `auth` → `mopzoybaeyeaaaaiyrdk.supabase.co` + TXT `_acme-challenge.auth` for SSL) live in Vercel DNS for myflipwork.com — don't delete them. Old supabase.co callback URL is still in Google OAuth's "Authorized redirect URIs" as a fallback for now; can be cleaned up after a week of confirmed working. The regular Supabase API/database calls still go through the supabase.co URL — only the auth flow uses the custom domain, which is normal.
 
 ---
 
