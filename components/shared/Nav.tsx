@@ -42,7 +42,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   const currentUserIdRef = useRef<string | null>(null)
 
   const links = role === 'admin' ? adminLinks : userLinks
-  const logoHref = role === 'admin' ? '/admin' : '/marketplace'
+  const logoHref = role === 'admin' ? '/admin' : '/home'
 
   useEffect(() => {
     if (role === 'admin') return
