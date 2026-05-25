@@ -22,6 +22,7 @@ const userLinks = [
   { href: '/marketplace/new', label: 'List an Item' },
   { href: '/marketplace/mine', label: 'My Listings' },
   { href: '/messages', label: 'Messages' },
+  { href: '/connections', label: 'My Connections' },
   { href: '/my-gigs/payouts', label: 'Payouts' },
 ]
 
