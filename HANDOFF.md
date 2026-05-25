@@ -75,6 +75,7 @@ After you push, Cory must:
 - **Unified Dashboard at `/home`** — still exists as a personalized dashboard reachable from the hamburger nav, but is NO LONGER the post-auth landing page (marketplace is). Greeting + date, 4-tile hero stats (total earned / invested / gigs completed / active), 30-day stacked-bar SVG chart of daily money flow (hand-rolled, no chart deps), action sections that hide when empty (needs review / pending applicants / unread messages / work in progress), "You vs the community" percentile bars (only shows once user has some activity), recent activity feed (last ~10 events). Brand-new users see a single welcome card instead. Hamburger nav collapses ALL primary nav items into the dropdown on every viewport — there's no desktop horizontal link row.
 - **Flipper dashboard with filter/sort + needs-review highlights** — banner appears when any gig has pending applicants, dedicated stat tile, filter chips (All / Needs review / Open / In progress / Completed), sort dropdown (Newest / Oldest / Due soon / Most applicants), pending gigs always float to top under "All". Note: does NOT yet surface "work submitted, awaiting your review" — that's a known gap (see What's Next).
 - **AI support chat at `/support`** — Haiku 4.5 agent for logged-in users. Answers FAQs, looks up the user's own gigs/payouts/Stripe status, escalates serious issues. Admin queue at `/admin/support`. See "AI support chat" section below.
+- **Terms of Service + Privacy Policy v1.0 LIVE** — full ~10k-word documents seeded into `legal_agreements` table. Public read at `/legal/terms` and `/legal/privacy` (no login required, search-engine friendly). Logged-in users hitting `/marketplace` get force-redirected to `/auth/agreements` if anything required is unaccepted. New signups already hit the agreements flow naturally. Operating entity = Groovy Greens, LLC (NC) d/b/a FlipWork. Governing law = NC. Mandatory binding arbitration + class action waiver. See "Legal docs (TOS + Privacy)" section below.
 
 ---
 
@@ -202,6 +203,53 @@ AI replies render through `react-markdown` + `remark-gfm` inside a `.chat-markdo
 - Email notification to admin on escalation (right now Cory checks `/admin/support` manually; the badge on `/admin` is the visible signal)
 - Streaming responses for snappier UX (currently waits for full reply)
 - Allow admin to reply IN the conversation as a human takeover (currently admin only views + resolves; user has no way to see admin replies)
+
+---
+
+## Legal docs (TOS + Privacy Policy) (DONE — shipped this session)
+
+Full Terms of Service and Privacy Policy seeded as v1.0, public-facing pages live, agreements gate wired up for existing users. This closes Bucket 1 #5 in `MARKETPLACE_ROADMAP.md`. No real lawyer reviewed the docs yet — Cory plans to get a 1-hour small-business attorney review before going live with real money, but the docs are professional-grade and based on what real marketplace platforms use.
+
+### Key decisions baked in
+- **Operating entity:** Groovy Greens, LLC, a NC LLC originally formed for microgreens, used as the operating shell for FlipWork via d/b/a (Cory has not yet filed the d/b/a — see TODO list below).
+- **Governing law / arbitration venue:** North Carolina (specifically Wake County for any court proceeding). Cory lives in Garner, NC.
+- **Eligibility:** 18+ U.S. residents only. Service is intended for U.S. users only. No GDPR compliance built in. Children under 18 explicitly excluded.
+- **Mandatory binding arbitration + class action waiver** under AAA Consumer Arbitration Rules. 30-day opt-out window for the user. Carveouts for small claims court and IP injunctive relief.
+- **Independent contractor classification** of Workers is spelled out at length (Section 5 of TOS). Critical for gig-platform protection — Uber/DoorDash have been sued repeatedly on this exact point.
+- **Limitation of liability:** $100 or 12 months of platform fees paid, whichever greater. Standard SaaS/marketplace cap.
+- **User content license:** non-exclusive, royalty-free, sublicensable, transferable for purposes of operating the Service. Plain-English note included that Anthropic doesn't sell photos to advertisers or train general AI models on user data.
+- **Email contact** in docs: `CoryThacker@proton.me`. No mailing address listed (says "available on request" — Cory hasn't set up a business address yet).
+- **AI support chat disclosure**: Privacy Policy Section 3.1(b) explicitly discloses the support chat is powered by Anthropic's Claude Haiku, what data is sent to Anthropic, and that Anthropic doesn't train on API data by default.
+
+### File map
+- `legal/terms-of-service.md` — source of truth for TOS. ~10,500 words, plain-text formatted to display well inside `<pre>` tags. Edit this when you need to update the TOS.
+- `legal/privacy-policy.md` — source of truth for Privacy Policy. ~7,000 words. Edit this when you need to update privacy.
+- `scripts/generate_legal_sql.py` — regenerates the SQL migration from the two `.md` files. Run after editing either `.md`. Uses `$LEGAL$` dollar-quote tag (Postgres syntax that bypasses string escaping) — the script asserts the tag doesn't appear in the content before writing.
+- `supabase/schema_legal_agreements_v1.sql` — generated SQL. Deactivates the original placeholder "Independent Contractor Agreement" seeded by `schema.sql` and inserts the new TOS + Privacy as required, active agreements (v1.0). Idempotent via `where not exists`.
+- `supabase/schema_legal_agreements_public_read.sql` — small RLS patch. The original schema's SELECT policy required `auth.uid() is not null`, which blocked the public `/legal/*` pages for logged-out visitors. This patch drops it and replaces with `using (active = true)`. Admin-management policy on the same table is untouched.
+- `app/legal/terms/page.tsx` and `app/legal/privacy/page.tsx` — thin wrappers that render `<LegalDocPage title="..." />`. Both `force-dynamic + revalidate=0` so admins can update text and see it live.
+- `components/shared/LegalDocPage.tsx` — shared component. Loads the latest active version of a named agreement, displays it inside a card with a header bar (logo + Terms/Privacy nav). Fallback message if the agreement isn't in the DB (so the page never 404s during deploys).
+- `lib/agreements-gate.ts` — exports `requireAgreementsAccepted(supabase, userId, currentPath)`. Call from any server page after `getUser()` returns a logged-in user. Internally fetches required+active agreements and the user's acceptances in parallel; redirects to `/auth/agreements?next=<currentPath>` if anything pending. Calls `redirect()` (Next's `next/navigation`) which throws, so no return-value handling needed at call sites.
+- `app/marketplace/page.tsx` — only post-auth landing page currently wired to call `requireAgreementsAccepted`. The gate runs ONLY for logged-in users; logged-out visitors can still browse the marketplace freely.
+- `app/auth/agreements/AgreementsClient.tsx` — bumped scroll-area height from `h-72` (288px) to `h-[60vh] min-h-[20rem]` so the new ~10k-word documents are actually readable. The component was already correctly designed to render one agreement at a time with a checkbox + version stamp + Accept button.
+
+### Editing the legal text later
+1. Edit `legal/terms-of-service.md` or `legal/privacy-policy.md`.
+2. If it's a small fix-up that should NOT force users to re-accept, leave the version string as `1.0` at the top of both the `.md` file AND in `scripts/generate_legal_sql.py`. Run `python scripts/generate_legal_sql.py`. The regenerated SQL's `where not exists` check will see v1.0 still exists and skip the insert — so editing won't actually change the DB. You'd need to run a manual `update public.legal_agreements set content = $LEGAL$...$LEGAL$ where title = '...' and version = '1.0'` to push the change. **This is the safe path for typo fixes.**
+3. If it's a material change that SHOULD force users to re-accept (e.g. new clauses, fee changes, jurisdiction changes), bump the version string to `1.1`, `2.0`, etc. in BOTH the `.md` file AND in `scripts/generate_legal_sql.py`. Re-run the script. The new row will insert as a new agreement, and since no user has an acceptance row for the new agreement_id, everyone gets caught in the gate on their next visit. The previous version stays in the DB as historical record (its `active` flag stays true unless you explicitly deactivate it). You may want to deactivate the old version in the same SQL run if you don't want it active.
+4. Push the code, run the SQL, done.
+
+### Public legal page SEO note
+The public pages use `force-dynamic + revalidate=0` so they're fresh, but that ALSO means they're server-rendered on every request. For 99% of marketplaces, this is fine — search engines hit each page once and cache. If `/legal/*` ever becomes a hotspot for whatever reason, you could swap to `revalidate=3600` (refresh hourly) without losing much. The trade-off is staleness during the hour after an update.
+
+### Quirks worth knowing
+- **RLS gotcha:** the original schema's "Anyone authenticated can view active agreements" policy was the reason `/legal/terms` and `/legal/privacy` first shipped showing "document not available" — logged-out viewers literally couldn't read their own legal docs. The `schema_legal_agreements_public_read.sql` patch fixed it. If you ever recreate the table from scratch, use `using (active = true)` for SELECT, not `using (auth.uid() is not null and active = true)`.
+- **The placeholder "Independent Contractor Agreement"** seeded by the original `schema.sql` is now `active = false`. Its acceptance rows in `user_agreement_acceptances` are still there (don't delete them — they're historical data), they just don't gate anything because the agreement is inactive. The IC language is now folded into Section 5 of the new TOS, so no separate IC agreement exists going forward.
+- **Dollar-quote tags:** the generator uses `$LEGAL$` (Postgres custom tag). If you ever need to use a string containing `$LEGAL$` in legal text (extremely unlikely), the generator will refuse to write and ask you to pick another tag. Standard `$$` (no tag) would NOT have worked because `$$$$` would parse as an empty string followed by start-of-quote.
+- **The gate is per-page, not middleware.** Reason: middleware runs on the Edge runtime, which doesn't have a fast path to the DB. Doing a DB hit on every single request to every protected route would slow the whole app. Only `/marketplace` is wired right now because it's the post-auth landing for everyone. If you add new high-traffic post-auth landing pages, wire `requireAgreementsAccepted` into those too. Otherwise it's a slow leak — a user who somehow skips marketplace can navigate around without ever being gated.
+- **The `next=` parameter is preserved through the gate** by `app/auth/agreements/page.tsx` (it was already preserving this from previous work) and by `requireAgreementsAccepted` which forwards the current path as `next`. The agreements page sends users to the `next` URL after the last agreement is accepted. So a deep link → marketplace gate → agreements gate → original deep link works end-to-end.
+- **Cory has NOT yet filed the d/b/a** with NC Wake County Register of Deeds. The legal docs reference "Groovy Greens, LLC, doing business as 'FlipWork'" as if the d/b/a already exists. This is fine for most purposes but technically the d/b/a needs to be on file to be fully clean. Cory was told this in the session and put on the non-code TODO list.
+- **No real lawyer has reviewed the docs.** Cory was advised in the session to budget $200-400 for a small-business attorney spot-check before going live with real money. The docs match industry-standard marketplace TOS (Etsy/OfferUp/TaskRabbit patterns), so a review will mostly be tweaks. Don't take this off the TODO list until it's done.
 
 ---
 
@@ -722,7 +770,7 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 ## ⚠️ TODOs left at end of session
 
-1. **Rotate `SIGHTENGINE_API_SECRET`** — exposed in chat in an earlier session. Regenerate in Sightengine dashboard, update Vercel env var, redeploy. STILL OUTSTANDING — Cory has not done this yet across multiple sessions.
+1. **Rotate `SIGHTENGINE_API_SECRET`** — exposed in chat in an earlier session. Regenerate in Sightengine dashboard, update Vercel env var, redeploy. STILL OUTSTANDING — Cory has not done this yet across multiple sessions. **See "Cory's non-code TODOs" #5 for step-by-step.**
 2. **Stripe Connect Phases 5, 6, 8, 9** — Phases 1-4 + 7 are done. Still needed before going live:
    - Phase 5: worker payout UI polish (Express dashboard login link, arrival window, Stripe-side status)
    - Phase 6: admin payout UI upgrade (show PI ID, status, refund button)
@@ -732,10 +780,7 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 4. **Place `ReportImageButton` on photo views** — gallery cards, gig photo grids, avatar viewers. Component is built; just needs to be slotted in.
 5. **Listing reports — Report button + admin queue.** `listing_reports` table exists from this session's SQL. Need a "Report listing" button on the marketplace listing detail page, a `/api/report-listing` endpoint, and an admin queue page at something like `/admin/listing-reports`. Parallel to the existing `image_reports` infrastructure — should copy that pattern.
 6. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
-7. **Legal/TOS work** — started but didn't finish in a previous session. Decisions already made:
-   - Source: generated starter text (lawyer-review-before-launch disclaimer at top)
-   - Gate: hard gate — must accept before doing anything
-   - Existing infra at `/auth/agreements` already handles multiple required agreements; just needs TOS + Privacy seed and a server-side check that redirects logged-in users with unaccepted required agreements to `/auth/agreements`. A SQL file (`supabase/schema_legal_agreements.sql`) was scaffolded but not completed. Restart fresh.
+7. ~~**Legal/TOS work**~~ ✅ DONE this session. Full TOS + Privacy Policy v1.0 shipped. Source markdown in `legal/*.md`, generator at `scripts/generate_legal_sql.py`, SQL at `supabase/schema_legal_agreements_v1.sql` (run) and `supabase/schema_legal_agreements_public_read.sql` (run). Public pages at `/legal/terms` and `/legal/privacy`. Existing logged-in users gated via `lib/agreements-gate.ts` wired into `app/marketplace/page.tsx`. See "Legal docs (TOS + Privacy)" section above. **Non-code follow-ups remain in the "Cory non-code TODOs" section below.**
 8. **Email notifications** (Bucket 1 #1 in MARKETPLACE_ROADMAP.md). Right now if someone applies to your gig, messages you on a listing, or buys/sells something, they have to log in and notice. Needs an email provider (Resend / Postmark / SES) and templated sends for the key events.
 9. **Address/pickup details on gigs** (Bucket 1 #3). Gigs only have city/state. Want full address visible to picked worker only. Schema change + reveal-after-pick UI.
 10. **Apply `force-dynamic` audit to other server pages.** The flipper dashboard, gig detail pages, AND `/my-gigs` (added this session) all have `force-dynamic + revalidate=0` now. Still worth scanning other server pages that show claim/applicant/message state (`/messages`, `/messages/[id]`, `/home`, etc.) and adding the same if they exhibit similar staleness.
@@ -748,6 +793,111 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
     - **Tighten the delete endpoint at the same time:** block hard delete when any claim row exists in `pending`, `active`, or `submitted_for_review` (Upwork/TaskRabbit pattern, "yes — block delete if ANY claim exists" was Cory's directional lean before pausing). Archive remains available in those cases.
     - Touches: `gig_claims` (new status value + maybe a `cancel_requested_by` column), new endpoints `/api/gigs/[id]/cancel/request`, `/api/gigs/[id]/cancel/respond`, UI on both `/my-gigs/[claimId]` and `/flipper/gigs/[id]`, system message into the existing `gig_messages` table, Stripe authorization-release helper (already exists as `cancelPickAuthorization` in `lib/stripe-pick.ts`).
     - Reference: see the conversation that pitched this (industry comparison + flow sketch) for context. ~60-90 min build per the discussion.
+
+---
+
+## 📋 Cory's non-code TODOs (walkthrough — read this!)
+
+These are things Claude CAN'T do for you. They matter for the legal protection your TOS/Privacy Policy promises. Take them in order — the lawyer review can happen anytime, but the LLC and d/b/a items should happen sooner than later.
+
+### 1. Confirm Groovy Greens, LLC is in good standing — DO THIS FIRST (5 min, free)
+
+Why it matters: your TOS names "Groovy Greens, LLC" as the operator. If the LLC is "administratively dissolved" by the state (which happens automatically if you miss an annual report), it legally doesn't exist right now and the TOS protection is much weaker. Easy to check.
+
+**Steps:**
+1. Open browser → go to **sosnc.gov** (NC Secretary of State)
+2. Click **Search** in the top nav → **Business Registration**
+3. Type "Groovy Greens" in the company name field
+4. Click your LLC in the results
+5. Look at the **"Status"** field
+
+**If status is "Current-Active":** you're good. Move to #2.
+
+**If status is "Administratively Dissolved" or anything not "Current-Active":**
+- Click the **"Annual Report"** button on the same page
+- Pay any outstanding annual reports (NC LLCs owe one every year by April 15, $200 each)
+- If past-due multiple years, NC may require a "Reinstatement" — there's a button on the page for that ($100 reinstatement fee + back annual reports). Total cost depends on how many years you missed.
+- Wait for the state to process it (usually same-day for online filings, can take a few days)
+- Once status shows "Current-Active," continue to #2
+
+If you're unsure, call NC SOS at 919-814-5400. They're helpful.
+
+### 2. File a NC Certificate of Assumed Name (d/b/a) for "FlipWork" (~$26, 15 min)
+
+Why it matters: your LLC is named "Groovy Greens, LLC" but everything customers interact with is called "FlipWork." Without a filed d/b/a, if a customer sues, they might claim "FlipWork" isn't a registered name and the contract (your TOS) doesn't legally apply. The d/b/a fixes that for ~$26.
+
+**Steps:**
+1. Open browser → go to **sosnc.gov/online_services** → "Assumed Business Name"
+   - OR if that's confusing: Google "NC Certificate of Assumed Name online filing"
+2. You'll fill out a form with:
+   - **Assumed Business Name:** `FlipWork`
+   - **Real Name of the Business:** `Groovy Greens, LLC`
+   - **County where you'll operate:** Wake County (Garner is in Wake County)
+   - **Type of Entity:** LLC
+   - **Address:** your business address (your home is fine if you don't have a separate one — but be aware this becomes public record)
+   - **Effective date:** today's date is fine
+3. Pay the $26 filing fee with a credit card
+4. Submit. You should get a confirmation email and a stamped copy within a few days.
+
+**After filing:** save the stamped certificate PDF somewhere safe (Google Drive, Dropbox, etc.). If a payment processor or bank ever asks for proof you can operate as "FlipWork," that's the document.
+
+**Important note:** in NC, the Certificate of Assumed Name is filed at the **state level via SOS** (this used to be county-level Register of Deeds before 2017). Don't get tripped up by old advice telling you to go to the courthouse — the state online system is current.
+
+### 3. Update your business setup AFTER the d/b/a is filed (10 min)
+
+Once you have the d/b/a certificate in hand:
+
+- **Stripe account name:** Sign into Stripe Dashboard → Settings → Business Settings → Public Details. If it currently says your personal name or "Groovy Greens, LLC," update the **"Public business name"** to `FlipWork`. The legal entity stays as Groovy Greens, LLC, but the customer-facing name is what shows on credit card statements and Stripe Express dashboards.
+- **Bank account (optional but recommended):** if you don't already have a business bank account for Groovy Greens LLC separate from your personal money, open one. Most local banks and online options (Mercury, Relay, Bluevine) let you open free business checking with the LLC formation docs + the new d/b/a. This is the SINGLE biggest thing protecting your LLC veil — mixing personal and business money is the #1 way courts pierce LLCs.
+
+### 4. Get a small-business lawyer to spot-check the TOS + Privacy Policy ($200-400, 1 hour) — DO THIS BEFORE TAKING REAL MONEY
+
+Why it matters: the legal docs Claude generated are based on what real marketplaces use (Etsy, OfferUp, TaskRabbit patterns), but Claude is NOT a lawyer and can't guarantee enforceability. A real attorney will:
+- Spot anything material to NC law that Claude missed
+- Tell you whether the arbitration clause + class action waiver will hold up in NC courts (they generally do, but state law evolves)
+- Flag anything that wouldn't survive specifically for your business model
+- Often suggest 2-3 small tweaks that meaningfully strengthen the docs
+
+**How to find one cheaply:**
+- **NC Bar Association lawyer referral service:** ncbar.org → "Need a Lawyer" → "Lawyer Referral Service." They'll match you with a small-business attorney in NC. First consult is often $50 for 30 minutes.
+- **Avvo or LegalMatch:** search "small business attorney Raleigh" or "internet law attorney NC." Lots of solo practitioners do flat-rate document reviews for $200-400.
+- **Ask local entrepreneur friends.** Someone you know has used one.
+
+**What to tell the lawyer:**
+> "I'm operating a small online marketplace platform under a NC LLC with a d/b/a. I have a Terms of Service and Privacy Policy that I drafted using a template. Can you review them for ~$300 and flag anything material I should change, especially around binding arbitration enforceability in NC and the independent-contractor classification of users who perform paid work?"
+
+**Files to send them:**
+- `legal/terms-of-service.md`
+- `legal/privacy-policy.md`
+- Tell them the live versions are at `https://myflipwork.com/legal/terms` and `https://myflipwork.com/legal/privacy`
+
+**When they come back with changes:** just paste their suggested edits to Claude in a future session and Claude will make the updates, regenerate the SQL, and walk you through the deploy.
+
+### 5. (Future) Rotate the Sightengine API secret (5 min)
+
+This has been on the TODO list for multiple sessions. Quick task:
+1. Sign into the Sightengine dashboard
+2. Generate a new API secret
+3. Update the `SIGHTENGINE_API_SECRET` env var on Vercel (Project → Settings → Environment Variables)
+4. Redeploy the latest production build (Deployments tab → ⋯ → Redeploy → uncheck "Use existing Build Cache")
+5. Done
+
+Reason: the old secret was exposed in a chat session a while back. Almost certainly fine but rotating is cheap.
+
+### 6. (Future) Set a business address on the legal docs
+
+The TOS currently says "(Mailing address available on request)" because you don't have a separate business address yet. Once you have:
+- A PO Box (NC USPS PO boxes are ~$70/year for a small one), OR
+- A virtual mailbox service (iPostal1, Anytime Mailbox, etc., ~$10-15/month), OR
+- An office/coworking space
+
+…tell Claude the address and we'll update the legal docs. NOT urgent, but nice to have on the docs eventually.
+
+### What you DON'T need to do
+
+- **Don't form a separate "FlipWork LLC."** Groovy Greens, LLC + d/b/a "FlipWork" is exactly the right structure. Forming another LLC just creates an extra entity to maintain.
+- **Don't try to "convert" Groovy Greens, LLC to a different name.** NC technically allows it but it's expensive and unnecessary — the d/b/a covers the customer-facing branding.
+- **Don't pay a lawyer to draft TOS from scratch.** The docs Claude generated are already 80-90% there. A 1-hour review is the right spend, not a 5-figure custom drafting engagement.
 
 ---
 
@@ -797,17 +947,27 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 ## What's next (next session)
 
-**This session: small focused UX polish around gig previews — no new systems, no schema changes, no SQL.** Four commits, all in `/gigs` and `/flipper/dashboard` territory:
+**This session: launch-prep cleanup + full TOS/Privacy Policy v1.0 shipped.** Three commits, focused on closing one of the two biggest pre-launch blockers (legal docs) plus a repo-hygiene cleanup:
+
+1. **Cleaned up 23 empty junk files** at the repo root that had been there since `9b1d2b2` (the worker city filter commit). Pure mechanical fix. Verified via `git show` that all were 0 bytes from creation, never had content. Single commit: `85c2f24`.
+2. **Full TOS + Privacy Policy v1.0 shipped end-to-end.** Source markdown in `legal/*.md`, generator at `scripts/generate_legal_sql.py`, SQL migrations, public read pages at `/legal/terms` and `/legal/privacy`, and runtime gate wired into `/marketplace` so existing logged-in users get caught. See "Legal docs (TOS + Privacy)" section. Also generated the **Cory's non-code TODOs walkthrough section** with step-by-step instructions for the NC LLC good-standing check, NC d/b/a filing, Stripe business name update, and lawyer review.
+3. **Hot-fix:** when Cory first visited `/legal/terms`, the page showed "document not available." Root cause was the original schema's RLS policy requiring `auth.uid() is not null` for SELECT — blocking logged-out viewers from reading public legal docs. Patched via `supabase/schema_legal_agreements_public_read.sql`. Cory ran the SQL and both pages now render correctly.
+
+**Pattern carry-over for next session:** the source-markdown-to-DB-via-generator pattern (`legal/*.md` → `scripts/generate_legal_sql.py` → `supabase/schema_legal_agreements_v1.sql` → DB row) is a clean way to keep large blocks of content versioned in git AND in the DB. Could be reused for support FAQs, email templates, or anything else that's "text in the DB but humans want to edit it like a file."
+
+---
+
+**Previous session: small focused UX polish around gig previews — no new systems, no schema changes, no SQL.** Four commits, all in `/gigs` and `/flipper/dashboard` territory:
 
 1. **Reference images now visible on the flipper side too.** The flipper dashboard list shows a 64px thumbnail per gig (first image by `sort_order`, placeholder icon if none). The flipper gig detail page renders the full reference-image grid using the existing `GigReferenceImages` component. Image URLs are built on the server in one batched query.
 2. **Own posted gigs now appear in the worker browse feed**, mixed in by date with everyone else's, marked with a small "Your post" badge under the status pill. Footer link reads "View as worker" on own posts. The existing `isOwnPostedGig` branch on `/gigs/[slug]` already prevents claiming and shows a "You posted this gig" panel, so no extra detail-page work was needed. Cory wanted this so he can see his gig the way workers see it without using a second account.
 3. **Checklist preview attempt** — added a full task-list preview to each browse card, Cory looked at it and asked to back it out (he wanted the checklist visible only on the detail page next to the description, not duplicated on every card). The detail page already shows the checklist. Net: card stayed compact, change was a no-op for users.
 
-**Pattern carry-over for next session:** batch-fetching related rows (images, checklist items, etc.) for a list of gigs in a single query and grouping by `gig_id` is a much better pattern than the client-side N+1 fetch `GigListingCard` does for thumbnails on the worker browse cards. That worker-side N+1 is still there (each card runs its own thumbnail query in a `useEffect`). Not urgent — perf has been fine — but if `/gigs` ever gets slow, that's where to start.
+**Pattern carry-over from that session:** batch-fetching related rows (images, checklist items, etc.) for a list of gigs in a single query and grouping by `gig_id` is a much better pattern than the client-side N+1 fetch `GigListingCard` does for thumbnails on the worker browse cards. That worker-side N+1 is still there (each card runs its own thumbnail query in a `useEffect`). Not urgent — perf has been fine — but if `/gigs` ever gets slow, that's where to start.
 
 ---
 
-**Previous session: killed two major iPhone bugs** — the photo upload hang and the OAuth hang. See "Previous session's commits" and the bugfix notes below for details. Tl;dr: Vercel 4.5MB body limit triggered 413s that returned non-JSON HTML, crashing every `res.json()` call silently. Fix was client-side image compression + try/catch around every res.json(). And Supabase Site URL was set to the vercel.app domain, which made OAuth redirect through the `*.vercel.app → myflipwork.com` 308 — and 308s strip URL fragments, so the auth token vanished. Fix was setting Supabase Site URL to `https://myflipwork.com` directly.
+**Two sessions ago: killed two major iPhone bugs** — the photo upload hang and the OAuth hang. See "Two-sessions-ago commits" and the bugfix notes below for details. Tl;dr: Vercel 4.5MB body limit triggered 413s that returned non-JSON HTML, crashing every `res.json()` call silently. Fix was client-side image compression + try/catch around every res.json(). And Supabase Site URL was set to the vercel.app domain, which made OAuth redirect through the `*.vercel.app → myflipwork.com` 308 — and 308s strip URL fragments, so the auth token vanished. Fix was setting Supabase Site URL to `https://myflipwork.com` directly.
 
 ---
 
@@ -819,49 +979,41 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 Cory's most likely next moves, in rough order:
 
-1. **Back button on Step 2 of Post a Gig flow.** Cory asked for this two sessions ago, asked the clarifying "what should back do" question (option A = back to Step 1 same flow, option B = route to Edit Gig page), then deferred — "skip this for now, focus on the photo delete bug first." Never got back to it. Same pattern as the List an Item back button shipped two sessions ago (`1b9a0c0`) — Step 1 already creates the gig, so coming back needs to switch save from create → update. Reference that commit for the pattern. Cory's preference was unstated; ask before building.
+1. **Mutual cancel for gigs + tighten hard delete.** Known safety hole shipped a previous session: a claimed gig can be hard-deleted even when a worker is mid-claim (as long as no Stripe money has moved). Plan is to build an Upwork/TaskRabbit-style mutual cancel (either side requests, the other accepts/declines via system message in chat, claim → `cancelled_by_mutual_agreement`, Stripe auth released), and at the same time block hard delete when any claim is in `pending`/`active`/`submitted_for_review`. Full plan + file touches are in the TODOs section above (#12).
 
-2. **Mutual cancel for gigs + tighten hard delete.** Known safety hole shipped a previous session: a claimed gig can be hard-deleted even when a worker is mid-claim (as long as no Stripe money has moved). Plan is to build an Upwork/TaskRabbit-style mutual cancel (either side requests, the other accepts/declines via system message in chat, claim → `cancelled_by_mutual_agreement`, Stripe auth released), and at the same time block hard delete when any claim is in `pending`/`active`/`submitted_for_review`. Full plan + file touches are in TODO #11.
+2. **Email notifications** (Bucket 1 #1 — MARKETPLACE_ROADMAP.md). Right now if someone applies to your gig or messages you, you have no idea unless you log in. Needs an email provider (Resend / Postmark / SES). Resend is recommended for simplicity — they have a generous free tier (~100 emails/day forever, no card required) and Next.js-friendly SDK. Templated sends for: gig claimed, gig submitted for review, work approved, payment received, listing message received. High-impact for retention.
 
-3. **Terms of Service, Privacy Policy, Worker Agreement, Flipper Agreement.** Worker agreement is currently a placeholder (`legal_agreements` table). Flipper agreement doesn't exist yet — the current schema only gates workers. Cory wanted to draft all four a previous session but we paused at the intake questions and didn't draft anything yet. **Before drafting, the next session needs Cory to answer:**
-   - Legal entity behind FlipWork (sole prop vs. LLC). If LLC, the docs name "FlipWork LLC" so they don't have to be rewritten after formation.
-   - State of operation (California is meaningfully harder due to AB5 gig-worker classification rules — worker agreement has to be much more careful about not implying employment).
-   - Local-only vs. nationwide (affects how much state-specific hedging the docs need).
-   - Whether forming an LLC before Stripe Phase 9 go-live is on the table — recommend yes for liability protection given real money flow.
+3. **Stripe Connect Phase 9: Go-live.** Swap test keys → live keys, redo the webhook destination in LIVE mode in Stripe (test-mode destinations don't carry over — Cory needs to make a second one and put the live `whsec_...` in Vercel), one real $1 transaction to verify, monitor. **Should not happen until at least the d/b/a is filed and the lawyer has reviewed the TOS — see "Cory's non-code TODOs" section.**
 
-   Plan once those are answered: draft all four documents, get them into the `legal_agreements` table (or wherever the Flipper one will live), then strongly recommend Cory pay an attorney for a 30-minute review of the gig agreement specifically before Phase 9 — California labor law has real teeth here.
+4. **Back button on Step 2 of Post a Gig flow.** Cory asked for this two sessions ago, asked the clarifying "what should back do" question (option A = back to Step 1 same flow, option B = route to Edit Gig page), then deferred — "skip this for now, focus on the photo delete bug first." Never got back to it. Same pattern as the List an Item back button shipped two sessions ago (`1b9a0c0`) — Step 1 already creates the gig, so coming back needs to switch save from create → update. Reference that commit for the pattern. Cory's preference was unstated; ask before building.
 
-4. **Marketplace location filter v2: zip-based + 100-mile radius.** A previous session shipped exact-city-match only. The full plan is zip-based: add `zip` to `worker_profiles`, `flipper_profiles`, and `marketplace_listings`; build a zip → lat/long lookup; show "within 100 mi of {zip}" with toggle. For logged-out users, prompt for zip and store in localStorage. Will naturally cover the logged-out marketplace location case too (currently they see all 60 most recent listings nationwide).
+5. **Marketplace location filter v2: zip-based + 100-mile radius.** A previous session shipped exact-city-match only. The full plan is zip-based: add `zip` to `worker_profiles`, `flipper_profiles`, and `marketplace_listings`; build a zip → lat/long lookup; show "within 100 mi of {zip}" with toggle. For logged-out users, prompt for zip and store in localStorage. Will naturally cover the logged-out marketplace location case too (currently they see all 60 most recent listings nationwide).
 
-5. **Show available gigs in the marketplace feed.** Cory wants a toggle (like the Free only pill) to mix gigs into the marketplace view. Deferred a previous session because there's no real data yet to design against. Decisions still open: how the toggle works (items/gigs/both vs. either/or), whether to show gigs to logged-out users (they can't apply without Stripe Connect — discovery vs. bounce tradeoff), and how to make gig cards visually distinct from listing cards.
+6. **Show available gigs in the marketplace feed.** Cory wants a toggle (like the Free only pill) to mix gigs into the marketplace view. Deferred a previous session because there's no real data yet to design against. Decisions still open: how the toggle works (items/gigs/both vs. either/or), whether to show gigs to logged-out users (they can't apply without Stripe Connect — discovery vs. bounce tradeoff), and how to make gig cards visually distinct from listing cards.
 
-6. **Listing reports — Report button + admin queue.** Table exists, button + admin UI don't. Mirrors the existing `image_reports` flow.
+7. **Listing reports — Report button + admin queue.** Table exists, button + admin UI don't. Mirrors the existing `image_reports` flow.
 
-7. **Stripe Connect Phase 5: Worker payout UI polish.** Show Stripe Express dashboard login link on `/my-gigs/payouts`, show expected payout arrival window, surface Stripe-side status (Pending / In transit / Paid) instead of legacy "unpaid/pending/paid."
+8. **Stripe Connect Phase 5: Worker payout UI polish.** Show Stripe Express dashboard login link on `/my-gigs/payouts`, show expected payout arrival window, surface Stripe-side status (Pending / In transit / Paid) instead of legacy "unpaid/pending/paid."
 
-8. **Stripe Connect Phase 6: Admin payout UI upgrade.** Show stripe_payment_intent_id, payment_status, capture/refund buttons on the admin payouts page. With webhooks in place (Phase 7 done), this is much more useful.
-
-9. **Email notifications** (Bucket 1 #1 — MARKETPLACE_ROADMAP.md). Needs an email provider (Resend / Postmark / SES). High-impact for retention.
+9. **Stripe Connect Phase 6: Admin payout UI upgrade.** Show stripe_payment_intent_id, payment_status, capture/refund buttons on the admin payouts page. With webhooks in place (Phase 7 done), this is much more useful.
 
 10. **Stripe Connect Phase 8: Edge cases.** Flipper's card declines at capture time, worker's Connect account gets restricted after approval, auth expires before work is done, flipper requests refund after capture, gig is canceled after authorization. Webhooks now detect most of these; the work here is the UI/notification side.
 
-11. **Stripe Connect Phase 9: Go-live.** Swap test keys → live keys, redo the webhook destination in LIVE mode in Stripe (test-mode destinations don't carry over — Cory needs to make a second one and put the live `whsec_...` in Vercel), one real $1 transaction to verify, monitor.
+11. **Streak counter + activity log for `/home`** — deferred again, still the next obvious dashboard enhancement.
 
-12. **Streak counter + activity log for `/home`** — deferred again, still the next obvious dashboard enhancement.
+12. **Address/pickup details on gigs** (Bucket 1 #3) — paired with messaging; reveal-after-pick.
 
-13. **Address/pickup details on gigs** (Bucket 1 #3) — paired with messaging; reveal-after-pick.
+13. **Ratings/reviews** (Bucket 1 #4).
 
-14. **Ratings/reviews** (Bucket 1 #4).
+14. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
 
-15. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
+15. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions. Two-minute task. See "Cory's non-code TODOs" #5.
 
-16. **Rotate `SIGHTENGINE_API_SECRET`** — overdue across multiple sessions. Two-minute task.
+16. **Place `ReportImageButton`** on photo views (gig and marketplace).
 
-17. **Place `ReportImageButton`** on photo views (gig and marketplace).
+17. **Dashboard discoverability micro-fix on `/flipper/dashboard`.** The current flipper-specific dashboard has no signal for "work submitted, awaiting your review." The "Pending applicants" tile only counts pending claims. Lower priority since `/home` surfaces this via the "needs review" action card.
 
-18. **Dashboard discoverability micro-fix on `/flipper/dashboard`.** The current flipper-specific dashboard has no signal for "work submitted, awaiting your review." The "Pending applicants" tile only counts pending claims. Lower priority since `/home` surfaces this via the "needs review" action card.
-
-19. **"Payouts" nav link is worker-centric.** Currently shown to everyone; flippers hitting it see "$0 earnings" empty state. Either rename it, hide it for users with no payout history, or build a paired flipper-side "Payments you've made" view. Low priority — Cory was aware and laughed it off, but worth fixing eventually.
+18. **"Payouts" nav link is worker-centric.** Currently shown to everyone; flippers hitting it see "$0 earnings" empty state. Either rename it, hide it for users with no payout history, or build a paired flipper-side "Payments you've made" view. Low priority — Cory was aware and laughed it off, but worth fixing eventually.
 
 Cory will pick. Open by confirming what you're about to build in 2-3 lines, then build.
 
@@ -869,14 +1021,20 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
+- `7e91e09` Fix /legal/terms and /legal/privacy showing as 'not available': the original schema's RLS SELECT policy on `legal_agreements` was `using (auth.uid() is not null and active = true)`, which blocked logged-out visitors — but the whole point of public legal pages is that logged-out visitors can read them. Created `supabase/schema_legal_agreements_public_read.sql` which drops the auth-required policy and replaces with `using (active = true)`. Admin-management policy on the same table untouched. Cory ran the SQL and confirmed both pages now render.
+- `6bceccd` Add full TOS + Privacy Policy v1.0 + public legal pages + agreements gate: the big one. ~10k-word Terms of Service + ~7k-word Privacy Policy seeded into the DB. Source markdown at `legal/*.md` (edit these to update), generator at `scripts/generate_legal_sql.py` (regenerates SQL from markdown using `$LEGAL$` dollar-quote tag), SQL migration at `supabase/schema_legal_agreements_v1.sql`. Public pages at `/legal/terms` and `/legal/privacy` via shared `components/shared/LegalDocPage.tsx` (force-dynamic, pulls from DB). New `lib/agreements-gate.ts` exports `requireAgreementsAccepted()` — wired into `app/marketplace/page.tsx` so existing logged-in users hit the gate naturally. Bumped agreement scroll area from `h-72` to `h-[60vh] min-h-[20rem]` so the new long docs are readable. Decisions baked in: Groovy Greens, LLC (NC) d/b/a FlipWork; NC governing law / Wake County venue; 18+ US-only; mandatory binding arbitration + class action waiver under AAA Consumer Rules with 30-day opt-out; strong independent-contractor classification for workers; $100 or 12-mo fees liability cap. See "Legal docs (TOS + Privacy)" section above for the full file map and editing instructions. See "Cory's non-code TODOs" section for the d/b/a filing walkthrough, LLC good-standing check, and lawyer review guidance.
+- `85c2f24` Clean up 23 empty junk files at repo root: leftover from `9b1d2b2` (worker city filter commit) — JSX fragments like `setTitle(e.target.value)}` got somehow split out as filenames. All were 0 bytes from creation (verified via `git show 9b1d2b2`). Pure mechanical cleanup. No functional change.
+
+## Previous session's commits
+
 - `52aaf60` Teach support AI: use backticks for paths, not bold: live-testing the AI support chat showed it was emitting `**/profile/payments**` which markdown couldn't parse (asterisks wrapping text starting with `/` confuse the parser, so it rendered as literal asterisks). Added a "Formatting" section to the system prompt instructing the AI to use backticks for paths/UI references, save bold for actual emphasis, no markdown headers in chat replies, and short paragraphs. Single-file change to `lib/support-prompt.ts`.
 - `21107bd` Render markdown in support chat bubbles: added `react-markdown@^10.1.0` + `remark-gfm@^4.0.1`. AI replies now render bold, lists, links (opens in new tab), code, blockquotes properly. User messages stay as plain text. Added `.chat-markdown` CSS class in `app/globals.css` to style markdown elements inside chat bubbles. Same renderer added to `/admin/support/[id]` so admin sees the same view users see.
 - `d3c36ce` Add AI support chat agent (Haiku 4.5): full AI support feature — `/support` page for users, `/admin/support` queue for admin, 5 tools (4 read-only DB lookups + 1 escalation), system prompt teaching the agent FlipWork rules. New tables `support_conversations` + `support_messages` with RLS. Hard caps: 5 chats/day/user, 50 messages/chat. Added `@anthropic-ai/sdk@^0.98.0` dependency and `ANTHROPIC_API_KEY` env var on Vercel. Cory tested live in production with "how do i get paid?" and got a clean correct answer. See "AI support chat" section above.
 
-### Note on Vercel deploy queue
-Cory hit a deploy queue jam this session — 4 commits in rapid succession stacked up behind a manual redeploy and stopped processing. Fix was to cancel the queued deploys via the `⋯` menu on each row and redeploy the latest commit. Vercel's free/hobby tier serializes builds (one at a time). LESSON for future sessions: batch related changes into fewer commits to avoid stacking the queue. Don't push 4 commits in 10 minutes.
+### Note on Vercel deploy queue (from the AI-support-chat session)
+Cory hit a deploy queue jam in that session — 4 commits in rapid succession stacked up behind a manual redeploy and stopped processing. Fix was to cancel the queued deploys via the `⋯` menu on each row and redeploy the latest commit. Vercel's free/hobby tier serializes builds (one at a time). LESSON for future sessions: batch related changes into fewer commits to avoid stacking the queue. Don't push 4 commits in 10 minutes.
 
-## Previous session's commits
+## Two-sessions-ago commits
 
 - `87f7a70` Remove checklist preview from browse-gigs card: backed out the checklist preview added two commits earlier. Cory wanted the checklist visible only on the gig detail page next to the description, not duplicated on every browse card. Cleanly removed the prop, the batch query in `app/gigs/page.tsx`, and the unused `ListChecks` / `Check` imports. Cards are back to compact mode.
 - `99e6b6f` Show full checklist preview on each browse-gigs card: batch-fetched all checklist items for visible gigs in one query, grouped by `gig_id`, passed through `GigFilterContent` → `GigListingCard`. Card renders the full task list in a small muted box with task count header and required (*) markers. Shipped, then reverted by `87f7a70` after Cory saw it.
