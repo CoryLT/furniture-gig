@@ -103,7 +103,7 @@ export default function AgreementsClient({ agreements, home }: Props) {
           </div>
           <div className="card-body">
             {/* Agreement text — scrollable */}
-            <div className="bg-muted/40 rounded-md border border-border p-4 h-72 overflow-y-auto">
+            <div className="bg-muted/40 rounded-md border border-border p-4 h-[60vh] min-h-[20rem] overflow-y-auto">
               <pre className="text-sm text-foreground whitespace-pre-wrap font-sans leading-relaxed">
                 {current.content}
               </pre>

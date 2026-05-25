@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { requireAgreementsAccepted } from '@/lib/agreements-gate'
 import PublicTopBar from '@/components/shared/PublicTopBar'
 import Nav from '@/components/shared/Nav'
 import MarketplaceFeed from './MarketplaceFeed'
@@ -18,6 +19,13 @@ export default async function MarketplacePage() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
+
+  // If logged in, force them through the agreements gate if any
+  // required agreement is pending. Logged-out visitors can still
+  // browse the marketplace freely.
+  if (user) {
+    await requireAgreementsAccepted(supabase, user.id, '/marketplace')
+  }
 
   // Get the latest active listings — most recent first.
   // We grab a generous batch (60) so the client can filter/sort
