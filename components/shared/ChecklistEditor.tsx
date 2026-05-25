@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Plus, GripVertical } from 'lucide-react'
+import { X, Plus, ChevronUp, ChevronDown } from 'lucide-react'
 
 // Shape of a single checklist row in the editor's local state.
 // `id` is optional — only existing items pulled from the DB will have one.
@@ -90,7 +90,16 @@ export default function ChecklistEditor({ items, onChange, disabled }: Props) {
                     className="text-muted-foreground hover:text-foreground disabled:opacity-30"
                     aria-label="Move up"
                   >
-                    <GripVertical className="w-4 h-4 rotate-90" />
+                    <ChevronUp className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveItem(index, index + 1)}
+                    disabled={disabled || index === items.length - 1}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                    aria-label="Move down"
+                  >
+                    <ChevronDown className="w-4 h-4" />
                   </button>
                 </div>
 
