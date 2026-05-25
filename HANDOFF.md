@@ -74,6 +74,7 @@ After you push, Cory must:
 - **Stripe Connect — webhooks** (Phase 7): `/api/stripe/webhook` is live. Receiver verifies Stripe signature, logs every event to `stripe_webhook_events` (idempotent via event ID PK), dispatches 8 event types (`account.updated`, `payment_intent.succeeded/payment_failed/canceled`, `transfer.created/reversed`, `charge.refunded/dispute.created`). Each handler is idempotent and won't move a payout row backwards in its status lifecycle. Always returns 200 unless signature fails — handler errors are logged on the event row but don't ask Stripe to retry (avoids infinite-loop on deterministic bugs). The Stripe dashboard side is configured with ONE event destination scoped to "Connected accounts" (not two — both platform and connected events flow through the same endpoint despite Stripe's UI suggesting otherwise; `transfer.failed` is deprecated, use `transfer.reversed`).
 - **Unified Dashboard at `/home`** — still exists as a personalized dashboard reachable from the hamburger nav, but is NO LONGER the post-auth landing page (marketplace is). Greeting + date, 4-tile hero stats (total earned / invested / gigs completed / active), 30-day stacked-bar SVG chart of daily money flow (hand-rolled, no chart deps), action sections that hide when empty (needs review / pending applicants / unread messages / work in progress), "You vs the community" percentile bars (only shows once user has some activity), recent activity feed (last ~10 events). Brand-new users see a single welcome card instead. Hamburger nav collapses ALL primary nav items into the dropdown on every viewport — there's no desktop horizontal link row.
 - **Flipper dashboard with filter/sort + needs-review highlights** — banner appears when any gig has pending applicants, dedicated stat tile, filter chips (All / Needs review / Open / In progress / Completed), sort dropdown (Newest / Oldest / Due soon / Most applicants), pending gigs always float to top under "All". Note: does NOT yet surface "work submitted, awaiting your review" — that's a known gap (see What's Next).
+- **AI support chat at `/support`** — Haiku 4.5 agent for logged-in users. Answers FAQs, looks up the user's own gigs/payouts/Stripe status, escalates serious issues. Admin queue at `/admin/support`. See "AI support chat" section below.
 
 ---
 
@@ -129,6 +130,73 @@ In `supabase/schema_marketplace_messaging.sql` (and `schema_marketplace_messagin
 - The two table sets are deliberately separate (not unified into one with a `kind` column). Rationale (also in the SQL file header): gig messaging is well-tested, RLS rules differ (listing conversations can be created by anyone non-seller without a claim row), uniqueness constraints differ, and the union-in-code pattern keeps both safer.
 - Conversation IDs are UUIDs and globally unique enough that a collision between `gig_conversations.id` and `listing_conversations.id` is effectively impossible. The chat page's "try gig first, then listing" dispatch is safe.
 
+
+---
+
+## AI support chat (DONE — shipped this session)
+
+Haiku 4.5 agent at `/support` for logged-in users. Answers FAQs, looks up the user's own gigs/payouts/Stripe status via tools, escalates serious issues to admin.
+
+### Tech basics
+- **Model:** `claude-haiku-4-5-20251001` (~1-2¢ per chat)
+- **SDK:** `@anthropic-ai/sdk` ^0.98.0
+- **Env var:** `ANTHROPIC_API_KEY` on Vercel (set this session)
+- **Cost protection:** 5 chats/day/user, 50 messages/chat hard caps in code
+- **Page:** `/support` (was a 404 before — now a real chat page)
+- **Admin queue:** `/admin/support` with red badge on `/admin` dashboard when escalated count > 0
+
+### Tools the agent has
+1. `get_my_gigs_posted` — gigs user posted (as flipper)
+2. `get_my_applications` — gigs user applied to (as worker)
+3. `get_my_payouts` — payment records
+4. `get_my_stripe_status` — Stripe Connect readiness
+5. `escalate_to_admin` — flags conversation with `reason` + `summary`; flips status to `'escalated'`
+
+All read-only DB lookups use service-role client BUT manually filter by `userId` from auth context — no cross-user data leakage.
+
+### Escalation triggers (from system prompt)
+- Legal threats / lawsuits
+- Refund requests for already-captured money
+- User-on-user fraud/abuse reports
+- Confirmed bugs
+- Account/data deletion requests
+- Abusive user behavior
+- AI tried 2+ times and can't answer
+- User explicitly asks for a human
+
+### DB tables (`supabase/schema_ai_support.sql` — already run)
+- `support_conversations` — id, user_id, status (active/resolved/escalated), summary, escalation_reason, message_count, timestamps
+- `support_messages` — id, conversation_id, role (user/assistant/system), content, created_at
+- RLS: users see own, admins see all. Inserts done via service-role client from the API route.
+- Trigger `bump_support_conversation_on_message` auto-updates `last_message_at` + increments `message_count` on every insert.
+
+### Key code files
+- `lib/anthropic.ts` — SDK client + constants (model name, rate limits)
+- `lib/support-prompt.ts` — the system prompt (the AI's "personality and rulebook"). EDIT THIS to teach the agent new things or change tone. No code change needed — just edit the string.
+- `lib/support-tools.ts` — tool schemas + handlers. Add new tools here.
+- `app/api/support/chat/route.ts` — main endpoint. Tool-use loop with `MAX_TOOL_ROUNDS = 5`. Always returns 200 with `{ reply, status, conversationId }` unless auth/rate-limit fails. On Anthropic API errors, returns 502 with a friendly message.
+- `app/api/support/conversations/route.ts` — list user's conversations
+- `app/api/support/conversation/[id]/route.ts` — load one conversation + messages
+- `app/api/support/resolve/route.ts` — user marks own chat resolved
+- `app/api/admin/support/set-status/route.ts` — admin reopen/resolve
+- `app/support/page.tsx` + `SupportClient.tsx` — the user-facing chat UI (sidebar list + chat panel, dark user bubbles, light AI bubbles, typing indicator, optimistic UI)
+- `app/admin/support/page.tsx` — admin queue (tabs: escalated / resolved / all)
+- `app/admin/support/[id]/page.tsx` + `AdminSupportActions.tsx` — admin views one conversation with full message history + reopen/resolve buttons
+- `app/admin/page.tsx` — added Support tile with escalated count badge
+
+### Quirks worth knowing
+- The system prompt mentions specific routes (`/profile/payments`, `/post-gig`, etc). If you rename a route, also update the prompt or the AI will send users to a 404.
+- Tool handlers cast Supabase queries with `as any` for the same TS-types-out-of-sync reasons as the Stripe code.
+- The agent CAN'T see other users' data, only the caller's. If you add tools that touch other users (e.g., "look up the flipper I'm applying to"), be careful with scoping.
+- `escalate_to_admin` is the only tool that WRITES to the DB. Everything else is read-only.
+- No email notification to Cory when something escalates yet — he checks `/admin/support` manually. The badge on `/admin` is the visible signal. Email notifications are a future enhancement (would tie into the broader notifications TODO #8).
+- The `users` table has a `role` column that's either `'admin'`, `'worker'`, or `'flipper'`. Admin checks use `where users.role = 'admin'`.
+
+### TODOs / future enhancements
+- Markdown rendering in chat bubbles (the AI sometimes uses `**bold**` syntax that displays as literal asterisks). Either add a markdown renderer or tell the AI not to use markdown in the prompt.
+- Email notification to admin on escalation
+- Streaming responses for snappier UX (currently waits for full reply)
+- Allow admin to reply IN the conversation as a human takeover (currently admin only views + resolves; user has no way to see admin replies)
 
 ---
 
@@ -655,7 +723,7 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
    - Phase 6: admin payout UI upgrade (show PI ID, status, refund button)
    - Phase 8: edge cases (declined cards at capture, restricted Connect accounts, expired auths, post-capture refunds)
    - Phase 9: go-live (swap to live keys, new webhook destination in live mode, $1 real-money smoke test)
-3. **AI support chat** — DEPRIORITIZED until Stripe payouts are live (the AI needs to be able to answer payout questions accurately). Plan still good — Haiku 4.5, `/support` page, `ANTHROPIC_API_KEY` env var, 5 chats/day per user. See prior handoffs for details.
+3. ~~**AI support chat**~~ ✅ DONE this session. Haiku 4.5 agent at `/support`, with 5 tools (`get_my_gigs_posted`, `get_my_applications`, `get_my_payouts`, `get_my_stripe_status`, `escalate_to_admin`). Admin queue at `/admin/support` with escalated-count badge on `/admin`. See "AI support chat" section below.
 4. **Place `ReportImageButton` on photo views** — gallery cards, gig photo grids, avatar viewers. Component is built; just needs to be slotted in.
 5. **Listing reports — Report button + admin queue.** `listing_reports` table exists from this session's SQL. Need a "Report listing" button on the marketplace listing detail page, a `/api/report-listing` endpoint, and an admin queue page at something like `/admin/listing-reports`. Parallel to the existing `image_reports` infrastructure — should copy that pattern.
 6. **Worker `/my-gigs/[claimId]` "not picked" state** — when a worker's application was rejected, they currently still see the full checklist UI.
@@ -796,12 +864,14 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
+- `d3c36ce` Add AI support chat agent (Haiku 4.5): full AI support feature — `/support` page for users, `/admin/support` queue for admin, 5 tools (4 read-only DB lookups + 1 escalation), system prompt teaching the agent FlipWork rules. New tables `support_conversations` + `support_messages` with RLS. Hard caps: 5 chats/day/user, 50 messages/chat. Added `@anthropic-ai/sdk@^0.98.0` dependency and `ANTHROPIC_API_KEY` env var on Vercel. Cory tested live in production with "how do i get paid?" and got a clean correct answer. See "AI support chat" section above.
+
+## Previous session's commits
+
 - `87f7a70` Remove checklist preview from browse-gigs card: backed out the checklist preview added two commits earlier. Cory wanted the checklist visible only on the gig detail page next to the description, not duplicated on every browse card. Cleanly removed the prop, the batch query in `app/gigs/page.tsx`, and the unused `ListChecks` / `Check` imports. Cards are back to compact mode.
 - `99e6b6f` Show full checklist preview on each browse-gigs card: batch-fetched all checklist items for visible gigs in one query, grouped by `gig_id`, passed through `GigFilterContent` → `GigListingCard`. Card renders the full task list in a small muted box with task count header and required (*) markers. Shipped, then reverted by `87f7a70` after Cory saw it.
 - `96e36bf` Show user's own posted gigs in browse, marked with 'Your post' badge: removed the `.or()` filter from `app/gigs/page.tsx` that hid own gigs. `GigListingCard` got an `isOwnPost` prop and shows a small "Your post" badge under the status pill when set. Footer link reads "View as worker" on own posts. The existing `isOwnPostedGig` branch on the gig detail page already prevents claiming and shows a "You posted this gig" panel with a button back to the flipper dashboard, so no extra work needed there.
 - `f4a7513` Show gig reference images in flipper dashboard list + flipper gig detail: `/flipper/dashboard` now shows a 64px square thumbnail per gig (first uploaded reference image by `sort_order`, or a placeholder `ImageIcon` if none). One batched query fetches all images for visible gigs, then we pick the lowest sort_order per gig and build public URLs once on the server. `/flipper/gigs/[id]` now renders the existing `GigReferenceImages` component below the gig header card — same UI workers see.
-
-## Previous session's commits
 
 - `a44d10f` Remove finishing-page debug box + bump cookie wait to 500ms for iOS Safari: cleaned up the temporary debug panel from `/auth/finishing` now that the iPhone OAuth bug is diagnosed and fixed. Also bumped the cookie-commit wait from 150ms → 500ms as cheap insurance for iOS Safari being slow to persist large chunked Supabase auth cookies.
 - `5b6a07a` DEBUG: on-screen log on /auth/finishing for mobile OAuth diagnosis: temporarily added an on-screen debug panel below the spinner to diagnose why iPhone OAuth hung on "Almost done…". Showed the entire flow completed successfully — root cause turned out to be domain mismatch (OAuth started on the Vercel preview URL, not the custom domain). This commit was reverted by `a44d10f`.
