@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { createClient } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 /**
  * GET /api/stripe/payment-method/status
  *

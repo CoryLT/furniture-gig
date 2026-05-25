@@ -5,6 +5,8 @@ import {
   cancelPickAuthorization,
 } from '@/lib/stripe-pick'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 /**
  * POST /api/stripe/pick-worker
  *

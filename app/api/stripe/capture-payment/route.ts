@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { capturePickPayment } from '@/lib/stripe-capture'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 /**
  * POST /api/stripe/capture-payment
  *
