@@ -144,53 +144,76 @@ export default function MarketplaceFeed({
       {/* Grid */}
       {filteredSorted.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border bg-card text-center py-16 px-4">
-          <p className="text-sm text-foreground font-medium">
-            Nothing here yet.
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {cityFilterOn && viewerCity
-              ? `No listings in ${viewerCity} match your filters.`
-              : 'No listings match your filters.'}
-          </p>
-          <div className="flex flex-wrap gap-2 justify-center mt-4">
-            {cityFilterOn && viewerCity && (
-              <button
-                type="button"
-                onClick={() => setCityFilterOn(false)}
-                className="text-xs font-medium px-3 py-1.5 rounded-md border border-input bg-card hover:bg-secondary transition"
-              >
-                Show all locations
-              </button>
-            )}
-            {(search || freeOnly) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch('')
-                  setFreeOnly(false)
-                }}
-                className="text-xs font-medium px-3 py-1.5 rounded-md border border-input bg-card hover:bg-secondary transition"
-              >
-                Clear filters
-              </button>
-            )}
-            {isLoggedIn && (
-              <Link
-                href="/marketplace/new"
-                className="text-xs font-medium px-3 py-1.5 rounded-md bg-foreground text-background hover:opacity-90 transition"
-              >
-                Post a listing
-              </Link>
-            )}
-            {!isLoggedIn && (
-              <Link
-                href="/auth/signup"
-                className="text-xs font-medium px-3 py-1.5 rounded-md bg-foreground text-background hover:opacity-90 transition"
-              >
-                Sign up to post
-              </Link>
-            )}
-          </div>
+          {initialListings.length === 0 ? (
+            <>
+              <p className="text-sm text-foreground font-medium">
+                FlipWork just launched.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+                The marketplace is still filling in. Be one of the first to
+                list a piece — early sellers get more eyes on their work.
+              </p>
+              <div className="flex flex-wrap gap-2 justify-center mt-4">
+                {isLoggedIn ? (
+                  <Link
+                    href="/marketplace/new"
+                    className="text-xs font-medium px-3 py-1.5 rounded-md bg-foreground text-background hover:opacity-90 transition"
+                  >
+                    Post a listing
+                  </Link>
+                ) : (
+                  <Link
+                    href="/auth/signup"
+                    className="text-xs font-medium px-3 py-1.5 rounded-md bg-foreground text-background hover:opacity-90 transition"
+                  >
+                    Sign up to post
+                  </Link>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-foreground font-medium">
+                No matches for your filters.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {cityFilterOn && viewerCity
+                  ? `Nothing in ${viewerCity} fits — try clearing the city filter.`
+                  : 'Try clearing your filters to see everything.'}
+              </p>
+              <div className="flex flex-wrap gap-2 justify-center mt-4">
+                {cityFilterOn && viewerCity && (
+                  <button
+                    type="button"
+                    onClick={() => setCityFilterOn(false)}
+                    className="text-xs font-medium px-3 py-1.5 rounded-md border border-input bg-card hover:bg-secondary transition"
+                  >
+                    Show all locations
+                  </button>
+                )}
+                {(search || freeOnly) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch('')
+                      setFreeOnly(false)
+                    }}
+                    className="text-xs font-medium px-3 py-1.5 rounded-md border border-input bg-card hover:bg-secondary transition"
+                  >
+                    Clear filters
+                  </button>
+                )}
+                {isLoggedIn && (
+                  <Link
+                    href="/marketplace/new"
+                    className="text-xs font-medium px-3 py-1.5 rounded-md bg-foreground text-background hover:opacity-90 transition"
+                  >
+                    Post a listing
+                  </Link>
+                )}
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-2.5">

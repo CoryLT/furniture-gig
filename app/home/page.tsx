@@ -514,9 +514,9 @@ export default async function HomePage() {
                 Welcome to FlipWork.
               </h2>
               <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                Post a gig to get help on a furniture project, or browse open
-                gigs to pick up some work. Whichever you start with, your
-                dashboard fills in as you go.
+                You're early — FlipWork just launched. Post a gig to get help
+                on a furniture project, or browse open gigs to pick up some
+                work. Your dashboard fills in as you go.
               </p>
             </div>
             <div className="flex gap-3 justify-center flex-wrap">

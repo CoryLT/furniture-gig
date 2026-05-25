@@ -139,9 +139,12 @@ export default function GigFilterContent({
           <div className="card-body text-center py-12">
             {initialGigs.length === 0 ? (
               <>
-                <p className="text-foreground font-medium">No open gigs yet</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Check back soon — new projects are posted often.
+                <p className="text-foreground font-medium">
+                  FlipWork just launched.
+                </p>
+                <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+                  Gigs are still rolling in. Check back soon — or be one of the
+                  first to post a project and have flippers fight over it.
                 </p>
               </>
             ) : (
