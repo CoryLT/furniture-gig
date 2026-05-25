@@ -4,6 +4,21 @@ You're picking up Cory's furniture-flipping gig platform. Read this whole thing 
 
 ---
 
+## 🚀 SOFT-LAUNCH STATUS (as of May 25, 2026)
+
+**FlipWork is LIVE. Real Stripe, real money, real users.** First end-to-end live transaction completed successfully tonight. Worker received payout, flipper card was charged, webhooks fired correctly, everything worked.
+
+Critical context to know when picking up:
+- **Stripe is in LIVE mode.** No more sandbox/test. Every payment now is real.
+- **`STRIPE_SECRET_KEY` is GONE.** The env var was renamed to **`STRIPE_SECRET_KEY_LIVE`**. Don't accidentally reintroduce the old name when adding new Stripe code — `lib/stripe.ts` reads from the new name.
+- **`/api/stripe/health` is the live diagnostic** — admin-only endpoint that returns Stripe account status + a `diagnostic` block with first 10 characters and length of every Stripe env var. Useful for debugging. Currently still exposing prefixes — Cory may want this stripped later. See "Stripe live-mode cutover" section.
+- **Live webhook is configured.** One destination, "Connected accounts" scope, all 8 event types (`account.updated`, `payment_intent.succeeded/payment_failed/canceled`, `transfer.created/reversed`, `charge.refunded/dispute.created`). Signing secret stored as `STRIPE_WEBHOOK_SECRET` in Vercel.
+- **All Stripe route handlers are now `force-dynamic` + `revalidate=0`.** Done during live-mode debugging — keep this pattern when adding new Stripe routes.
+- **NC d/b/a "FlipWork" is filed** (Wake County, May 25, 2026, $26 paid). State will record in 1-3 business days and email a PDF certificate. Save it.
+- **NC LLC annual report is OUTSTANDING** — Groovy Greens, LLC is "Current-Active" but the 2025 annual report ($200) was not filed. Cory is waiting on cash. Hard deadline: before NC moves status to "Admin. Dissolved" (realistically summer 2026). After that the LLC veil is gone.
+
+---
+
 ## Project basics
 
 - **Repo:** https://github.com/CoryLT/furniture-gig
@@ -286,6 +301,33 @@ The public pages use `force-dynamic + revalidate=0` so they're fresh, but that A
 ### Quirks worth knowing
 - The `switch` statement on `event.type` uses `(event.type as string)` cast because Stripe's TS literal union doesn't include all valid runtime event types.
 - The "error" status on `stripe_webhook_events` stores the actual handler error message in `error_message`. The "processed" rows reuse `error_message` to store the handler's status message — a small hack documented in the route.
+
+---
+
+## Stripe live-mode cutover (DONE — shipped this session, Phase 9)
+
+The whole platform flipped from test mode to live mode on May 25, 2026. End-to-end live transaction verified ($1 real-money smoke test). Several things changed during this cutover — read this section before touching anything Stripe-related.
+
+### What's now live in production
+- **Stripe is in Live mode.** Live publishable + secret keys in Vercel, live webhook destination created, live API responses confirmed via `/api/stripe/health`.
+- **One live webhook destination** at `dashboard.stripe.com/webhooks` named "FlipWork" — scoped to "Connected accounts", subscribed to the same 8 event types as the previous test destination. Endpoint URL: `https://myflipwork.com/api/stripe/webhook`. Signing secret is in Vercel as `STRIPE_WEBHOOK_SECRET`.
+- **`STRIPE_SECRET_KEY` env var was renamed to `STRIPE_SECRET_KEY_LIVE`.** This happened mid-debugging when we suspected something was shadowing the old name (turned out to be a copy/paste error — Cory was pasting the webhook signing secret into the secret key slot). The rename stuck because it's a useful sanity belt — code can't accidentally read a test-mode value if the old name doesn't exist. **Going forward: any new code that needs the secret key must read `process.env.STRIPE_SECRET_KEY_LIVE`, NOT `STRIPE_SECRET_KEY`.** `lib/stripe.ts` is the canonical source — import the `stripe` client from there rather than constructing one inline.
+- **All Stripe route handlers (`app/api/stripe/**/route.ts`) now have `export const dynamic = 'force-dynamic'` and `export const revalidate = 0`** at the top. Added during cutover to rule out cached response theory. Keep this pattern for any new Stripe routes — these can never be statically rendered anyway and cache headers cause spooky bugs.
+- **`/api/stripe/health` has a `diagnostic` block** that returns the first 10 characters + length of `STRIPE_SECRET_KEY_LIVE`, `STRIPE_SECRET_KEY` (legacy/should be empty), `STRIPE_WEBHOOK_SECRET`, and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, plus the full list of all env var names containing "STRIPE". Admin-only. Useful for instantly verifying env state in production without revealing full secrets. **Decision pending:** Cory may want this trimmed back. Removing is a 30-second commit — strip the `diagnostic` const + the field from both response paths.
+
+### Database cleanup that ran during cutover
+`supabase/schema_reset_test_mode_connect.sql` was run. It clears all stored test-mode Stripe IDs:
+- `worker_profiles.stripe_account_id` + 4 status flags → NULL/false (forces re-onboarding in live mode)
+- `users.stripe_customer_id` → NULL (flippers must re-save cards)
+- `payout_records.stripe_payment_intent_id/charge_id/transfer_id` → NULL, `payment_status` → `'none'`
+
+Only one row was affected (Cory's own worker profile) — he's been the only test user. **If any other test-mode users sign in later who happened to set up Connect before the cutover, the script can be re-run safely.**
+
+### Lessons learned (so future sessions don't waste hours)
+1. **Stripe has two different "secrets" that both start with secret-looking strings.** The **API Secret Key** is at `dashboard.stripe.com/apikeys`, starts with `sk_live_`, is ~107 characters. The **Webhook Signing Secret** is at `dashboard.stripe.com/webhooks` → click destination → "Signing secret", starts with `whsec_`, is ~38 characters. They are not interchangeable. Cory spent hours pasting the webhook secret into the secret key field thinking it was the same thing. **If a Stripe API call returns `Invalid API Key provided: whsec_...`, the wrong secret is in `STRIPE_SECRET_KEY_LIVE` — verify with `/api/stripe/health` first before guessing anything else.**
+2. **Vercel env var edit form is misleading.** The value shown in the edit text area is sometimes a hover preview of what was just typed, not what's actually saved. Don't trust the visual — verify by hitting `/api/stripe/health` after every change.
+3. **Vercel doesn't auto-redeploy on env var changes.** Same gotcha as always — env var update + redeploy with cache OFF is two steps, not one. If you change an env var, IMMEDIATELY trigger a redeploy with "Use existing Build Cache" unchecked. Otherwise the new value isn't running.
+4. **When the runtime error message is identical character-for-character across multiple changes**, the issue is almost always: (a) the deployment didn't actually rebuild, (b) you're looking at a cached browser response, or (c) the new value is wrong in a way you haven't noticed (e.g. you saved the same wrong value twice). Diagnostic logging beats guessing every time.
 
 ---
 
@@ -808,11 +850,11 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 ## ⚠️ TODOs left at end of session
 
 1. **Rotate `SIGHTENGINE_API_SECRET`** — exposed in chat in an earlier session. Regenerate in Sightengine dashboard, update Vercel env var, redeploy. STILL OUTSTANDING — Cory has not done this yet across multiple sessions. **See "Cory's non-code TODOs" #5 for step-by-step.**
-2. **Stripe Connect Phases 5, 6, 8, 9** — Phases 1-4 + 7 are done. Still needed before going live:
+2. **Stripe Connect Phases 5, 6, 8** — Phases 1-4 + 7 + 9 are done. Still needed:
    - Phase 5: worker payout UI polish (Express dashboard login link, arrival window, Stripe-side status)
    - Phase 6: admin payout UI upgrade (show PI ID, status, refund button)
    - Phase 8: edge cases (declined cards at capture, restricted Connect accounts, expired auths, post-capture refunds)
-   - Phase 9: go-live (swap to live keys, new webhook destination in live mode, $1 real-money smoke test)
+   - ~~Phase 9: go-live~~ ✅ DONE this session. Live keys swapped in, live webhook destination created in live mode, $1 real-money smoke test completed end-to-end. See "Stripe live-mode cutover" section below.
 3. ~~**AI support chat**~~ ✅ DONE this session. Haiku 4.5 agent at `/support`, with 5 tools (`get_my_gigs_posted`, `get_my_applications`, `get_my_payouts`, `get_my_stripe_status`, `escalate_to_admin`). Admin queue at `/admin/support` with escalated-count badge on `/admin`. See "AI support chat" section below.
 4. **Place `ReportImageButton` on photo views** — gallery cards, gig photo grids, avatar viewers. Component is built; just needs to be slotted in.
 5. **Listing reports — Report button + admin queue.** `listing_reports` table exists from this session's SQL. Need a "Report listing" button on the marketplace listing detail page, a `/api/report-listing` endpoint, and an admin queue page at something like `/admin/listing-reports`. Parallel to the existing `image_reports` infrastructure — should copy that pattern.
@@ -835,95 +877,46 @@ The legacy `payout_records` columns (`payout_status`, `payout_reference`, `payou
 
 ## 📋 Cory's non-code TODOs (walkthrough — read this!)
 
-These are things Claude CAN'T do for you. They matter for the legal protection your TOS/Privacy Policy promises. Take them in order — the lawyer review can happen anytime, but the LLC and d/b/a items should happen sooner than later.
+These are things Claude CAN'T do for you. Most of the originals are DONE — what's left is the LLC annual report (waiting on cash) and a few minor cleanup items.
 
-### 1. Confirm Groovy Greens, LLC is in good standing — DO THIS FIRST (5 min, free)
+### 1. ✅ Confirm Groovy Greens, LLC is in good standing — DONE (May 25, 2026)
 
-Why it matters: your TOS names "Groovy Greens, LLC" as the operator. If the LLC is "administratively dissolved" by the state (which happens automatically if you miss an annual report), it legally doesn't exist right now and the TOS protection is much weaker. Easy to check.
+Verified "Current-Active" at sosnc.gov. The 2025 annual report is **OUTSTANDING** — Cory is deferring the $200 fee until he has cash. NC doesn't immediately dissolve LLCs for one missed report (grace period until the following April), so this is not blocking the soft launch. **Hard deadline:** pay before NC moves status to "Admin. Dissolved" — realistically summer 2026. The first $200 of FlipWork revenue should go straight to NC. After Admin. Dissolved the liability shield is gone and reinstatement is more expensive than just paying the report.
 
-**Steps:**
-1. Open browser → go to **sosnc.gov** (NC Secretary of State)
-2. Click **Search** in the top nav → **Business Registration**
-3. Type "Groovy Greens" in the company name field
-4. Click your LLC in the results
-5. Look at the **"Status"** field
+To file later: sosnc.gov → search Groovy Greens → click "File Most Recent Annual Report" or similar → confirm address/registered agent (nothing changed) → pay $200 with card.
 
-**If status is "Current-Active":** you're good. Move to #2.
+### 2. ✅ File NC Certificate of Assumed Name (d/b/a) for "FlipWork" — DONE (May 25, 2026)
 
-**If status is "Administratively Dissolved" or anything not "Current-Active":**
-- Click the **"Annual Report"** button on the same page
-- Pay any outstanding annual reports (NC LLCs owe one every year by April 15, $200 each)
-- If past-due multiple years, NC may require a "Reinstatement" — there's a button on the page for that ($100 reinstatement fee + back annual reports). Total cost depends on how many years you missed.
-- Wait for the state to process it (usually same-day for online filings, can take a few days)
-- Once status shows "Current-Active," continue to #2
+Filed via Wake County Register of Deeds e-recording system (Tyler Portico). Paid $26. State will process in 1-3 business days and email a recorded PDF certificate. **Save the PDF when it arrives** — needed if Stripe or a bank later asks for proof. Wake County records it; the "filed at state via SOS" comment in older versions of this doc was wrong for current NC procedure (it's actually filed at the county Register of Deeds since the 2017 changes).
 
-If you're unsure, call NC SOS at 919-814-5400. They're helpful.
+### 3. ⚠️ Update Stripe public business name to "FlipWork" — PENDING (waiting on recorded d/b/a)
 
-### 2. File a NC Certificate of Assumed Name (d/b/a) for "FlipWork" (~$26, 15 min)
+Stripe will accept "FlipWork" as the public-facing name once Wake County emails the recorded d/b/a certificate. Until then, statement descriptors and Express dashboard still show the legal name (Groovy Greens, LLC) or whatever Cory entered during Stripe identity verification. To do once the certificate arrives:
 
-Why it matters: your LLC is named "Groovy Greens, LLC" but everything customers interact with is called "FlipWork." Without a filed d/b/a, if a customer sues, they might claim "FlipWork" isn't a registered name and the contract (your TOS) doesn't legally apply. The d/b/a fixes that for ~$26.
+- Stripe Dashboard → Settings → Business → Public details → set **Public business name** = `FlipWork`. Legal entity name stays `Groovy Greens, LLC`.
+- Statement descriptor (what shows on credit card statements) → set to something short like `FLIPWORK` (22-char limit).
+- May ask for proof of the d/b/a — upload the Wake County PDF.
 
-**Steps:**
-1. Open browser → go to **sosnc.gov/online_services** → "Assumed Business Name"
-   - OR if that's confusing: Google "NC Certificate of Assumed Name online filing"
-2. You'll fill out a form with:
-   - **Assumed Business Name:** `FlipWork`
-   - **Real Name of the Business:** `Groovy Greens, LLC`
-   - **County where you'll operate:** Wake County (Garner is in Wake County)
-   - **Type of Entity:** LLC
-   - **Address:** your business address (your home is fine if you don't have a separate one — but be aware this becomes public record)
-   - **Effective date:** today's date is fine
-3. Pay the $26 filing fee with a credit card
-4. Submit. You should get a confirmation email and a stamped copy within a few days.
+Bank account for Groovy Greens, LLC separate from personal money is still recommended (Mercury, Relay, Bluevine, etc.) — biggest single thing protecting the LLC veil. Not urgent for soft launch.
 
-**After filing:** save the stamped certificate PDF somewhere safe (Google Drive, Dropbox, etc.). If a payment processor or bank ever asks for proof you can operate as "FlipWork," that's the document.
+### 4. ✅ Lawyer review of TOS + Privacy Policy — DONE
 
-**Important note:** in NC, the Certificate of Assumed Name is filed at the **state level via SOS** (this used to be county-level Register of Deeds before 2017). Don't get tripped up by old advice telling you to go to the courthouse — the state online system is current.
+Cory had the legal docs spot-checked. Lawyer said they looked great. No changes needed. Standing by the v1.0 docs shipped this session.
 
-### 3. Update your business setup AFTER the d/b/a is filed (10 min)
+### 5. (Deferred — low priority) Rotate the Sightengine API secret
 
-Once you have the d/b/a certificate in hand:
+Cory deliberately deferred this during the soft-launch push — the risk is low (worst case is someone burns through API quota on his bill if the old key leaks; not a data breach risk) and Sightengine's UI for rotating keys is annoying. To do whenever Cory's in the Sightengine dashboard for another reason:
 
-- **Stripe account name:** Sign into Stripe Dashboard → Settings → Business Settings → Public Details. If it currently says your personal name or "Groovy Greens, LLC," update the **"Public business name"** to `FlipWork`. The legal entity stays as Groovy Greens, LLC, but the customer-facing name is what shows on credit card statements and Stripe Express dashboards.
-- **Bank account (optional but recommended):** if you don't already have a business bank account for Groovy Greens LLC separate from your personal money, open one. Most local banks and online options (Mercury, Relay, Bluevine) let you open free business checking with the LLC formation docs + the new d/b/a. This is the SINGLE biggest thing protecting your LLC veil — mixing personal and business money is the #1 way courts pierce LLCs.
-
-### 4. Get a small-business lawyer to spot-check the TOS + Privacy Policy ($200-400, 1 hour) — DO THIS BEFORE TAKING REAL MONEY
-
-Why it matters: the legal docs Claude generated are based on what real marketplaces use (Etsy, OfferUp, TaskRabbit patterns), but Claude is NOT a lawyer and can't guarantee enforceability. A real attorney will:
-- Spot anything material to NC law that Claude missed
-- Tell you whether the arbitration clause + class action waiver will hold up in NC courts (they generally do, but state law evolves)
-- Flag anything that wouldn't survive specifically for your business model
-- Often suggest 2-3 small tweaks that meaningfully strengthen the docs
-
-**How to find one cheaply:**
-- **NC Bar Association lawyer referral service:** ncbar.org → "Need a Lawyer" → "Lawyer Referral Service." They'll match you with a small-business attorney in NC. First consult is often $50 for 30 minutes.
-- **Avvo or LegalMatch:** search "small business attorney Raleigh" or "internet law attorney NC." Lots of solo practitioners do flat-rate document reviews for $200-400.
-- **Ask local entrepreneur friends.** Someone you know has used one.
-
-**What to tell the lawyer:**
-> "I'm operating a small online marketplace platform under a NC LLC with a d/b/a. I have a Terms of Service and Privacy Policy that I drafted using a template. Can you review them for ~$300 and flag anything material I should change, especially around binding arbitration enforceability in NC and the independent-contractor classification of users who perform paid work?"
-
-**Files to send them:**
-- `legal/terms-of-service.md`
-- `legal/privacy-policy.md`
-- Tell them the live versions are at `https://myflipwork.com/legal/terms` and `https://myflipwork.com/legal/privacy`
-
-**When they come back with changes:** just paste their suggested edits to Claude in a future session and Claude will make the updates, regenerate the SQL, and walk you through the deploy.
-
-### 5. (Future) Rotate the Sightengine API secret (5 min)
-
-This has been on the TODO list for multiple sessions. Quick task:
-1. Sign into the Sightengine dashboard
-2. Generate a new API secret
-3. Update the `SIGHTENGINE_API_SECRET` env var on Vercel (Project → Settings → Environment Variables)
-4. Redeploy the latest production build (Deployments tab → ⋯ → Redeploy → uncheck "Use existing Build Cache")
-5. Done
-
-Reason: the old secret was exposed in a chat session a while back. Almost certainly fine but rotating is cheap.
+1. Sightengine dashboard → API Keys → create a new API user (no built-in "rotate" button — manual workaround). Name it something like `flipwork-prod-2026`.
+2. Copy the new `api_user` + `api_secret`.
+3. Update Vercel env vars `SIGHTENGINE_API_USER` and `SIGHTENGINE_API_SECRET`.
+4. Redeploy with cache OFF.
+5. Test an image upload to confirm moderation still works.
+6. Delete the old API user in Sightengine.
 
 ### 6. (Future) Set a business address on the legal docs
 
-The TOS currently says "(Mailing address available on request)" because you don't have a separate business address yet. Once you have:
+The TOS currently says "(Mailing address available on request)" because Cory doesn't have a separate business address yet. Once he has:
 - A PO Box (NC USPS PO boxes are ~$70/year for a small one), OR
 - A virtual mailbox service (iPostal1, Anytime Mailbox, etc., ~$10-15/month), OR
 - An office/coworking space
@@ -934,7 +927,6 @@ The TOS currently says "(Mailing address available on request)" because you don'
 
 - **Don't form a separate "FlipWork LLC."** Groovy Greens, LLC + d/b/a "FlipWork" is exactly the right structure. Forming another LLC just creates an extra entity to maintain.
 - **Don't try to "convert" Groovy Greens, LLC to a different name.** NC technically allows it but it's expensive and unnecessary — the d/b/a covers the customer-facing branding.
-- **Don't pay a lawyer to draft TOS from scratch.** The docs Claude generated are already 80-90% there. A 1-hour review is the right spend, not a 5-figure custom drafting engagement.
 
 ---
 
@@ -1076,19 +1068,46 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
+- `e3c4ce7` Re-trigger deploy after deletion of `082a5d6`: tiny comment in `app/api/stripe/health/route.ts`. The previous diagnostic deployment was deleted before completing, so this just kicks Vercel to build the same diagnostic code that was already in `082a5d6`.
+- `082a5d6` Add env var diagnostic to `/api/stripe/health`: returns first 10 chars + length of `STRIPE_SECRET_KEY_LIVE`, legacy `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, plus all env var names containing "STRIPE". Admin-only. This is what finally surfaced the real bug — `STRIPE_SECRET_KEY_LIVE` literally contained a `whsec_...` value (Cory had been pasting the webhook signing secret into the secret key field). **Decision pending:** Cory may want this diagnostic block stripped — `/api/stripe/health` is admin-gated so the leak is contained, but trimming it back to a basic ok/not-ok response is a 30-second cleanup commit.
+- `a2072ed` Disable caching on all Stripe API routes: added `export const dynamic = 'force-dynamic'` + `revalidate = 0` to all `app/api/stripe/**/route.ts` files. Done while debugging the auth error — we suspected (incorrectly, as it turned out) that Next.js was serving cached error responses. Keep this pattern for any new Stripe routes regardless.
+- `71cbf5f` Rename `STRIPE_SECRET_KEY` → `STRIPE_SECRET_KEY_LIVE`: touched 7 files (`lib/stripe.ts` + 6 route handlers). Done mid-debugging to bypass anything that might be shadowing the old name (no evidence anything was, but renaming was a clean nuclear option). The rename stuck because it's a useful sanity-belt — guarantees no code path can accidentally read a stale test-mode value. **Anything new that needs the Stripe secret key reads `STRIPE_SECRET_KEY_LIVE` now.**
+- `bbd9edb` Force cold start of cached Stripe client after live-mode cutover: build marker comment in `lib/stripe.ts`. Was an attempted fix for the auth bug (thinking module-level `new Stripe(...)` was holding the old key in a warm function instance). Didn't help, but the comment is harmless.
+- `89a3ce8` Add SQL to reset test-mode Stripe data after live-mode cutover: `supabase/schema_reset_test_mode_connect.sql`. Clears `worker_profiles.stripe_account_id` + 4 status flags, `users.stripe_customer_id`, and `payout_records` Stripe IDs. Three-step format (preview / reset / verify), safe to re-run. Only one row was affected (Cory) — he's been the only test user. Re-run safely if any other test-mode users surface later.
+
+### What got accomplished this session beyond the commits
+
+- **Stripe Phase 9 (go-live) is DONE.** First real $1 transaction completed end-to-end. Worker received payout, flipper card charged, webhooks fired correctly, all state transitions verified in production.
+- **Live Stripe API keys** swapped into Vercel (publishable, secret, webhook signing secret all in `STRIPE_SECRET_KEY_LIVE`/`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`/`STRIPE_WEBHOOK_SECRET`).
+- **Live webhook destination** created at `dashboard.stripe.com/webhooks` — "Connected accounts" scope, all 8 event types subscribed.
+- **NC d/b/a "FlipWork"** filed with Wake County Register of Deeds — $26 paid, pending recording (1-3 business days).
+- **Groovy Greens, LLC good-standing** verified at sosnc.gov. 2025 annual report ($200) is outstanding — Cory is deferring until cash is available.
+- **Database cleaned** of test-mode Stripe IDs (one affected row, Cory's worker profile).
+- **Diagnostic endpoint built** at `/api/stripe/health` — admin-only sanity check that returns Stripe account status + env var prefixes + length. Critical for any future Stripe debugging — hit this FIRST before guessing.
+
+### Lessons learned this session (read before debugging Stripe stuff again)
+
+The Stripe auth bug took ~3 hours to find because we kept guessing. The root cause was Cory copy/pasting the webhook signing secret (`whsec_...`) into the `STRIPE_SECRET_KEY_LIVE` field. The Vercel edit UI made this hard to catch — it showed a hover-preview of an `sk_live_...` value rather than what was actually saved.
+
+**For future Stripe debugging:** ALWAYS hit `/api/stripe/health` as admin first to see what's actually in the env vars. The masked error from Stripe (`Invalid API Key provided: whsec_Fd*****xKbL`) was telling us exactly what was wrong from the very first failure, but we kept treating it as a generic "bad key" rather than reading the prefix.
+
+**For future Stripe setup:** the API Secret Key (`sk_live_...`, ~107 chars, at `dashboard.stripe.com/apikeys`) and the Webhook Signing Secret (`whsec_...`, ~38 chars, at `dashboard.stripe.com/webhooks` → destination → Signing secret) are two completely different things despite both being called "secrets" by Stripe. Mixing them up will produce exactly the cryptic auth-error symptom we saw.
+
+## Previous session's commits
+
 - `56a5e77` Add Terms + Privacy links to logged-in hamburger menu: side-by-side `Terms · Privacy` row in `components/shared/Nav.tsx`, tucked between Support and Logout with a separator above and below. Small font, low-emphasis (`text-muted-foreground`), matches the landing-page footer style. Closes a real gap — logged-in users previously had no way to reach the legal docs from inside the app.
 - `96b2a13` Logged-in nav logo points to `/home` instead of `/marketplace`: single-line change to `logoHref` in `components/shared/Nav.tsx`. Admin logo (`/admin`) unchanged. Matches the new "logo = home base" pattern now that `/home` is the post-login landing.
 - `61f25ef` Add temporary diagnostic logs to marketplace photo query: server-side `console.log('[marketplace] photo query', ...)` in `app/marketplace/page.tsx` dumping `requested_listing_ids`, `returned_photo_count`, and the first 3 rows. Added because card thumbnails are blank on `/marketplace` for listings that DO have photos (detail page shows them fine). REMOVE after the bug is fixed. See "Watch out for" entry.
 - `57dae08` Post-login destination: send users to `/home`, not `/marketplace`: three files (`app/auth/login/actions.ts`, `app/auth/login/page.tsx`, `app/api/auth/set-session/route.ts`). `?next=` safe deep-links still take priority — only the no-next fallback changes. The `agreements-gate.ts` fallback was deliberately left as `/marketplace` (it's a "drop them somewhere sensible after the gate" target, not a login destination).
 - `986c159` New marketing landing page at `/` for logged-out visitors: replaces the bare `redirect('/marketplace')` that had been the front door. Logged-in users now redirect to `/home`; logged-out users see the new landing page. Sections: hero with "Hire a flipper. Or become one.", 3-step "How it works", two-sided "For posters / For workers" cards, marketplace teaser, final CTA, footer with Terms/Privacy. Reuses `PublicTopBar`, `Button`, and brand fonts/colors. Single-file (~230 lines) on purpose. See "New landing page" section above.
 
-## Previous session's commits
+## Two-sessions-ago commits
 
 - `7e91e09` Fix /legal/terms and /legal/privacy showing as 'not available': the original schema's RLS SELECT policy on `legal_agreements` was `using (auth.uid() is not null and active = true)`, which blocked logged-out visitors — but the whole point of public legal pages is that logged-out visitors can read them. Created `supabase/schema_legal_agreements_public_read.sql` which drops the auth-required policy and replaces with `using (active = true)`. Admin-management policy on the same table untouched. Cory ran the SQL and confirmed both pages now render.
 - `6bceccd` Add full TOS + Privacy Policy v1.0 + public legal pages + agreements gate: the big one. ~10k-word Terms of Service + ~7k-word Privacy Policy seeded into the DB. Source markdown at `legal/*.md` (edit these to update), generator at `scripts/generate_legal_sql.py` (regenerates SQL from markdown using `$LEGAL$` dollar-quote tag), SQL migration at `supabase/schema_legal_agreements_v1.sql`. Public pages at `/legal/terms` and `/legal/privacy` via shared `components/shared/LegalDocPage.tsx` (force-dynamic, pulls from DB). New `lib/agreements-gate.ts` exports `requireAgreementsAccepted()` — wired into `app/marketplace/page.tsx` so existing logged-in users hit the gate naturally. Bumped agreement scroll area from `h-72` to `h-[60vh] min-h-[20rem]` so the new long docs are readable. Decisions baked in: Groovy Greens, LLC (NC) d/b/a FlipWork; NC governing law / Wake County venue; 18+ US-only; mandatory binding arbitration + class action waiver under AAA Consumer Rules with 30-day opt-out; strong independent-contractor classification for workers; $100 or 12-mo fees liability cap. See "Legal docs (TOS + Privacy)" section above for the full file map and editing instructions. See "Cory's non-code TODOs" section for the d/b/a filing walkthrough, LLC good-standing check, and lawyer review guidance.
 - `85c2f24` Clean up 23 empty junk files at repo root: leftover from `9b1d2b2` (worker city filter commit) — JSX fragments like `setTitle(e.target.value)}` got somehow split out as filenames. All were 0 bytes from creation (verified via `git show 9b1d2b2`). Pure mechanical cleanup. No functional change.
 
-## Two-sessions-ago commits
+## Three-sessions-ago commits
 
 - `52aaf60` Teach support AI: use backticks for paths, not bold: live-testing the AI support chat showed it was emitting `**/profile/payments**` which markdown couldn't parse (asterisks wrapping text starting with `/` confuse the parser, so it rendered as literal asterisks). Added a "Formatting" section to the system prompt instructing the AI to use backticks for paths/UI references, save bold for actual emphasis, no markdown headers in chat replies, and short paragraphs. Single-file change to `lib/support-prompt.ts`.
 - `21107bd` Render markdown in support chat bubbles: added `react-markdown@^10.1.0` + `remark-gfm@^4.0.1`. AI replies now render bold, lists, links (opens in new tab), code, blockquotes properly. User messages stay as plain text. Added `.chat-markdown` CSS class in `app/globals.css` to style markdown elements inside chat bubbles. Same renderer added to `/admin/support/[id]` so admin sees the same view users see.
@@ -1097,7 +1116,7 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 ### Note on Vercel deploy queue (from the AI-support-chat session)
 Cory hit a deploy queue jam in that session — 4 commits in rapid succession stacked up behind a manual redeploy and stopped processing. Fix was to cancel the queued deploys via the `⋯` menu on each row and redeploy the latest commit. Vercel's free/hobby tier serializes builds (one at a time). LESSON for future sessions: batch related changes into fewer commits to avoid stacking the queue. Don't push 4 commits in 10 minutes.
 
-## Three-sessions-ago commits
+## Four-sessions-ago commits
 
 - `87f7a70` Remove checklist preview from browse-gigs card: backed out the checklist preview added two commits earlier. Cory wanted the checklist visible only on the gig detail page next to the description, not duplicated on every browse card. Cleanly removed the prop, the batch query in `app/gigs/page.tsx`, and the unused `ListChecks` / `Check` imports. Cards are back to compact mode.
 - `99e6b6f` Show full checklist preview on each browse-gigs card: batch-fetched all checklist items for visible gigs in one query, grouped by `gig_id`, passed through `GigFilterContent` → `GigListingCard`. Card renders the full task list in a small muted box with task count header and required (*) markers. Shipped, then reverted by `87f7a70` after Cory saw it.
