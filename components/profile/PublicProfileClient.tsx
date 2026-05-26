@@ -188,10 +188,9 @@ export function PublicProfileClient({
                     <p className="text-base text-muted-foreground mt-1">{secondaryName}</p>
                   )}
                   <p className="text-sm text-muted-foreground mt-1">@{profile.username}</p>
-                  {(profile.isFoundingMember || profile.isVerified) && (
+                  {(profile.isFoundingMember) && (
                     <div className="mt-2 flex flex-wrap justify-center sm:justify-start gap-2">
-                      {profile.isVerified && <VerifiedBadge size="md" withLabel />}
-                      {profile.isFoundingMember && <FoundingMemberBadge size="md" />}
+                      <FoundingMemberBadge size="md" />
                     </div>
                   )}
                 </div>

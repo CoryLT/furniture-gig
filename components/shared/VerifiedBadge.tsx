@@ -12,7 +12,7 @@ interface Props {
 // ============================================================
 // VerifiedBadge
 // ============================================================
-// A small blue checkmark shown next to verified users' names.
+// A small purple checkmark shown next to verified users' names.
 //
 // A user is "verified" when they've cleared a real-money trust
 // gate on the platform — either Stripe has verified them as a
@@ -26,6 +26,11 @@ interface Props {
 // Use this anywhere a person's name appears in a trust-building
 // context: public profile, applicant list, gig card poster name,
 // listing seller name, chat headers, etc.
+//
+// Color note: purple (not blue) to differentiate FlipWork's
+// verified mark from Twitter/Meta's blue checks. Hover tooltip
+// still explains the meaning since the icon stands alone with
+// no text label.
 // ============================================================
 
 export function VerifiedBadge({ size = 'sm', withLabel = false }: Props) {
@@ -37,11 +42,11 @@ export function VerifiedBadge({ size = 'sm', withLabel = false }: Props) {
   if (withLabel) {
     return (
       <span
-        className={`inline-flex items-center gap-1 ${textSize} font-medium text-blue-700`}
+        className={`inline-flex items-center gap-1 ${textSize} font-medium text-purple-700`}
         title="Verified — this user has cleared a real-money trust check on FlipWork"
       >
         <BadgeCheck
-          className={`${iconSize} fill-blue-500 stroke-white`}
+          className={`${iconSize} fill-purple-500 stroke-white`}
           strokeWidth={2.5}
         />
         Verified
@@ -56,7 +61,7 @@ export function VerifiedBadge({ size = 'sm', withLabel = false }: Props) {
       aria-label="Verified user"
     >
       <BadgeCheck
-        className={`${iconSize} fill-blue-500 stroke-white shrink-0`}
+        className={`${iconSize} fill-purple-500 stroke-white shrink-0`}
         strokeWidth={2.5}
       />
     </span>
