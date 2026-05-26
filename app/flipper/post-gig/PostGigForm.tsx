@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { slugify } from '@/lib/utils'
-import { X, ChevronRight, Check } from 'lucide-react'
+import { X, ChevronRight, Check, AlertCircle } from 'lucide-react'
 import { LocationSelect } from '@/components/ui/location-select'
 import GigImageUploader from '@/components/admin/GigImageUploader'
 import ChecklistEditor, { ChecklistDraftItem } from '@/components/shared/ChecklistEditor'
@@ -23,15 +23,30 @@ const SKILL_SUGGESTIONS = [
   'Power tools', 'Hand tools', 'Distressing',
 ]
 
-export default function PostGigForm() {
+export type ExistingDraft = { id: string; title: string }
+
+interface Props {
+  existingDraft: ExistingDraft | null
+}
+
+export default function PostGigForm({ existingDraft }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
   // Two-step flow:
-  //   step 1 = "details" — fill out the form, save the gig
-  //   step 2 = "photos"  — upload reference images for the saved gig
-  const [step, setStep] = useState<'details' | 'photos'>('details')
-  const [savedGigId, setSavedGigId] = useState<string | null>(null)
+  //   step 1 = "details" — fill out the form, save the gig as a DRAFT
+  //   step 2 = "photos"  — upload reference images, then publish on finish
+  //
+  // The gig only goes LIVE (status: 'open') when the user clicks
+  // "Finish & post gig" at the end of step 2. If they refresh, close the
+  // tab, or hit back during step 2 the draft stays in the database and
+  // we resume it the next time they hit this page.
+  const [step, setStep] = useState<'details' | 'photos'>(
+    existingDraft ? 'photos' : 'details',
+  )
+  const [savedGigId, setSavedGigId] = useState<string | null>(
+    existingDraft?.id ?? null,
+  )
 
   const [form, setForm] = useState({
     title: '',
@@ -49,6 +64,8 @@ export default function PostGigForm() {
   const [checklist, setChecklist] = useState<ChecklistDraftItem[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
@@ -72,6 +89,8 @@ export default function PostGigForm() {
     setSkills((prev) => prev.filter((s) => s !== skill))
   }
 
+  // Step 1 submit: saves the gig as a DRAFT (not live yet) so the user
+  // can add photos in step 2 before publishing. Workers cannot see drafts.
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -98,7 +117,7 @@ export default function PostGigForm() {
         pay_amount: parseFloat(form.pay_amount) || 0,
         required_skills: skills,
         due_date: form.due_date || null,
-        status: 'open',
+        status: 'draft',
         poster_user_id: user.id,
         created_by: user.id,
       })
@@ -135,15 +154,71 @@ export default function PostGigForm() {
       }
     }
 
-    // Gig is saved — move to the photo step so they can add reference images.
+    // Draft is saved — move to the photo step. The gig is NOT visible to
+    // workers yet because status='draft'.
     setSavedGigId(newGig.id)
     setStep('photos')
     setLoading(false)
   }
 
-  function handleFinish() {
+  // Step 2 finish: flip the draft to 'open' so workers can see it, then
+  // bounce to the dashboard.
+  async function handleFinish() {
+    if (!savedGigId) return
+    setError('')
+    setPublishing(true)
+
+    const { error: publishError } = await supabase
+      .from('gigs')
+      .update({ status: 'open' })
+      .eq('id', savedGigId)
+      .eq('status', 'draft') // safety: don't accidentally re-open an old gig
+
+    if (publishError) {
+      console.error('[post-gig] publish error:', publishError)
+      setError(publishError.message ?? 'Could not publish the gig.')
+      setPublishing(false)
+      return
+    }
+
     router.push('/flipper/dashboard')
     router.refresh()
+  }
+
+  // "Start over" on the resume banner: delete the existing draft so the
+  // user gets a clean slate. Cascade FKs handle checklist items and any
+  // images already uploaded to the draft.
+  async function handleDiscardDraft() {
+    if (!savedGigId) return
+    const ok = window.confirm(
+      'Delete this draft and start a new gig from scratch? This cannot be undone.',
+    )
+    if (!ok) return
+
+    setDiscarding(true)
+    setError('')
+
+    const { error: deleteError } = await supabase
+      .from('gigs')
+      .delete()
+      .eq('id', savedGigId)
+      .eq('status', 'draft') // safety: only delete drafts
+
+    if (deleteError) {
+      console.error('[post-gig] discard error:', deleteError)
+      setError(deleteError.message ?? 'Could not delete the draft.')
+      setDiscarding(false)
+      return
+    }
+
+    // Reload the page so the server picks up the now-empty draft state
+    // and shows a fresh step 1.
+    router.refresh()
+    // Belt-and-suspenders: also reset local state so we move back to step 1
+    // immediately even before the server data round-trip finishes.
+    setSavedGigId(null)
+    setStep('details')
+    setDiscarding(false)
   }
 
   return (
@@ -156,6 +231,43 @@ export default function PostGigForm() {
             : 'Add reference photos so workers can see what they\u2019re bidding on.'}
         </p>
       </div>
+
+      {/* Resume banner — only shown when we're picking up an existing draft */}
+      {step === 'photos' && existingDraft && savedGigId === existingDraft.id && (
+        <div className="card border-amber-300/60 bg-amber-50/50">
+          <div className="card-body">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-foreground">
+                  Picking up where you left off
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  You have an unfinished draft: <span className="font-medium text-foreground">{existingDraft.title || 'Untitled gig'}</span>.
+                  Add photos below and hit <span className="font-medium text-foreground">Finish &amp; post gig</span> to make it live,
+                  or start over.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a
+                    href={`/flipper/gigs/${existingDraft.id}/edit`}
+                    className="text-xs font-medium px-3 py-1.5 rounded-md bg-card border border-border hover:bg-muted"
+                  >
+                    Edit details
+                  </a>
+                  <button
+                    type="button"
+                    onClick={handleDiscardDraft}
+                    disabled={discarding || publishing}
+                    className="text-xs font-medium px-3 py-1.5 rounded-md bg-card border border-border hover:bg-muted disabled:opacity-50"
+                  >
+                    {discarding ? 'Deleting…' : 'Start over (delete draft)'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Step indicator */}
       <div className="flex items-center gap-3 text-sm">
@@ -307,11 +419,19 @@ export default function PostGigForm() {
             onImagesChange={() => {}}
           />
 
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
             <p className="text-sm text-muted-foreground">
-              Photos save as soon as they upload. You can skip this and add photos later.
+              Photos save as soon as they upload. Your gig isn&apos;t live until you hit Finish &amp; post.
             </p>
-            <Button type="button" variant="accent" onClick={handleFinish}>
+            <Button
+              type="button"
+              variant="accent"
+              loading={publishing}
+              disabled={discarding}
+              onClick={handleFinish}
+            >
               Finish & post gig
             </Button>
           </div>
