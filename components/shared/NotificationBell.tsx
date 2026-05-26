@@ -22,7 +22,7 @@ interface NotificationRow {
   id: string
   recipient_user_id: string
   actor_user_id: string | null
-  type: 'follow'
+  type: 'follow' | 'gig_application'
   data: Record<string, any>
   read_at: string | null
   created_at: string
@@ -239,6 +239,14 @@ export function NotificationBell() {
   function renderRow(n: NotificationRow) {
     const actor = n.actor_user_id ? actorById.get(n.actor_user_id) : null
     const profileHref = actor?.username ? `/u/${actor.username}` : '/connections'
+    // Per-type click target. Follow notifications go to the follower's
+    // profile. Gig-application notifications go to the gig page where
+    // the flipper reviews applicants. Add new cases here as the
+    // notification types grow.
+    let clickHref = profileHref
+    if (n.type === 'gig_application' && n.data?.gig_id) {
+      clickHref = `/flipper/gigs/${n.data.gig_id}`
+    }
     const message = renderMessage(n, actor)
     const when = timeAgo(n.created_at)
     const initials = actor
@@ -254,7 +262,7 @@ export function NotificationBell() {
     return (
       <Link
         key={n.id}
-        href={profileHref}
+        href={clickHref}
         onClick={() => {
           if (!n.read_at) markOneRead(n.id)
           setOpen(false)
@@ -307,6 +315,16 @@ export function NotificationBell() {
     switch (n.type) {
       case 'follow':
         return <>{who} followed you.</>
+      case 'gig_application': {
+        const title = n.data?.gig_title as string | undefined
+        return (
+          <>
+            {who} applied to
+            {title ? <span className="font-medium text-foreground"> {title}</span> : ' your gig'}
+            .
+          </>
+        )
+      }
       default:
         return <>{who} did something.</>
     }
