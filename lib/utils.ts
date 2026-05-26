@@ -7,6 +7,25 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Return the public base URL of the site (e.g. https://myflipwork.com),
+ * with no trailing slash. Used for building shareable absolute URLs.
+ *
+ * Priority:
+ *   1. NEXT_PUBLIC_SITE_URL — set this in Vercel for the canonical domain
+ *   2. VERCEL_URL — provided by Vercel for preview deploys (no protocol)
+ *   3. Last-resort hard-coded production domain
+ */
+export function getSiteUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL
+  if (explicit) return explicit.replace(/\/$/, '')
+
+  const vercelHost = process.env.VERCEL_URL
+  if (vercelHost) return `https://${vercelHost}`.replace(/\/$/, '')
+
+  return 'https://myflipwork.com'
+}
+
 // Format a number as USD currency
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {

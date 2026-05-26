@@ -1,9 +1,10 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel } from '@/lib/utils'
+import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel, getSiteUrl } from '@/lib/utils'
 import { MapPin, Calendar, Wrench, DollarSign } from 'lucide-react'
 import ClaimButton from './ClaimButton'
 import GigReferenceImages from '@/components/shared/GigReferenceImages'
+import ShareButton from '@/components/shared/ShareButton'
 import type { GigImageRow } from '@/types/database'
 
 interface Props {
@@ -75,10 +76,17 @@ export default async function GigDetailPage({ params }: Props) {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      {/* Back link */}
-      <a href="/gigs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-        ← Back to gigs
-      </a>
+      {/* Back link + share */}
+      <div className="flex items-center justify-between gap-4">
+        <a href="/gigs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          ← Back to gigs
+        </a>
+        <ShareButton
+          url={`${getSiteUrl()}/gigs/${gig.slug}`}
+          title={gig.title}
+          kind="gig"
+        />
+      </div>
 
       {/* Header card */}
       <div className="card">

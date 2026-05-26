@@ -5,6 +5,7 @@ import {
   formatPriceFromCents,
   timeAgo,
   conditionLabel,
+  getSiteUrl,
 } from '@/lib/utils'
 import { MapPin, Tag, Calendar, Package, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -12,6 +13,7 @@ import PublicTopBar from '@/components/shared/PublicTopBar'
 import Nav from '@/components/shared/Nav'
 import PhotoCarousel from './PhotoCarousel'
 import MessageSellerButton from '@/components/shared/MessageSellerButton'
+import ShareButton from '@/components/shared/ShareButton'
 import type {
   MarketplaceListingRow,
   MarketplacePhotoRow,
@@ -223,6 +225,14 @@ export default async function MarketplaceListingPage({ params }: Props) {
                     </p>
                   </>
                 )}
+                {/* Share lives outside the if/else so it's always available */}
+                <div className="pt-1 flex justify-center">
+                  <ShareButton
+                    url={`${getSiteUrl()}/marketplace/${listing.slug}`}
+                    title={listing.title}
+                    kind="listing"
+                  />
+                </div>
               </div>
 
               {/* Seller card */}
