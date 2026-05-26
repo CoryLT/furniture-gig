@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel, claimStatusLabel, claimStatusClass } from '@/lib/utils'
-import { MapPin, Calendar, Wrench, ArrowLeft, User, Pencil } from 'lucide-react'
+import { MapPin, Calendar, Wrench, ArrowLeft, User, Pencil, Check, StickyNote } from 'lucide-react'
 import OpenChatButton from '@/components/shared/OpenChatButton'
 import ApplicantActions from './ApplicantActions'
 import GigReferenceImages from '@/components/shared/GigReferenceImages'
@@ -55,6 +55,23 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
 
   const images = (imagesData ?? []) as GigImageRow[]
 
+  // Load this gig's checklist items. We show these on the detail page so
+  // the flipper can see what they asked for at a glance.
+  const { data: checklistRaw } = await supabase
+    .from('gig_checklist_items')
+    .select('id, title, description, required, sort_order')
+    .eq('gig_id', gig.id)
+    .order('sort_order')
+
+  type ChecklistItem = {
+    id: string
+    title: string
+    description: string | null
+    required: boolean
+    sort_order: number
+  }
+  const checklist = (checklistRaw ?? []) as ChecklistItem[]
+
   // Load claims (no join — we fetch worker profiles separately to avoid
   // any silent embed-join failures from RLS)
   const { data: claimsRaw } = await supabase
@@ -102,6 +119,38 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
     (c) =>
       !['pending', 'active', 'submitted_for_review'].includes(c.status)
   )
+
+  // If there's a worker actively working (or one who has submitted for
+  // review), load their per-item completion progress so we can mark off
+  // the checklist with ✓s and surface any notes they left.
+  // We prefer submitted-for-review if both exist (rare), since that's the
+  // claim the flipper is most likely interested in.
+  const workingClaim = submittedClaim ?? activeClaim
+  type CompletionRow = {
+    checklist_item_id: string
+    completed: boolean
+    notes: string | null
+  }
+  const completionMap = new Map<string, CompletionRow>()
+  if (workingClaim && checklist.length > 0) {
+    const checklistIds = checklist.map((c) => c.id)
+    const { data: completionsRaw } = await supabase
+      .from('gig_task_completions')
+      .select('checklist_item_id, completed, notes')
+      .eq('worker_user_id', workingClaim.worker_user_id)
+      .in('checklist_item_id', checklistIds)
+
+    for (const row of (completionsRaw ?? []) as any[]) {
+      completionMap.set(row.checklist_item_id, {
+        checklist_item_id: row.checklist_item_id,
+        completed: !!row.completed,
+        notes: (row.notes as string) ?? null,
+      })
+    }
+  }
+  const completedCount = checklist.filter(
+    (c) => completionMap.get(c.id)?.completed,
+  ).length
 
   const renderApplicantCard = (
     claim: ClaimRow,
@@ -240,6 +289,63 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
 
       {/* Reference images you uploaded */}
       <GigReferenceImages images={images} />
+
+      {/* Checklist — what you asked the worker to do.
+          When a worker is mid-job or has submitted for review, we also
+          show their progress (✓ checked items + any notes they left). */}
+      {checklist.length > 0 && (
+        <div className="card">
+          <div className="card-header flex items-center justify-between gap-3">
+            <h2 className="font-sans font-semibold text-foreground">
+              Checklist ({checklist.length} {checklist.length === 1 ? 'item' : 'items'})
+            </h2>
+            {workingClaim && (
+              <span className="text-xs text-muted-foreground">
+                {completedCount} of {checklist.length} done
+              </span>
+            )}
+          </div>
+          <div className="divide-y divide-border">
+            {checklist.map((item, i) => {
+              const progress = completionMap.get(item.id)
+              const isDone = !!progress?.completed
+              return (
+                <div key={item.id} className="px-6 py-3 flex items-start gap-3">
+                  {/* Number bubble OR ✓ check when worker has completed it */}
+                  {workingClaim && isDone ? (
+                    <span
+                      className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 mt-0.5"
+                      aria-label="Completed"
+                      title="Marked complete by worker"
+                    >
+                      <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                    </span>
+                  ) : (
+                    <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0 mt-0.5">
+                      {i + 1}
+                    </span>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">
+                      {item.title}
+                      {item.required && <span className="text-destructive ml-1">*</span>}
+                    </p>
+                    {item.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                    )}
+                    {workingClaim && progress?.notes && (
+                      <p className="text-xs text-foreground mt-2 flex items-start gap-1.5 rounded-md bg-muted/50 px-2 py-1.5">
+                        <StickyNote className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
+                        <span className="whitespace-pre-wrap">{progress.notes}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Submitted for review (worker is done, flipper needs to approve) */}
       {submittedClaim && (
