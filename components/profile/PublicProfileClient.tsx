@@ -22,6 +22,7 @@ import {
 import { type GalleryPhoto } from '@/components/ui/PhotoGallery'
 import Nav from '@/components/shared/Nav'
 import { FoundingMemberBadge } from '@/components/shared/FoundingMemberBadge'
+import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import { FollowButton } from '@/components/profile/FollowButton'
 import { formatCurrency, formatDate, formatPriceFromCents } from '@/lib/utils'
 
@@ -37,6 +38,7 @@ interface MergedProfile {
   website: string
   skills: string[]
   isFoundingMember?: boolean
+  isVerified?: boolean
 }
 
 interface PublicProfileClientProps {
@@ -178,14 +180,18 @@ export function PublicProfileClient({
               {/* Name + meta */}
               <div className="flex-1 space-y-3 min-w-0 text-center sm:text-left">
                 <div>
-                  <h1 className="text-3xl sm:text-4xl font-serif text-foreground">{primaryName}</h1>
+                  <h1 className="text-3xl sm:text-4xl font-serif text-foreground inline-flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+                    <span>{primaryName}</span>
+                    {profile.isVerified && <VerifiedBadge size="lg" />}
+                  </h1>
                   {secondaryName && (
                     <p className="text-base text-muted-foreground mt-1">{secondaryName}</p>
                   )}
                   <p className="text-sm text-muted-foreground mt-1">@{profile.username}</p>
-                  {profile.isFoundingMember && (
-                    <div className="mt-2 flex justify-center sm:justify-start">
-                      <FoundingMemberBadge size="md" />
+                  {(profile.isFoundingMember || profile.isVerified) && (
+                    <div className="mt-2 flex flex-wrap justify-center sm:justify-start gap-2">
+                      {profile.isVerified && <VerifiedBadge size="md" withLabel />}
+                      {profile.isFoundingMember && <FoundingMemberBadge size="md" />}
                     </div>
                   )}
                 </div>

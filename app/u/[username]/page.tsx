@@ -36,6 +36,20 @@ export default async function PublicProfilePage({
   // Pick a userId from whichever table has data
   const userId = worker?.user_id || flipper?.user_id
 
+  // Has this user cleared a real-money trust check?
+  //   - worker: Stripe Connect active (KYC, bank, ID all confirmed by Stripe)
+  //   - flipper: has at least one captured/transferred/refunded payout (real
+  //     card ran real money)
+  // Either one earns the blue checkmark next to their name.
+  let isVerified = false
+  if (userId) {
+    const { data: verifiedResult } = await (supabase.rpc as any)(
+      'is_user_verified',
+      { target_user_id: userId }
+    )
+    isVerified = verifiedResult === true
+  }
+
   // Merged profile data — prefer non-empty values across both tables
   const merged = {
     user_id: userId,
@@ -50,6 +64,7 @@ export default async function PublicProfilePage({
     skills: (worker?.skills as string[]) || [],
     isFoundingMember:
       worker?.founding_member === true || flipper?.founding_member === true,
+    isVerified,
   }
 
   // Pull their open gigs (as a poster) and completed count
