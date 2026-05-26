@@ -94,6 +94,51 @@ export default async function PublicProfilePage({
     }
   }
 
+  // Pull this user's active marketplace listings so we can show them
+  // on the profile. We deliberately exclude sold/hidden — only active
+  // items are useful to a visitor right now. Cap at 12, newest first.
+  const { data: listingsRaw } = userId
+    ? await supabase
+        .from('marketplace_listings')
+        .select('id, slug, title, price_cents, price_mode, condition, location_city, location_state, created_at, status')
+        .eq('seller_user_id', userId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(12)
+    : { data: [] }
+
+  const listings = (listingsRaw ?? []) as Array<{
+    id: string
+    slug: string
+    title: string
+    price_cents: number
+    price_mode: 'fixed' | 'free'
+    condition: string | null
+    location_city: string
+    location_state: string
+    created_at: string
+    status: string
+  }>
+
+  // One thumbnail per listing — same pattern as gigs above.
+  const listingIds = listings.map((l) => l.id)
+  const { data: listingPhotosRaw } = listingIds.length > 0
+    ? await supabase
+        .from('marketplace_photos')
+        .select('listing_id, file_path, sort_order')
+        .in('listing_id', listingIds)
+        .order('sort_order')
+    : { data: [] }
+
+  const listingThumbnails: Record<string, string> = {}
+  for (const ph of (listingPhotosRaw ?? []) as { listing_id: string; file_path: string }[]) {
+    if (!listingThumbnails[ph.listing_id]) {
+      listingThumbnails[ph.listing_id] = supabase.storage
+        .from('marketplace-photos')
+        .getPublicUrl(ph.file_path).data.publicUrl
+    }
+  }
+
   // Pull photo galleries from BOTH worker and flipper tables, combine
   const [workerPhotosResult, flipperPhotosResult] = userId
     ? await Promise.all([
@@ -142,6 +187,8 @@ export default async function PublicProfilePage({
       profile={merged}
       openGigs={openGigs}
       gigThumbnails={gigThumbnails}
+      listings={listings}
+      listingThumbnails={listingThumbnails}
       completedCount={completedCount}
       workerPhotos={workerPhotosResult.data || []}
       flipperPhotos={flipperPhotosResult.data || []}
