@@ -4,11 +4,13 @@ You're picking up Cory's furniture-flipping gig platform. Read this whole thing 
 
 ---
 
-## 🚀 SOFT-LAUNCH STATUS (as of May 25, 2026)
+## 🚀 SOFT-LAUNCH STATUS (as of May 26, 2026)
 
-**FlipWork is LIVE and Facebook-group ready.** First end-to-end live transaction completed successfully a few sessions ago. As of this session, the public landing experience has been polished for a marketing push: founder note + photo, founding-member counter, "you're early" empty states, welcome modal on first login, and the admin side rebuilt as a real analytics dashboard.
+**FlipWork is LIVE and Facebook-group ready.** First end-to-end live transaction completed successfully a few sessions ago. The public landing experience is polished for a marketing push. This session was about supply-side polish: turning lonely individual pages into a connected discovery surface (profile shows your open gigs AND your active listings, gig detail page shows more gigs from the same poster, etc.) plus shipping platform-level reliability fixes (HEIC photos, draft-until-publish gig flow).
 
 Critical context to know when picking up:
+- **iPhone HEIC photos now work everywhere.** Previously they failed silently at multiple points (empty MIME type rejected by client checks, browser-image-compression can't decode HEIC, Sightengine can't decode HEIC). New `heic-to` library in the browser converts HEIC → JPEG before compression. All 6 upload paths use a new `isAcceptableImageFile()` helper. The 5 server API routes are unchanged on purpose — by the time files arrive server-side they're always JPEG. See "HEIC photo uploads" entry below in this session's commits.
+- **Gigs now save as `draft` until the user explicitly publishes.** The two-step "Post a Gig" flow used to insert with `status: 'open'` on step 1 — so a refresh on step 2 silently published a photo-less gig. Now step 1 inserts as `draft` (invisible to workers), step 2's "Finish & post gig" button is the only thing that flips to `open`. If a draft exists when you visit `/flipper/post-gig`, it auto-resumes on step 2 with an amber banner offering "Edit details" or "Start over (delete draft)". See "Post-gig draft flow" entry below.
 - **Stripe is in LIVE mode.** No more sandbox/test. Every payment now is real.
 - **`STRIPE_SECRET_KEY` is GONE.** The env var was renamed to **`STRIPE_SECRET_KEY_LIVE`**. Don't accidentally reintroduce the old name when adding new Stripe code — `lib/stripe.ts` reads from the new name.
 - **`/api/stripe/health` is the live diagnostic** — admin-only endpoint that returns Stripe account status + a `diagnostic` block with first 10 characters and length of every Stripe env var. Useful for debugging. Currently still exposing prefixes — Cory may want this stripped later. See "Stripe live-mode cutover" section.
@@ -68,12 +70,13 @@ After you push, Cory must:
 
 - Signup / login / unified login (anyone can post OR claim gigs)
 - **Unified profile editor at `/profile`** — saves to both `worker_profiles` and `flipper_profiles` tables via `/api/profile/unified-save`
-- **Unified public profile at `/u/[username]`** — pulls from both tables, hero card with avatar, name, location, website, stats, bio, skills, and Instagram-style square photo grid
+- **Unified public profile at `/u/[username]`** — pulls from both tables. Hero card with avatar, name, location, website, stats, bio, skills. Then three discovery sections: **Available gigs** (up to 10 open gigs the user has posted, with thumbnails), **Listings for sale** (up to 12 active marketplace listings in a 2/3-col grid), and Work Samples (Instagram-style square photo grid). Each section hides from strangers when empty; the owner sees an empty-state CTA. See "Profile discovery sections" entry in this session's commits.
 - Old `/workers/[username]` and `/flippers/[username]` routes redirect to `/u/[username]`
 - Old `/profile/worker` and `/profile/flipper` pages still exist as dead code, nothing links to them — leave them alone
 - Post a gig, edit a gig, browse gigs (with city/state filter; **own posted gigs ARE included** in the browse feed with a "Your post" badge — Cory wants to see what workers see)
 - Claim a gig (exclusive — DB unique constraint; **users can't claim their own gigs**, enforced at UI + DB level)
 - **Reference images visible everywhere they should be:** the worker browse cards show a thumbnail of the first reference image; the flipper's My Posted Gigs list (`/flipper/dashboard`) shows a 64px square thumbnail; the worker gig detail page AND the flipper gig detail page (`/flipper/gigs/[id]`) both render the full reference image grid via the shared `GigReferenceImages` component.
+- **Checklist visible on the flipper gig detail page** (`/flipper/gigs/[id]`) with live worker progress. Numbered bubbles for not-yet-done items flip to a green ✓ when the worker completes them. Notes left by the worker appear under the item in a subtle card. Section header shows "N of M done". When there's no active or submitted-for-review claim, the checklist still shows as a plain numbered list so the flipper can review what they asked for. Read-only — the formal review screen at `/flipper/review/[claimId]` still owns approval/rejection.
 - "My Gigs" workflow: checklist + photo uploads + submit for review
 - Admin review flow at `/admin`
 - Payouts tracking (manual PayPal, admin updates status)
@@ -99,6 +102,11 @@ After you push, Cory must:
 - **Founding member system** — first 25 worker signups and first 25 flipper signups auto-get a `founding_member=true` flag (boolean + timestamp on each profile table). Trigger fires `BEFORE INSERT` on `worker_profiles` / `flipper_profiles`, checks current count, flags the row if under cap. `FoundingMemberBadge` component shows on public profiles (small gold pill, two sizes). Landing page shows live counter via `founding_member_counts()` RPC (SECURITY DEFINER, grants execute to anon — logged-out visitors can see the count without seeing the underlying profile data). Cap = 25, defined in `public.founding_member_cap()`. See "Founding member system" section below.
 - **Welcome modal on first `/home` visit** — `components/shared/WelcomeModal.tsx` overlays the dashboard for any user with `users.dismissed_welcome_modal_at = null`. Warm personal welcome from Cory (no em dashes — those are an AI tell), photo + name + "Founder, FlipWork" signature, single "Let's go!" CTA. POSTs to `/api/welcome/dismiss` to mark dismissed, then closes locally. Backfill marked all pre-existing users as already-dismissed so only true newcomers see it.
 - **Admin side fully rebuilt** — `/admin` is now an analytics dashboard (4 hero stat tiles, 30-day money chart, ops tiles, attention-required card, recent activity feed). The old "post a gig" / "edit any gig" admin tools are GONE from the UI — `/admin/gigs` is read-only now (just a sortable list, no actions). The underlying routes `/admin/gigs/new` and `/admin/gigs/[id]/edit` still exist (untouched, so nothing breaks if you visit them directly), they're just not linked from anywhere. All gig posting/editing happens on the user side now: `/flipper/post-gig`, `/flipper/dashboard`, `/flipper/gigs/[id]/edit`.
+- **HEIC uploads** — iPhone photos (which default to HEIC) now convert to JPEG in the browser before upload. Lives in `lib/imageCompression.ts` via the `heic-to` package. Exports `looksLikeHeic()` and `isAcceptableImageFile()` helpers used by all 6 client upload paths. Server API routes are intentionally unchanged — by the time a file arrives server-side it's always JPEG. See "Watch out for" for the MIME-type-can-be-empty quirk.
+- **Post-gig draft flow** — step 1 of `/flipper/post-gig` saves gigs as `status: 'draft'` (invisible to workers). Step 2 lets the flipper add photos. The "Finish & post gig" button on step 2 is the only thing that flips status to `open` (live). If a draft exists when the user revisits the page (e.g. they refreshed), it auto-resumes on step 2 with an amber banner offering "Edit details" or "Start over (delete draft)". Drafts appear on the flipper dashboard with a "Draft" pill, and are excluded from the `totalGigs` stat tile so unfinished work doesn't inflate the count.
+- **Share button on listings and gigs** — `components/shared/ShareButton.tsx` is a small popover with up to four options: native share sheet (mobile only, when supported), copy link, email (mailto: with prefilled subject + body), text message (sms:). Branded copy: "Check out this listing/gig on FlipWork: …". `getSiteUrl()` helper in `lib/utils.ts` builds the absolute URL with `NEXT_PUBLIC_SITE_URL` → `VERCEL_URL` → `https://myflipwork.com` fallback. Wired into both `/marketplace/[slug]` (in the action card) and `/gigs/[slug]` (next to the back link).
+- **"More gigs from this poster" carousel on `/gigs/[slug]`** — horizontal swipe carousel below the apply button. Up to 12 other open gigs from the same `poster_user_id`, with thumbnails. Hidden from the poster themselves. Header has a "View profile →" link that goes to `/u/<poster_username>` for a fuller list of their work.
+- **Site-wide back-to-top button** — `components/shared/BackToTopButton.tsx`, mounted from the root layout. Hidden until the user scrolls ~400px down, then fades in bottom-right with a chevron-up icon. Smooth scroll on click. `z-40` so modals (`z-50`) always cover it cleanly.
 
 ---
 
@@ -1042,6 +1050,9 @@ The TOS currently says "(Mailing address available on request)" because Cory doe
 - **DO NOT BREAK: OAuth must NEVER route through the `*.vercel.app → myflipwork.com` 308 redirect** for the same reason as above (308s strip fragments). The Vercel 308 is still in place for catching stale bookmarks, which is fine. Just don't make Supabase emit OAuth redirects through it.
 - **Testing OAuth changes:** always test in a fresh incognito window on the actual `myflipwork.com` domain. Starting on a vercel.app URL produces the bad version of the flow.
 - **Vercel has a hard 4.5MB body limit** on serverless functions — bigger requests get a `413 FUNCTION_PAYLOAD_TOO_LARGE` at the gateway, which returns HTML (not JSON). Every client form should compress images >1MB via `lib/imageCompression.ts` before upload AND wrap `res.json()` in try/catch. There are 6 live upload paths all using this pattern — if you add a 7th, mirror it. The cedar-bed JPEG (4.6MB iPhone original) is a good reproducer.
+- **HEIC files often have an empty MIME type.** Browsers report `file.type === ''` for iPhone HEIC photos (some report `image/heic`, but blank is common). That means `file.type.startsWith('image/')` returns FALSE and the upload gets rejected at the client. Always use `isAcceptableImageFile()` from `lib/imageCompression.ts` instead — it checks MIME type OR `.heic`/`.heif` filename extension. Also: when adding a new upload UI, the `<input>` accept attribute should be `accept="image/*,.heic,.heif"` (some browsers don't include HEIC in `image/*`). And don't try to render HEIC in `<img>` tags — browsers can't decode them; the conversion to JPEG happens inside `compressImageForUpload` before upload, so by the time the file hits a `<img src=...>` from Supabase Storage it's always JPEG.
+- **HEIC preview limitations.** `PhotoUploadForm.tsx` deliberately skips the `FileReader.readAsDataURL` preview for HEIC files (since the browser can't render them) and shows a small "HEIC photo selected — your browser can't show a preview, but it will be converted to JPG when you upload" notice instead. The conversion runs at submit time, not at selection time. If you build a new upload UI with previews, copy this pattern.
+- **Post-gig step 1 saves as `draft` now, not `open`.** The gig only becomes visible to workers when the user explicitly hits "Finish & post gig" on step 2. If you ever change `PostGigForm.tsx`, do NOT revert step 1's `status: 'draft'` to `'open'` — that was a real bug (a refresh on step 2 would silently publish a photo-less gig). Also: the page auto-resumes any existing draft on step 2 with a banner. If you build a new gig-creation surface (e.g. a fast "Quick Post"), think about whether it should also save as `draft` or whether `'open'` is appropriate.
 - **⚠️ OPEN BUG (left at end of session): marketplace card thumbnails show blank gray boxes on `/marketplace`** for at least 3 listings that DO have photos uploaded. The detail page for those same listings (`/marketplace/<slug>`) renders the photos fine. So photos exist in `marketplace_photos`, the storage bucket public-URL flow works, RLS allows public reads (`status in ('active', 'sold')`) — but the listing-page batched query somehow isn't surfacing them. Schemas and queries between `/marketplace` and the detail page look identical. A diagnostic `console.log('[marketplace] photo query', ...)` is currently in `app/marketplace/page.tsx` to dump `requested_listing_ids`, `returned_photo_count`, and the first few rows. Next session: get Cory to load `/marketplace` while logged in, then read the Vercel function logs to see what Supabase actually returns. Most likely culprits: (a) a sneaky type mismatch between `listing.id` and `marketplace_photos.listing_id` in the `.in()` filter, (b) some pre-existing data state where photos are orphaned to listings that aren't in the visible top-60, (c) something weird about the `.order('sort_order')` + tied `sort_order=0` values changing the result set. Remove the diagnostic log once fixed.
 - **🚨 `auth.uid()` in the Supabase SQL Editor returns NULL silently.** It only resolves inside a Supabase API request context with a real session. If you write an SQL snippet that uses `auth.uid()` and tell Cory to paste it into the editor, the WHERE clause matches zero rows and the update LOOKS LIKE it succeeded ("Success. No rows returned"). Always use a concrete identifier (email or user_id) when handing Cory a one-off admin SQL. This bit us debugging the welcome modal dismissal — wasted 5 minutes thinking the modal was broken when the SQL had simply done nothing.
 - **Admin posting UI is hidden, not deleted.** `/admin/gigs/new` and `/admin/gigs/[id]/edit` still exist as routes. They're untouched code. No nav surface in the app links to them, but if someone bookmarks them or types the URL they still work. If you ever truly delete these, do a full grep first — there's also a `/admin/payouts` page and an admin gigs read-only page that need to stay intact.
@@ -1052,7 +1063,30 @@ The TOS currently says "(Mailing address available on request)" because Cory doe
 
 ## What's next (next session)
 
-**This session: launch-polish package for the Facebook-group push.** Six commits, two SQL migrations, no new core systems. All focused on turning a working-but-empty app into one that explains itself and creates urgency to sign up. See "Launch-polish package" section above for the full breakdown. Headline items:
+**This session: supply-side polish + platform reliability fixes.** Nine commits, zero SQL migrations, no new schema. All focused on (a) turning lonely individual pages into a connected discovery surface and (b) plugging some real reliability holes. Headline items:
+
+1. **HEIC photos work end-to-end.** iPhone-default format now converts to JPEG in the browser via `heic-to`. Touched all 6 client upload paths. See "HEIC photo uploads" entry below and the new "Watch out for" entry about empty MIME types.
+2. **Post-gig step 2 refresh bug fixed.** Step 1 now saves as `draft` (invisible to workers) instead of `open`. Only "Finish & post gig" on step 2 publishes. Auto-resume on revisit with an amber banner. Drafts also excluded from the `totalGigs` stat tile.
+3. **Checklist + worker progress visible on the flipper gig detail page** (`/flipper/gigs/[id]`). Green ✓s, worker notes inline, "N of M done" tally. Read-only; formal review still owns approval.
+4. **Share button on listings and gigs.** Native share sheet (mobile), copy link, email, SMS. Branded "Check out this listing/gig on FlipWork: …". `getSiteUrl()` helper in `lib/utils.ts`.
+5. **Public profile shows Available gigs AND Listings for sale.** Up to 10 gigs (vertical list with thumbnails) and 12 listings (2/3-col grid). Hides from strangers when empty; owner sees empty-state CTAs. This is THE supply-side answer to "share my profile link with someone who missed a gig — they see everything else I have."
+6. **"More gigs from this poster" carousel on `/gigs/[slug]`** below the apply button. Up to 12 other open gigs from the same poster in a horizontal-scroll snap carousel. View profile link goes to `/u/<username>` for a fuller browse.
+7. **Site-wide back-to-top button.** Fixed bottom-right chevron, hidden until ~400px scroll, smooth scroll on click, z-40 so modals cover it. Lives in the root layout.
+8. **`(private)` label removed** from the owner-only follower count on profile. Looked shady. Hover tooltip still says "Only you can see this".
+
+**New package dependency:** `heic-to@^1.4.2`. Cory needs to run `npm install` once locally and `git push` so Vercel picks up the new `package-lock.json` for builds. (Was called out in chat at the time of the HEIC commit; should be done by now.)
+
+**No SQL migrations this session.** Pure code + npm.
+
+**Supply-discovery surface is now connected.** Any "I lost interest in this gig" moment funnels to "but here are 4 more from the same person" or "but here's my profile with my full catalog." Before this session every page was a dead-end if the user wasn't sold.
+
+**Honest pushback worth remembering:** Cory floated a "see who follows whom" social feature mid-session. I pushed back ("this looks like a discovery feature but it doesn't fix your actual problem, which is supply"). He revealed the real motive was masking low supply. We then talked through fixes that actually grow supply (outreach, lowering posting friction, marketing) and shipped things that magnify the supply we DO have (profile gigs/listings sections, the gig-detail carousel). Good pattern — when Cory pitches a feature, ask what problem he's solving. If he tells you the underlying problem, build the right thing for that, not the literal feature.
+
+**One pending Cory-side test:** the very first commit of the session (HEIC fix) needs `npm install` locally before Vercel can build. If the build is failing on `Cannot find module 'heic-to'`, that's the cause — confirm Cory ran `npm install` between `git pull` and `git push`.
+
+---
+
+**Two sessions ago: launch-polish package for the Facebook-group push.** Six commits, two SQL migrations, no new core systems. All focused on turning a working-but-empty app into one that explains itself and creates urgency to sign up. See "Launch-polish package" section above for the full breakdown. Headline items:
 
 1. **Empty states reframed as "you're early"** across marketplace, gigs board, and `/home` welcome card.
 2. **Founder note on landing page** with Cory's actual photo.
@@ -1071,7 +1105,7 @@ The TOS currently says "(Mailing address available on request)" because Cory doe
 
 ---
 
-**Two sessions ago: launch-prep UX cleanup — new landing page, post-auth routing, legal links in nav.** Four commits, no schema changes, no SQL. All focused on making the app's front door explain itself to first-time visitors.
+**Three sessions ago: launch-prep UX cleanup — new landing page, post-auth routing, legal links in nav.** Four commits, no schema changes, no SQL. All focused on making the app's front door explain itself to first-time visitors.
 
 1. **Real marketing landing page at `/`.** Replaces the "redirect to /marketplace" front door that's been in place for a few sessions. The marketplace feed was a confusing first impression for new visitors — they couldn't tell what FlipWork even did. New page has a hero ("Hire a flipper. Or become one."), a 3-step "How it works", side-by-side "for posters / for workers" cards, a marketplace teaser, and a final CTA. See "New landing page" section above for the full file map.
 2. **Post-login destination flipped from `/marketplace` → `/home`.** Three files (email login server action, client login page, OAuth set-session route). `?next=` safe deep-links still take priority — only the no-next fallback changes.
@@ -1082,7 +1116,7 @@ The TOS currently says "(Mailing address available on request)" because Cory doe
 
 ---
 
-**Three sessions ago: launch-prep cleanup + full TOS/Privacy Policy v1.0 shipped.** Three commits, focused on closing one of the two biggest pre-launch blockers (legal docs) plus a repo-hygiene cleanup:
+**Four sessions ago: launch-prep cleanup + full TOS/Privacy Policy v1.0 shipped.** Three commits, focused on closing one of the two biggest pre-launch blockers (legal docs) plus a repo-hygiene cleanup:
 
 1. **Cleaned up 23 empty junk files** at the repo root that had been there since `9b1d2b2` (the worker city filter commit). Pure mechanical fix. Verified via `git show` that all were 0 bytes from creation, never had content. Single commit: `85c2f24`.
 2. **Full TOS + Privacy Policy v1.0 shipped end-to-end.** Source markdown in `legal/*.md`, generator at `scripts/generate_legal_sql.py`, SQL migrations, public read pages at `/legal/terms` and `/legal/privacy`, and runtime gate wired into `/marketplace` so existing logged-in users get caught. See "Legal docs (TOS + Privacy)" section.
@@ -1092,7 +1126,7 @@ The TOS currently says "(Mailing address available on request)" because Cory doe
 
 ---
 
-**Four sessions ago: small focused UX polish around gig previews — no new systems, no schema changes, no SQL.** Four commits, all in `/gigs` and `/flipper/dashboard` territory:
+**Five sessions ago: small focused UX polish around gig previews — no new systems, no schema changes, no SQL.** Four commits, all in `/gigs` and `/flipper/dashboard` territory:
 
 1. **Reference images now visible on the flipper side too.** The flipper dashboard list shows a 64px thumbnail per gig (first image by `sort_order`, placeholder icon if none). The flipper gig detail page renders the full reference-image grid using the existing `GigReferenceImages` component. Image URLs are built on the server in one batched query.
 2. **Own posted gigs now appear in the worker browse feed**, mixed in by date with everyone else's, marked with a small "Your post" badge under the status pill. Footer link reads "View as worker" on own posts. The existing `isOwnPostedGig` branch on `/gigs/[slug]` already prevents claiming and shows a "You posted this gig" panel, so no extra detail-page work was needed. Cory wanted this so he can see his gig the way workers see it without using a second account.
@@ -1102,7 +1136,7 @@ The TOS currently says "(Mailing address available on request)" because Cory doe
 
 ---
 
-**Five sessions ago: killed two major iPhone bugs** — the photo upload hang and the OAuth hang. See "Older commits" and the bugfix notes below for details. Tl;dr: Vercel 4.5MB body limit triggered 413s that returned non-JSON HTML, crashing every `res.json()` call silently. Fix was client-side image compression + try/catch around every res.json(). And Supabase Site URL was set to the vercel.app domain, which made OAuth redirect through the `*.vercel.app → myflipwork.com` 308 — and 308s strip URL fragments, so the auth token vanished. Fix was setting Supabase Site URL to `https://myflipwork.com` directly.
+**Six sessions ago: killed two major iPhone bugs** — the photo upload hang and the OAuth hang. See "Older commits" and the bugfix notes below for details. Tl;dr: Vercel 4.5MB body limit triggered 413s that returned non-JSON HTML, crashing every `res.json()` call silently. Fix was client-side image compression + try/catch around every res.json(). And Supabase Site URL was set to the vercel.app domain, which made OAuth redirect through the `*.vercel.app → myflipwork.com` 308 — and 308s strip URL fragments, so the auth token vanished. Fix was setting Supabase Site URL to `https://myflipwork.com` directly.
 
 ---
 
@@ -1158,6 +1192,34 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 ## This session's commits (most recent first)
 
+- `b40de9a` Add site-wide back-to-top button. New `components/shared/BackToTopButton.tsx`, mounted from the root layout. Hidden until the user scrolls ~400px down, then fades in bottom-right with a chevron-up icon. Smooth scroll on click (respects OS "Reduce Motion"). Passive scroll listener. Rendered conditionally (not just hidden via CSS) so it isn't tab-reachable when hidden. `z-40` so modals (`z-50`) always cover cleanly. Also stripped a leftover UTF-8 BOM from the start of `app/layout.tsx`.
+- `923492e` Show user's active listings on public profile. New "Listings for sale" section in `/u/[username]` between Available gigs and Work Samples. Server pulls up to 12 active `marketplace_listings` by `seller_user_id` + one thumbnail per via `marketplace_photos`. 2/3-col grid of cards with square thumbnails, price, title (2-line clamp), location. Tag icon fallback when no photos. Hides from strangers when empty; owner sees an empty state with "Create a listing" CTA + "+ New listing" header shortcut.
+- `4948b44` Remove '(private)' label next to follower count. The label read shady; hover tooltip ("Only you can see this") is still there. Count only appears when viewing your own profile so privacy is already in the behavior.
+- `c6631c3` Show other gigs from the same poster on gig detail page. Below the apply button on `/gigs/[slug]`, a "More gigs from <Name>" horizontal carousel. Server pulls up to 12 other open gigs by `gig.poster_user_id`, excludes the current gig, batched thumbnail query, poster name from `flipper_profiles.business_name` → worker first+last → `@username` fallback. CSS scroll-snap for native-feeling swipe. "View profile →" link to `/u/<username>`. Hidden entirely when poster has no other open gigs or when the viewer IS the poster.
+- `7c71661` Show available gigs on public profile pages. New "Available gigs" section in `/u/[username]` between Skills and Work Samples. The server query was ALREADY fetching `openGigs` (limit 10) and just never rendering them — added a batched `gig_images` thumbnail query and the client rendering. Vertical list of cards with thumbnail, title, summary, location, due date, payout. Same hide/show rules as listings.
+- `472bda5` Add Share button to listings and gigs. New `components/shared/ShareButton.tsx`: popover with native share (mobile share sheet via `navigator.share`), copy link (with transient "Copied!" state), email (mailto: with prefilled subject + body), text message (sms:). Branded copy: "Check out this listing/gig on FlipWork: …". Closes on outside click or Escape. New `getSiteUrl()` helper in `lib/utils.ts` resolves the absolute URL via `NEXT_PUBLIC_SITE_URL` → `VERCEL_URL` → `myflipwork.com` fallback. Wired into `/marketplace/[slug]` (in the contact/action card) and `/gigs/[slug]` (next to the back link).
+- `840820a` Show checklist on flipper gig detail page. `/flipper/gigs/[id]` previously showed reference images + applicants but not the checklist itself. Now always renders the checklist (numbered bubbles, required asterisk, descriptions). When there's an active or submitted-for-review claim, also loads the worker's `gig_task_completions` records and shows ✓s for completed items, the worker's notes inline in a subtle card, and an "N of M done" tally. Read-only; the formal review screen at `/flipper/review/[claimId]` still owns approve/reject.
+- `e80d957` Save gigs as draft until publish (fix step-2 refresh bug). Before this commit, step 1 of `/flipper/post-gig` inserted with `status: 'open'` — so a refresh on step 2 left behind a published, photo-less gig the flipper never confirmed. Three changes: (a) step 1 now saves as `status: 'draft'` (invisible to workers since `/gigs` filters `status='open'`), (b) "Finish & post gig" on step 2 flips to `'open'`, (c) on revisit, the server page detects any existing draft and auto-loads step 2 with an amber banner offering "Edit details" (→ `/flipper/gigs/[id]/edit`) or "Start over (delete draft)". Also: drafts excluded from the `totalGigs` stat tile on `/flipper/dashboard`. Admin dashboard totalGigs LEFT as-is (ops can see all). Drafts naturally appear on the flipper dashboard's "All" filter with a "Draft" pill via existing `gigStatusLabel`.
+- `d222137` Accept HEIC photo uploads (iPhone default format). Adds `heic-to@^1.4.2` to package.json. Rewrites `lib/imageCompression.ts` to detect HEIC by MIME OR filename extension, convert to JPEG via `heicTo({ blob, type: 'image/jpeg', quality: 0.9 })` BEFORE running `browser-image-compression`. Two new exports: `looksLikeHeic(file)` and `isAcceptableImageFile(file)`. All 6 client upload paths now use `isAcceptableImageFile()` instead of `file.type.startsWith('image/')`. All `<input>` accept attributes upgraded to `image/*,.heic,.heif`. `PhotoUploadForm.tsx` shows a "HEIC selected — preview hidden, will convert on upload" notice since browsers can't render HEIC in `<img>`. Server API routes intentionally unchanged — by the time a file arrives server-side it's always JPEG.
+
+### What got accomplished this session beyond the commits
+
+- **Supply-side discovery surface is now end-to-end.** Three connected surfaces: (a) profile shows your gigs AND listings, (b) gig detail page shows more gigs from same poster, (c) share button lets you push individual gig/listing URLs externally. The workflow Cory described — "share my profile URL when a gig gets taken so people see what else I have" — is now a real flow.
+- **Pushback on a wrong-shaped feature pitch.** Cory pitched "see who follows whom" mid-session. After some clarifying questions he revealed the real motive: low supply on the platform makes it feel empty. Rather than build a vanity-metric feature, we talked through what actually grows supply (outreach, lowered posting friction, marketing) and shipped things that magnify the supply that exists (profile sections, the carousel, share button). Worth keeping the pattern in mind: when Cory pitches a feature, ask what problem he's solving. Often the right build is something else.
+- **HANDOFF.md updated** with this session's work.
+
+### Lessons learned this session
+
+**Empty MIME type for HEIC files is the single biggest gotcha.** Browsers report `file.type === ''` (literal empty string) for iPhone HEIC photos. That means `file.type.startsWith('image/')` returns FALSE and the upload gets rejected at the client BEFORE any conversion can happen. The fix is checking MIME type OR filename extension (`.heic`/`.heif`). The new "Watch out for" entry calls this out — pattern is `isAcceptableImageFile(file)` from `lib/imageCompression.ts`.
+
+**Vertical lists for gigs, grids for listings.** I tested both shapes for both sections and ended up with the gig section as a vertical list (richer text per row — title, summary, location, due date, payout all matter) and listings as a 2/3-col grid (more visual, less text needed since the price + image carry most of the meaning). Worth keeping in mind for future "list of things from a user" sections — visual goods get a grid, work-like things get a list.
+
+**Three-mode rendering is a useful pattern for read-only progress views.** The new flipper checklist UI shows the same items three different ways depending on claim state: (1) plain numbered list when no worker is picked, (2) ✓ green bubbles + worker notes when claim is active/submitted-for-review, (3) same as #2 visually for submitted_for_review (the "approve/reject" buttons live on the formal review page, not here). Single data source, branched rendering, no separate components.
+
+---
+
+## Previous session's commits
+
 - `f3ccb25` Founder photo: add cory-founder.jpg + show it in welcome modal. Adds the actual JPEG to `/public/cory-founder.jpg` (the landing page founder note had been 404'ing on it) and updates `WelcomeModal.tsx` to show the same photo in a small circle next to "Cory / Founder, FlipWork" signature.
 - `a5fc2b2` Welcome modal: one-time popup on first /home visit. Three new files: `supabase/welcome_modal_20260525.sql` (adds `users.dismissed_welcome_modal_at`, backfills existing users as already-dismissed), `app/api/welcome/dismiss/route.ts` (POST to mark dismissed), `components/shared/WelcomeModal.tsx` (the actual modal). Wired into `app/home/page.tsx` — modal mounts when `dismissed_welcome_modal_at` is null. Warm copy in Cory's voice with photo + name + "Founder, FlipWork" signature, single "Let's go!" CTA.
 - `8f39459` Landing: add Cory's photo to the founder note. (Photo file added in a later commit `f3ccb25` — this commit just added the `<img>` reference, which then 404'd until the file landed.)
@@ -1182,7 +1244,7 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 **Cory's instincts about marketing copy are good.** He spotted em dashes as an AI tell and asked for a rewrite. He asked about the test-account thing eating a founding-member spot before I thought to warn him. Trust his pattern-matching — when he flags something, dig in.
 
-## Previous session's commits
+## Two-sessions-ago commits
 
 - `e3c4ce7` Re-trigger deploy after deletion of `082a5d6`: tiny comment in `app/api/stripe/health/route.ts`. The previous diagnostic deployment was deleted before completing, so this just kicks Vercel to build the same diagnostic code that was already in `082a5d6`.
 - `082a5d6` Add env var diagnostic to `/api/stripe/health`: returns first 10 chars + length of `STRIPE_SECRET_KEY_LIVE`, legacy `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, plus all env var names containing "STRIPE". Admin-only. This is what finally surfaced the real bug — `STRIPE_SECRET_KEY_LIVE` literally contained a `whsec_...` value (Cory had been pasting the webhook signing secret into the secret key field). **Decision pending:** Cory may want this diagnostic block stripped — `/api/stripe/health` is admin-gated so the leak is contained, but trimming it back to a basic ok/not-ok response is a 30-second cleanup commit.
@@ -1202,7 +1264,7 @@ Cory will pick. Open by confirming what you're about to build in 2-3 lines, then
 
 The Stripe auth bug took ~3 hours to find because of guessing. Root cause was Cory pasting the webhook signing secret (`whsec_...`) into the `STRIPE_SECRET_KEY_LIVE` field. **For future Stripe debugging:** ALWAYS hit `/api/stripe/health` as admin first to see what's actually in the env vars.
 
-## Two-sessions-ago commits
+## Three-sessions-ago commits
 
 - `56a5e77` Add Terms + Privacy links to logged-in hamburger menu: side-by-side `Terms · Privacy` row in `components/shared/Nav.tsx`, tucked between Support and Logout with a separator above and below.
 - `96b2a13` Logged-in nav logo points to `/home` instead of `/marketplace`: single-line change to `logoHref` in `components/shared/Nav.tsx`. Admin logo (`/admin`) unchanged.
@@ -1214,7 +1276,7 @@ The Stripe auth bug took ~3 hours to find because of guessing. Root cause was Co
 - `6bceccd` Add full TOS + Privacy Policy v1.0 + public legal pages + agreements gate: the big one. ~10k-word Terms of Service + ~7k-word Privacy Policy seeded into the DB. Source markdown at `legal/*.md` (edit these to update), generator at `scripts/generate_legal_sql.py` (regenerates SQL from markdown using `$LEGAL$` dollar-quote tag), SQL migration at `supabase/schema_legal_agreements_v1.sql`. Public pages at `/legal/terms` and `/legal/privacy` via shared `components/shared/LegalDocPage.tsx` (force-dynamic, pulls from DB). New `lib/agreements-gate.ts` exports `requireAgreementsAccepted()` — wired into `app/marketplace/page.tsx` so existing logged-in users hit the gate naturally. Bumped agreement scroll area from `h-72` to `h-[60vh] min-h-[20rem]` so the new long docs are readable. Decisions baked in: Groovy Greens, LLC (NC) d/b/a FlipWork; NC governing law / Wake County venue; 18+ US-only; mandatory binding arbitration + class action waiver under AAA Consumer Rules with 30-day opt-out; strong independent-contractor classification for workers; $100 or 12-mo fees liability cap. See "Legal docs (TOS + Privacy)" section above for the full file map and editing instructions. See "Cory's non-code TODOs" section for the d/b/a filing walkthrough, LLC good-standing check, and lawyer review guidance.
 - `85c2f24` Clean up 23 empty junk files at repo root: leftover from `9b1d2b2` (worker city filter commit) — JSX fragments like `setTitle(e.target.value)}` got somehow split out as filenames. All were 0 bytes from creation (verified via `git show 9b1d2b2`). Pure mechanical cleanup. No functional change.
 
-## Three-sessions-ago commits
+## Four-sessions-ago commits
 
 - `52aaf60` Teach support AI: use backticks for paths, not bold: live-testing the AI support chat showed it was emitting `**/profile/payments**` which markdown couldn't parse (asterisks wrapping text starting with `/` confuse the parser, so it rendered as literal asterisks). Added a "Formatting" section to the system prompt instructing the AI to use backticks for paths/UI references, save bold for actual emphasis, no markdown headers in chat replies, and short paragraphs. Single-file change to `lib/support-prompt.ts`.
 - `21107bd` Render markdown in support chat bubbles: added `react-markdown@^10.1.0` + `remark-gfm@^4.0.1`. AI replies now render bold, lists, links (opens in new tab), code, blockquotes properly. User messages stay as plain text. Added `.chat-markdown` CSS class in `app/globals.css` to style markdown elements inside chat bubbles. Same renderer added to `/admin/support/[id]` so admin sees the same view users see.
@@ -1223,7 +1285,7 @@ The Stripe auth bug took ~3 hours to find because of guessing. Root cause was Co
 ### Note on Vercel deploy queue (from the AI-support-chat session)
 Cory hit a deploy queue jam in that session — 4 commits in rapid succession stacked up behind a manual redeploy and stopped processing. Fix was to cancel the queued deploys via the `⋯` menu on each row and redeploy the latest commit. Vercel's free/hobby tier serializes builds (one at a time). LESSON for future sessions: batch related changes into fewer commits to avoid stacking the queue. Don't push 4 commits in 10 minutes.
 
-## Four-sessions-ago commits
+## Older commits
 
 - `87f7a70` Remove checklist preview from browse-gigs card: backed out the checklist preview added two commits earlier. Cory wanted the checklist visible only on the gig detail page next to the description, not duplicated on every browse card. Cleanly removed the prop, the batch query in `app/gigs/page.tsx`, and the unused `ListChecks` / `Check` imports. Cards are back to compact mode.
 - `99e6b6f` Show full checklist preview on each browse-gigs card: batch-fetched all checklist items for visible gigs in one query, grouped by `gig_id`, passed through `GigFilterContent` → `GigListingCard`. Card renders the full task list in a small muted box with task count header and required (*) markers. Shipped, then reverted by `87f7a70` after Cory saw it.
@@ -1240,7 +1302,7 @@ Cory hit a deploy queue jam in that session — 4 commits in rapid succession st
 **Configuration changes (no code) from the previous session:**
 - Vercel Project → Settings → Domains: added `furniture-gig-corylts-projects.vercel.app` as a domain and configured BOTH `*.vercel.app` URLs (the team alias and the short alias `furniture-gig.vercel.app`) to issue a 308 Permanent Redirect to `myflipwork.com`. Originally framed as the OAuth bug fix; ended up causing a regression because 308s strip URL fragments — see "DO NOT BREAK" notes in "Watch out for." The real OAuth fix was changing the Supabase Site URL.
 
-## Older commits
+## Even older commits
 
 - `5186236` Add visible delete + arrow-button reorder for listing photos: new API route `POST /api/marketplace/[id]/reorder-photos` (owner/admin only, defensively verifies every photo belongs to the listing), photo grid in both `NewListingForm.tsx` and `EditListingForm.tsx` got always-visible delete button + cover badge + up/down arrow buttons + disabled state at ends. Reorder uses optimistic UI with rollback. Removed misleading "Drag-to-reorder coming soon" copy.
 - `9796c9f` Fix indefinite hang on listing photo upload: added 30s AbortController timeout to the Sightengine fetch in `lib/moderation.ts` (returns existing `service_error` result on abort), added 60s AbortController timeout to the client fetch in `NewListingForm.tsx`, added per-photo try/catch so one bad photo doesn't lock the whole loop. (Didn't actually fix the hang — see this session's commits for the real fix.)
@@ -1251,7 +1313,7 @@ Cory hit a deploy queue jam in that session — 4 commits in rapid succession st
 - `c1f0f4d` Hide archived gigs by default; add 'Show archived' toggle on flipper dashboard: `FlipperGigList.tsx` got a `showArchived` state, archived gigs filter out by default, a `Show archived (N)` checkbox renders only when archived gigs exist. Also fixed the `Total Gigs` stat tile to exclude archived. Public marketplace was already filtered to `status='open'` so no change needed there.
 - `c90f9f0` Swap city/state order: State on left, City on right: one fix to the shared `components/ui/location-select.tsx` covers 9 pages (worker/flipper onboarding, profile editors, post-gig, edit-gig, new listing, edit listing, etc.) plus the marketplace filter `components/worker/GigFilterContent.tsx` which had its own copy. Reasoning: city dropdown was disabled until state was picked, so left→right tab/click flow was awkward.
 
-## Even older commits
+## Stripe Connect early commits
 
 - `df33049` Fix ghost count on /my-gigs from orphan claims: app-side filter skips claims whose `gigs` join is null (orphan from before cascade was reliable), plus a one-time SQL cleanup file `schema_cleanup_orphan_claims.sql` that deletes any existing orphans AND re-asserts the `on delete cascade` FK so new ones can't appear after a gig delete. SQL was run on prod.
 - `8448e85` Fix stale count on /my-gigs after a gig is deleted: added `export const dynamic = 'force-dynamic'` + `export const revalidate = 0` to `app/my-gigs/page.tsx`. Tab badges were caching and showing pre-delete counts.
@@ -1266,7 +1328,7 @@ Cory hit a deploy queue jam in that session — 4 commits in rapid succession st
 - `e8069db` Marketplace messaging: POST /api/listing-messages/start (find-or-create conversation)
 - `90b8014` SQL: idempotent version of marketplace messaging schema (safe to re-run)
 
-## Stripe Connect early commits
+## Stripe Connect even-earlier commits
 
 - `b6d74c8` Stripe Connect Phase 4: RLS fix + silent-failure guards
 - `85e0ec4` Stripe Connect Phase 4: flipper-side review page (not admin)
