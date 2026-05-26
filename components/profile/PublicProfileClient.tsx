@@ -224,7 +224,6 @@ export function PublicProfileClient({
                           {ownFollowerCount}
                         </span>
                         {ownFollowerCount === 1 ? 'follower' : 'followers'}
-                        <span className="text-xs opacity-60">(private)</span>
                       </Link>
                     )}
                   </div>
