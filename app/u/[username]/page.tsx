@@ -73,6 +73,27 @@ export default async function PublicProfilePage({
   const openGigs = openGigsResult.data || []
   const completedCount = (completedCountResult as any).count || 0
 
+  // Grab one thumbnail per open gig so the cards on the profile look
+  // alive instead of being text-only. Single batched query, lowest
+  // sort_order wins per gig.
+  const openGigIds = openGigs.map((g: any) => g.id)
+  const { data: gigImagesRaw } = openGigIds.length > 0
+    ? await supabase
+        .from('gig_images')
+        .select('gig_id, file_path, sort_order')
+        .in('gig_id', openGigIds)
+        .order('sort_order')
+    : { data: [] }
+
+  const gigThumbnails: Record<string, string> = {}
+  for (const img of (gigImagesRaw ?? []) as { gig_id: string; file_path: string }[]) {
+    if (!gigThumbnails[img.gig_id]) {
+      gigThumbnails[img.gig_id] = supabase.storage
+        .from('gig-images')
+        .getPublicUrl(img.file_path).data.publicUrl
+    }
+  }
+
   // Pull photo galleries from BOTH worker and flipper tables, combine
   const [workerPhotosResult, flipperPhotosResult] = userId
     ? await Promise.all([
@@ -120,6 +141,7 @@ export default async function PublicProfilePage({
     <PublicProfileClient
       profile={merged}
       openGigs={openGigs}
+      gigThumbnails={gigThumbnails}
       completedCount={completedCount}
       workerPhotos={workerPhotosResult.data || []}
       flipperPhotos={flipperPhotosResult.data || []}

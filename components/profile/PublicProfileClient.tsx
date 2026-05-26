@@ -13,11 +13,15 @@ import {
   User,
   Wrench,
   Image as ImageIcon,
+  Briefcase,
+  Calendar,
+  ArrowRight,
 } from 'lucide-react'
 import { type GalleryPhoto } from '@/components/ui/PhotoGallery'
 import Nav from '@/components/shared/Nav'
 import { FoundingMemberBadge } from '@/components/shared/FoundingMemberBadge'
 import { FollowButton } from '@/components/profile/FollowButton'
+import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface MergedProfile {
   user_id: string
@@ -36,6 +40,7 @@ interface MergedProfile {
 interface PublicProfileClientProps {
   profile: MergedProfile
   openGigs: any[]
+  gigThumbnails: Record<string, string>
   completedCount: number
   workerPhotos: any[]
   flipperPhotos: any[]
@@ -47,6 +52,7 @@ interface PublicProfileClientProps {
 export function PublicProfileClient({
   profile,
   openGigs,
+  gigThumbnails,
   completedCount,
   workerPhotos: initialWorkerPhotos,
   flipperPhotos: initialFlipperPhotos,
@@ -298,6 +304,130 @@ export function PublicProfileClient({
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Available gigs — what this person currently has open for workers.
+            We hide the whole section from strangers when there are none; the
+            owner sees an empty state that prompts them to post one. */}
+        {(openGigs.length > 0 || isOwnProfile) && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h2 className="text-2xl font-serif text-foreground flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-accent" strokeWidth={1.5} />
+                Available gigs
+                {openGigs.length > 0 && (
+                  <span className="text-base font-sans text-muted-foreground font-normal">
+                    ({openGigs.length})
+                  </span>
+                )}
+              </h2>
+              {isOwnProfile && (
+                <Link
+                  href="/flipper/post-gig"
+                  className="text-sm text-accent hover:underline"
+                >
+                  + Post a gig
+                </Link>
+              )}
+            </div>
+
+            {openGigs.length > 0 ? (
+              <div className="space-y-2">
+                {openGigs.map((gig: any) => {
+                  const thumb = gigThumbnails[gig.id]
+                  const gigLocation =
+                    gig.city && gig.state
+                      ? `${gig.city}, ${gig.state}`
+                      : gig.location_text || ''
+                  return (
+                    <Link
+                      key={gig.id}
+                      href={`/gigs/${gig.slug}`}
+                      className="card hover:shadow-md transition-shadow group block"
+                    >
+                      <div className="card-body">
+                        <div className="flex items-start gap-3">
+                          {/* Thumbnail or placeholder */}
+                          <div className="w-16 h-16 rounded-md overflow-hidden bg-muted border border-border shrink-0 flex items-center justify-center">
+                            {thumb ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={thumb}
+                                alt=""
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <Armchair className="w-5 h-5 text-muted-foreground" />
+                            )}
+                          </div>
+
+                          {/* Body */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-foreground group-hover:text-accent transition-colors line-clamp-1">
+                              {gig.title}
+                            </h3>
+                            {gig.summary && (
+                              <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
+                                {gig.summary}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+                              {gigLocation && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="w-3.5 h-3.5" />
+                                  {gigLocation}
+                                </span>
+                              )}
+                              {gig.due_date && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="w-3.5 h-3.5" />
+                                  Due {formatDate(gig.due_date)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Pay + chevron */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-mono font-semibold text-foreground">
+                              {formatCurrency(gig.pay_amount)}
+                            </span>
+                            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  )
+                })}
+
+                {/* If we capped at 10 and there are exactly 10 shown, hint
+                    that more might exist via the gigs page. We can't tell
+                    from here if there are >10 — keeping it simple. */}
+                {openGigs.length >= 10 && (
+                  <p className="text-xs text-muted-foreground text-center pt-2">
+                    Showing the 10 most recent open gigs.
+                  </p>
+                )}
+              </div>
+            ) : (
+              /* Owner-only empty state */
+              <div className="card">
+                <div className="card-body text-center py-10">
+                  <Briefcase className="w-10 h-10 mx-auto text-slate-300 mb-3" strokeWidth={1.5} />
+                  <p className="text-sm text-muted-foreground mb-4">
+                    You don&apos;t have any open gigs right now.
+                  </p>
+                  <Link
+                    href="/flipper/post-gig"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-accent-foreground font-medium hover:bg-accent/90 transition-colors text-sm"
+                  >
+                    Post a gig
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
