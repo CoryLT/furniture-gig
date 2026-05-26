@@ -1,7 +1,8 @@
+import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel, getSiteUrl } from '@/lib/utils'
-import { MapPin, Calendar, Wrench, DollarSign } from 'lucide-react'
+import { MapPin, Calendar, Wrench, DollarSign, Armchair, ArrowRight } from 'lucide-react'
 import ClaimButton from './ClaimButton'
 import GigReferenceImages from '@/components/shared/GigReferenceImages'
 import ShareButton from '@/components/shared/ShareButton'
@@ -73,6 +74,82 @@ export default async function GigDetailPage({ params }: Props) {
     !!wp.stripe_payouts_enabled &&
     !!wp.stripe_details_submitted
   const stripeStarted = !!wp.stripe_account_id
+
+  // Pull other OPEN gigs from the same poster so we can show them at
+  // the bottom of the page. Skip the current gig, cap at 12, newest first.
+  // Only show this section to workers — the poster sees their own gigs
+  // on their dashboard.
+  const { data: otherGigsRaw } =
+    !isOwnPostedGig && gig.poster_user_id
+      ? await supabase
+          .from('gigs')
+          .select('id, slug, title, summary, city, state, location_text, pay_amount, due_date')
+          .eq('poster_user_id', gig.poster_user_id)
+          .eq('status', 'open')
+          .neq('id', gig.id)
+          .order('created_at', { ascending: false })
+          .limit(12)
+      : { data: [] }
+
+  const otherGigs = (otherGigsRaw ?? []) as Array<{
+    id: string
+    slug: string
+    title: string
+    summary: string
+    city: string
+    state: string
+    location_text: string
+    pay_amount: number
+    due_date: string | null
+  }>
+
+  // Thumbnails for those other gigs — same one-image-per-gig pattern
+  // used on the flipper dashboard.
+  const otherGigIds = otherGigs.map((g) => g.id)
+  const { data: otherImagesRaw } = otherGigIds.length > 0
+    ? await supabase
+        .from('gig_images')
+        .select('gig_id, file_path, sort_order')
+        .in('gig_id', otherGigIds)
+        .order('sort_order')
+    : { data: [] }
+
+  const otherGigThumbnails: Record<string, string> = {}
+  for (const img of (otherImagesRaw ?? []) as { gig_id: string; file_path: string }[]) {
+    if (!otherGigThumbnails[img.gig_id]) {
+      otherGigThumbnails[img.gig_id] = supabase.storage
+        .from('gig-images')
+        .getPublicUrl(img.file_path).data.publicUrl
+    }
+  }
+
+  // Poster's public profile info — name + username for the section
+  // header link. We try flipper_profiles first (since posters are
+  // flippers), then fall back to worker_profiles for the display name.
+  let posterName = ''
+  let posterUsername = ''
+  if (otherGigs.length > 0 && gig.poster_user_id) {
+    const [{ data: posterFp }, { data: posterWp }] = await Promise.all([
+      supabase
+        .from('flipper_profiles')
+        .select('username, business_name')
+        .eq('user_id', gig.poster_user_id)
+        .maybeSingle(),
+      supabase
+        .from('worker_profiles')
+        .select('first_name, last_name, username')
+        .eq('user_id', gig.poster_user_id)
+        .maybeSingle(),
+    ])
+    const fp = (posterFp as any) ?? {}
+    const wpRow = (posterWp as any) ?? {}
+    posterUsername = fp.username || wpRow.username || ''
+    const fullName = [wpRow.first_name, wpRow.last_name].filter(Boolean).join(' ').trim()
+    posterName =
+      fp.business_name ||
+      fullName ||
+      (posterUsername ? `@${posterUsername}` : 'this poster')
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -195,6 +272,87 @@ export default async function GigDetailPage({ params }: Props) {
         stripeReady={stripeReady}
         stripeStarted={stripeStarted}
       />
+
+      {/* More gigs from this poster — only renders if there are any,
+          and only for non-owners (the poster doesn't need to see their
+          own gigs surfaced back to them). Horizontal swipe carousel
+          with CSS scroll-snap so it feels native on phones. */}
+      {otherGigs.length > 0 && (
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-sans font-semibold text-foreground">
+              More gigs from {posterName}
+            </h2>
+            {posterUsername && (
+              <Link
+                href={`/u/${posterUsername}`}
+                className="text-sm text-accent hover:underline inline-flex items-center gap-1 shrink-0"
+              >
+                View profile
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            )}
+          </div>
+
+          <div
+            className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory"
+            style={{ scrollbarWidth: 'thin' }}
+          >
+            {otherGigs.map((other) => {
+              const thumb = otherGigThumbnails[other.id]
+              const loc =
+                other.city && other.state
+                  ? `${other.city}, ${other.state}`
+                  : other.location_text || ''
+              return (
+                <Link
+                  key={other.id}
+                  href={`/gigs/${other.slug}`}
+                  className="snap-start shrink-0 w-56 card hover:shadow-md transition-shadow group block"
+                >
+                  {/* Image */}
+                  <div className="aspect-[4/3] w-full overflow-hidden rounded-t-md bg-muted border-b border-border flex items-center justify-center">
+                    {thumb ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={thumb}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <Armchair className="w-8 h-8 text-muted-foreground" />
+                    )}
+                  </div>
+
+                  {/* Text */}
+                  <div className="p-3 space-y-1.5">
+                    <h3 className="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-accent transition-colors min-h-[2.5rem]">
+                      {other.title}
+                    </h3>
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="font-mono font-semibold text-foreground">
+                        {formatCurrency(other.pay_amount)}
+                      </span>
+                      {loc && (
+                        <span className="text-muted-foreground truncate">
+                          {loc}
+                        </span>
+                      )}
+                    </div>
+                    {other.due_date && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        Due {formatDate(other.due_date)}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
