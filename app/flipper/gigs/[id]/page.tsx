@@ -294,7 +294,12 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
         <div className="pt-1 flex flex-wrap items-center gap-2">
           <OpenChatButton gigId={gig.id} otherUserId={claim.worker_user_id} label="Message" />
           {showActions && (
-            <ApplicantActions claimId={claim.id} workerName={workerName} />
+            <ApplicantActions
+              claimId={claim.id}
+              workerName={workerName}
+              gigTitle={(gig as any).title || 'this gig'}
+              payAmount={Number((gig as any).pay_amount) || 0}
+            />
           )}
           {showReviewLink && (
             <Link

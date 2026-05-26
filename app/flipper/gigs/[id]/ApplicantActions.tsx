@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { loadStripe } from '@stripe/stripe-js'
 import { Button } from '@/components/ui/button'
 import AddPaymentMethodModal from '@/components/shared/AddPaymentMethodModal'
+import PickWorkerConfirmModal from '@/components/shared/PickWorkerConfirmModal'
 
 // Module-level cache — loadStripe should be called once.
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -15,15 +16,33 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 interface Props {
   claimId: string
   workerName: string
+  gigTitle: string
+  payAmount: number
 }
 
-export default function ApplicantActions({ claimId, workerName }: Props) {
+interface SavedCardInfo {
+  brand: string | null
+  last4: string | null
+}
+
+export default function ApplicantActions({
+  claimId,
+  workerName,
+  gigTitle,
+  payAmount,
+}: Props) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState<'approve' | 'reject' | null>(null)
   const [error, setError] = useState('')
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [pendingPickAfterCard, setPendingPickAfterCard] = useState(false)
+
+  // Confirm-modal state. Opens AFTER we verify a card exists on file.
+  // The flipper must explicitly click Confirm in the modal before any
+  // money-moving Stripe call fires.
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
+  const [savedCard, setSavedCard] = useState<SavedCardInfo | null>(null)
 
   /**
    * Calls /api/stripe/pick-worker.
@@ -112,18 +131,12 @@ export default function ApplicantActions({ claimId, workerName }: Props) {
   }
 
   async function handleApprove() {
-    if (
-      !confirm(
-        `Pick ${workerName} for this gig?\n\nMoney for this gig will be held on your card now. It won't be charged until the work is approved.\n\nEveryone else who applied will be rejected.`
-      )
-    ) {
-      return
-    }
-
     setError('')
     setLoading('approve')
 
-    // Check if flipper has a saved card BEFORE attempting the pick
+    // First check if a card is on file. The server returns the card
+    // brand + last-4 along with the boolean so we can show them in the
+    // confirmation modal.
     try {
       const res = await fetch('/api/stripe/payment-method/status')
       const data = await res.json()
@@ -135,19 +148,48 @@ export default function ApplicantActions({ claimId, workerName }: Props) {
       }
 
       if (!data.hasPaymentMethod) {
-        // Open modal — when card is saved, we'll auto-resume the pick
+        // No card on file — open the Add-a-card modal. Once the card
+        // is saved we'll come back through handleCardSaved which will
+        // re-run handleApprove to surface the confirm modal.
         setPendingPickAfterCard(true)
         setPaymentModalOpen(true)
         setLoading(null)
         return
       }
 
-      // Has a card — go straight to the new pick endpoint
-      await runApprove()
+      // Card on file — capture the first card's brand + last-4 so the
+      // confirm modal can show them.
+      const first = data.paymentMethods?.[0]
+      setSavedCard({
+        brand: first?.brand ?? null,
+        last4: first?.last4 ?? null,
+      })
+      // Show the confirm modal. The actual Stripe authorization only
+      // fires AFTER the flipper clicks the confirm button in the modal.
+      setConfirmModalOpen(true)
+      setLoading(null)
     } catch (err: any) {
       setError(err?.message || 'Could not check payment method.')
       setLoading(null)
     }
+  }
+
+  // Called when the flipper clicks Confirm in the PickWorkerConfirmModal.
+  async function handleConfirmedPick() {
+    setLoading('approve')
+    await runApprove()
+    // Close the modal AFTER runApprove resolves. runApprove already
+    // does router.refresh() on success which will rerender this row
+    // (probably unmounting it), so this close call is a no-op then.
+    // On failure, runApprove sets `error` so the flipper sees the
+    // problem; we still close the modal so they aren't trapped.
+    setConfirmModalOpen(false)
+  }
+
+  function handleConfirmedCancel() {
+    if (loading === 'approve') return // don't allow cancel mid-flight
+    setConfirmModalOpen(false)
+    setSavedCard(null)
   }
 
   async function handleReject() {
@@ -173,12 +215,15 @@ export default function ApplicantActions({ claimId, workerName }: Props) {
     router.refresh()
   }
 
-  // Called when AddPaymentMethodModal reports a saved card
+  // Called when AddPaymentMethodModal reports a saved card.
+  // We deliberately re-run handleApprove instead of calling runApprove
+  // directly — that routes through the confirm modal so the flipper
+  // can see the amount + their newly-saved card before money is held.
   async function handleCardSaved() {
     setPaymentModalOpen(false)
     if (pendingPickAfterCard) {
       setPendingPickAfterCard(false)
-      await runApprove()
+      await handleApprove()
     }
   }
 
@@ -215,6 +260,17 @@ export default function ApplicantActions({ claimId, workerName }: Props) {
         open={paymentModalOpen}
         onClose={handleModalClose}
         onSuccess={handleCardSaved}
+      />
+
+      <PickWorkerConfirmModal
+        open={confirmModalOpen}
+        workerName={workerName}
+        gigTitle={gigTitle}
+        payAmount={payAmount}
+        savedCard={savedCard}
+        loading={loading === 'approve'}
+        onCancel={handleConfirmedCancel}
+        onConfirm={handleConfirmedPick}
       />
     </div>
   )
