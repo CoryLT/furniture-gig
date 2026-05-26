@@ -1,5 +1,6 @@
-﻿import type { Metadata, Viewport } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { DM_Sans, DM_Serif_Display, DM_Mono } from 'next/font/google'
+import BackToTopButton from '@/components/shared/BackToTopButton'
 import './globals.css'
 
 const dmSans = DM_Sans({
@@ -71,6 +72,7 @@ export default function RootLayout({
     <html lang="en" className={`${dmSans.variable} ${dmSerif.variable} ${dmMono.variable}`}>
       <body className="min-h-screen bg-background">
         {children}
+        <BackToTopButton />
       </body>
     </html>
   )
