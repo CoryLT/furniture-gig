@@ -1,11 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel, claimStatusLabel, claimStatusClass } from '@/lib/utils'
 import { MapPin, Calendar, Wrench, ArrowLeft, User, Pencil, Check, StickyNote } from 'lucide-react'
 import OpenChatButton from '@/components/shared/OpenChatButton'
 import ApplicantActions from './ApplicantActions'
 import GigReferenceImages from '@/components/shared/GigReferenceImages'
+import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import type { GigImageRow } from '@/types/database'
 
 // Always fetch fresh — never cache this page
@@ -15,11 +17,15 @@ export const revalidate = 0
 type WorkerProfile = {
   first_name: string
   last_name: string
+  full_name: string | null
   city: string
   state: string
   username: string | null
   bio: string
   skills: string[]
+  avatar_url: string | null
+  stripe_charges_enabled: boolean
+  stripe_payouts_enabled: boolean
 }
 
 type ClaimRow = {
@@ -85,7 +91,7 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
   const { data: profilesRaw } = workerIds.length > 0
     ? await supabase
         .from('worker_profiles')
-        .select('user_id, first_name, last_name, city, state, username, bio, skills')
+        .select('user_id, first_name, last_name, full_name, city, state, username, bio, skills, avatar_url, stripe_charges_enabled, stripe_payouts_enabled')
         .in('user_id', workerIds)
     : { data: [] }
 
@@ -94,11 +100,15 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
     profileByUserId.set(p.user_id, {
       first_name: p.first_name,
       last_name: p.last_name,
+      full_name: p.full_name ?? null,
       city: p.city,
       state: p.state,
       username: p.username,
       bio: p.bio,
       skills: p.skills,
+      avatar_url: p.avatar_url ?? null,
+      stripe_charges_enabled: p.stripe_charges_enabled === true,
+      stripe_payouts_enabled: p.stripe_payouts_enabled === true,
     })
   }
 
@@ -158,29 +168,101 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
     showReviewLink: boolean = false
   ) => {
     const wp = claim.worker_profiles
-    const workerName = wp ? `${wp.first_name} ${wp.last_name}`.trim() || 'Worker' : 'Worker'
+
+    // Build the best display name from whatever we have. We try
+    // full_name first (newer field), then first+last, then @username,
+    // then a generic fallback. Trim to avoid lone leading/trailing
+    // spaces if one of first/last is missing.
+    const firstLast = wp ? `${wp.first_name ?? ''} ${wp.last_name ?? ''}`.trim() : ''
+    const workerName =
+      wp?.full_name?.trim() ||
+      firstLast ||
+      (wp?.username ? `@${wp.username}` : '') ||
+      'Worker'
+
+    // Initials for the avatar fallback (when no avatar_url is set)
+    const initials = workerName
+      .split(' ')
+      .map((p) => p[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('')
+      .toUpperCase()
+
+    // Worker-side verified: their Stripe Connect is fully active.
+    // This is the relevant trust signal here because the flipper is
+    // about to send money to this person's Stripe Connect account.
+    const isVerified =
+      wp?.stripe_charges_enabled === true && wp?.stripe_payouts_enabled === true
+
+    // Profile link — only meaningful if they have a username set.
+    const profileHref = wp?.username ? `/u/${wp.username}` : null
+
+    // Reusable avatar element (used both clickable and not)
+    const avatarEl = wp?.avatar_url ? (
+      <div className="relative w-11 h-11 rounded-full overflow-hidden bg-secondary shrink-0">
+        <Image
+          src={wp.avatar_url}
+          alt={workerName}
+          fill
+          sizes="44px"
+          className="object-cover"
+        />
+      </div>
+    ) : initials ? (
+      <div className="w-11 h-11 rounded-full bg-secondary text-muted-foreground flex items-center justify-center shrink-0 font-medium text-sm">
+        {initials}
+      </div>
+    ) : (
+      <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center shrink-0">
+        <User className="w-5 h-5 text-muted-foreground" />
+      </div>
+    )
 
     return (
       <div key={claim.id} className="card card-body space-y-3">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center shrink-0">
-              <User className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="font-medium text-foreground">{workerName}</p>
+          <div className="flex items-center gap-3 min-w-0">
+            {profileHref ? (
+              <Link
+                href={profileHref}
+                target="_blank"
+                className="shrink-0 hover:opacity-80 transition-opacity"
+                aria-label={`View ${workerName}'s profile`}
+              >
+                {avatarEl}
+              </Link>
+            ) : (
+              avatarEl
+            )}
+            <div className="min-w-0">
+              {profileHref ? (
+                <Link
+                  href={profileHref}
+                  target="_blank"
+                  className="inline-flex items-center gap-1.5 font-medium text-foreground hover:underline"
+                >
+                  <span className="truncate">{workerName}</span>
+                  {isVerified && <VerifiedBadge size="sm" />}
+                </Link>
+              ) : (
+                <p className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                  <span className="truncate">{workerName}</span>
+                  {isVerified && <VerifiedBadge size="sm" />}
+                </p>
+              )}
               {wp?.city && wp?.state && (
                 <p className="text-xs text-muted-foreground">{wp.city}, {wp.state}</p>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <span className={claimStatusClass(claim.status as 'pending' | 'active' | 'submitted_for_review' | 'approved' | 'rejected' | 'cancelled')}>
               {claimStatusLabel(claim.status as 'pending' | 'active' | 'submitted_for_review' | 'approved' | 'rejected' | 'cancelled')}
             </span>
-            {wp?.username && (
+            {profileHref && (
               <Link
-                href={`/u/${wp.username}`}
+                href={profileHref}
                 className="text-xs text-accent hover:underline"
                 target="_blank"
               >
