@@ -364,7 +364,7 @@ export default function ProfilePage() {
               <div>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.heic,.heif"
                   onChange={handleAvatarUpload}
                   disabled={uploading}
                   className="hidden"

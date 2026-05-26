@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Upload, X, Image as ImageIcon } from 'lucide-react'
 import type { GigPhotoUploadRow } from '@/types/database'
-import { compressImageForUpload } from '@/lib/imageCompression'
+import { compressImageForUpload, isAcceptableImageFile } from '@/lib/imageCompression'
 
 interface Props {
   gigId: string
@@ -44,7 +44,7 @@ export default function PhotoSection({ gigId, userId, photos: initialPhotos, rea
     setError('')
 
     for (const file of files) {
-      if (!file.type.startsWith('image/')) {
+      if (!isAcceptableImageFile(file)) {
         setError('Only image files are allowed.')
         continue
       }
@@ -171,7 +171,7 @@ export default function PhotoSection({ gigId, userId, photos: initialPhotos, rea
             <input
               ref={fileRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.heic,.heif"
               multiple
               className="hidden"
               onChange={handleFileChange}

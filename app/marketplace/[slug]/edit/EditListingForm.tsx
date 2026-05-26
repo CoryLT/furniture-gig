@@ -17,7 +17,7 @@ import {
   ArrowDown,
 } from 'lucide-react'
 import Link from 'next/link'
-import { compressImageForUpload } from '@/lib/imageCompression'
+import { compressImageForUpload, isAcceptableImageFile } from '@/lib/imageCompression'
 import type {
   MarketplaceListingRow,
   MarketplacePhotoRow,
@@ -157,7 +157,7 @@ export default function EditListingForm({
         setError(`You can upload up to ${MAX_PHOTOS} photos per listing.`)
         break
       }
-      if (!file.type.startsWith('image/')) continue
+      if (!isAcceptableImageFile(file)) continue
       if (file.size > 25 * 1024 * 1024) continue
 
       // Compress big photos (e.g. straight from a phone) before uploading.
@@ -430,7 +430,7 @@ export default function EditListingForm({
             <input
               ref={fileRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.heic,.heif"
               multiple
               className="hidden"
               onChange={handlePhotoChange}

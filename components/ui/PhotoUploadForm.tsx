@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "./button";
-import { compressImageForUpload } from "@/lib/imageCompression";
+import { compressImageForUpload, isAcceptableImageFile, looksLikeHeic } from "@/lib/imageCompression";
 
 interface PhotoUploadFormProps {
   onPhotoUploaded?: () => void;
@@ -24,8 +24,8 @@ export function PhotoUploadForm({
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    // Validate file type
-    if (!selectedFile.type.startsWith("image/")) {
+    // Validate file type (accepts HEIC too — iPhone default)
+    if (!isAcceptableImageFile(selectedFile)) {
       setError("Please select an image file");
       return;
     }
@@ -38,6 +38,13 @@ export function PhotoUploadForm({
 
     setFile(selectedFile);
     setError(null);
+
+    // HEIC can't be rendered by the browser, so skip the preview.
+    // The image will still convert + upload fine when the user submits.
+    if (looksLikeHeic(selectedFile)) {
+      setPreview(null);
+      return;
+    }
 
     // Create preview
     const reader = new FileReader();
@@ -139,12 +146,12 @@ export function PhotoUploadForm({
         <input
           id="photo-upload"
           type="file"
-          accept="image/*"
+          accept="image/*,.heic,.heif"
           onChange={handleFileChange}
           disabled={isUploading}
           className="block w-full text-sm text-stone-500 file:mr-4 file:rounded file:border-0 file:bg-amber-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-amber-700"
         />
-        <p className="text-xs text-stone-500">PNG, JPG, or WebP. Max 10MB.</p>
+        <p className="text-xs text-stone-500">PNG, JPG, HEIC, or WebP. Max 10MB.</p>
       </div>
 
       {/* Preview */}
@@ -155,6 +162,14 @@ export function PhotoUploadForm({
             alt="Preview"
             className="h-40 w-full object-cover"
           />
+        </div>
+      )}
+
+      {/* HEIC notice when no preview is shown */}
+      {file && !preview && looksLikeHeic(file) && (
+        <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+          HEIC photo selected — your browser can&apos;t show a preview, but
+          it will be converted to JPG when you upload.
         </div>
       )}
 

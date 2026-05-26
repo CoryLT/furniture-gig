@@ -17,7 +17,7 @@ import {
   ArrowDown,
 } from 'lucide-react'
 import type { MarketplaceCategoryRow } from '@/types/database'
-import { compressImageForUpload } from '@/lib/imageCompression'
+import { compressImageForUpload, isAcceptableImageFile } from '@/lib/imageCompression'
 
 interface Props {
   categories: MarketplaceCategoryRow[]
@@ -184,7 +184,7 @@ export default function NewListingForm({ categories }: Props) {
         setError(`You can upload up to ${MAX_PHOTOS} photos per listing.`)
         break
       }
-      if (!file.type.startsWith('image/')) {
+      if (!isAcceptableImageFile(file)) {
         setError('Only image files are allowed.')
         continue
       }
@@ -578,7 +578,7 @@ export default function NewListingForm({ categories }: Props) {
                 <input
                   ref={fileRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.heic,.heif"
                   multiple
                   className="hidden"
                   onChange={handlePhotoChange}

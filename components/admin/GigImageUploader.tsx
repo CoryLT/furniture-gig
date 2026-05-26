@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Upload, X, Image as ImageIcon, GripVertical } from 'lucide-react'
 import type { GigImageRow } from '@/types/database'
-import { compressImageForUpload } from '@/lib/imageCompression'
+import { compressImageForUpload, isAcceptableImageFile } from '@/lib/imageCompression'
 
 interface Props {
   gigId: string
@@ -48,7 +48,7 @@ export default function GigImageUploader({ gigId, images: initialImages, onImage
     setError('')
 
     for (const file of files) {
-      if (!file.type.startsWith('image/')) {
+      if (!isAcceptableImageFile(file)) {
         setError('Only image files are allowed.')
         continue
       }
@@ -238,7 +238,7 @@ export default function GigImageUploader({ gigId, images: initialImages, onImage
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept="image/*,.heic,.heif"
             multiple
             className="hidden"
             onChange={handleFileChange}
