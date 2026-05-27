@@ -63,13 +63,13 @@ export default function PayoutRow({ payout }: Props) {
                 </select>
               </div>
               <div>
-                <label className="field-label">PayPal reference</label>
+                <label className="field-label">Payment reference</label>
                 <input
                   type="text"
                   className="field-input"
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
-                  placeholder="Transaction ID"
+                  placeholder="Stripe transfer ID"
                 />
               </div>
               <div>
@@ -106,7 +106,6 @@ export default function PayoutRow({ payout }: Props) {
     <tr className="hover:bg-muted/20 transition-colors">
       <td className="px-4 py-3">
         <p className="font-medium text-foreground">{worker?.first_name} {worker?.last_name}</p>
-        <p className="text-xs text-muted-foreground">{worker?.paypal_email}</p>
       </td>
       <td className="px-4 py-3 hidden sm:table-cell text-muted-foreground">{gig?.title}</td>
       <td className="px-4 py-3 font-mono font-medium text-foreground">{formatCurrency(payout.amount)}</td>

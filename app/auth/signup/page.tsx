@@ -77,7 +77,7 @@ export default function SignupPage() {
       return
     }
 
-    // Everyone lands on the basic onboarding (name, phone, location, paypal).
+    // Everyone lands on the basic onboarding (name, phone, location).
     // Forward ?next= so the user lands back where they started post-agreements.
     const onboardingHref = safeNext
       ? `/auth/onboarding?next=${encodeURIComponent(safeNext)}`

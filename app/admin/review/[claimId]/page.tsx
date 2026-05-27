@@ -86,7 +86,7 @@ export default async function AdminReviewPage({ params }: Props) {
             <div>
               <p className="text-xs text-muted-foreground">Worker</p>
               <p className="font-medium text-foreground">{worker.first_name} {worker.last_name}</p>
-              <p className="text-xs text-muted-foreground">PayPal: {worker.paypal_email}</p>
+              <p className="text-xs text-muted-foreground">{worker.city}{worker.city && worker.state ? ', ' : ''}{worker.state}</p>
             </div>
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Payout</p>

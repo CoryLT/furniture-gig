@@ -126,7 +126,7 @@ export default async function MyGigDetailPage({ params }: Props) {
           {claim.status === 'submitted_for_review'
             ? 'Your work has been submitted and is awaiting review.'
             : claim.status === 'approved'
-            ? '✓ This gig has been approved. Payment will be sent via PayPal.'
+            ? '✓ This gig has been approved. Payment is being transferred to your bank through Stripe.'
             : 'This gig claim is closed.'}
         </div>
       )}

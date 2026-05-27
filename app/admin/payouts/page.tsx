@@ -25,7 +25,7 @@ export default async function AdminPayoutsPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl text-foreground">Payouts</h1>
-        <p className="text-muted-foreground mt-1">Manual PayPal payout tracking</p>
+        <p className="text-muted-foreground mt-1">Stripe payout tracking</p>
       </div>
 
       {/* Summary */}
@@ -95,7 +95,6 @@ export default async function AdminPayoutsPage() {
                     <tr key={payout.id} className="hover:bg-muted/20">
                       <td className="px-4 py-3">
                         <p className="font-medium text-foreground">{worker?.first_name} {worker?.last_name}</p>
-                        <p className="text-xs text-muted-foreground">{worker?.paypal_email}</p>
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell text-muted-foreground">{gig?.title}</td>
                       <td className="px-4 py-3 font-mono font-medium text-foreground">{formatCurrency(payout.amount)}</td>

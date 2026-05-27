@@ -118,27 +118,17 @@ export function PublicWorkerProfileClient({
             )}
 
             {/* Contact Info (if shared) */}
-            {(profile.phone || profile.paypal_email) && (
+            {profile.phone && (
               <div className="card">
                 <div className="card-body">
                   <h2 className="text-lg font-serif text-foreground mb-3">Contact</h2>
                   <div className="space-y-2 text-sm">
-                    {profile.phone && (
-                      <div>
-                        <span className="text-muted-foreground">Phone: </span>
-                        <a href={`tel:${profile.phone}`} className="text-accent hover:underline">
-                          {profile.phone}
-                        </a>
-                      </div>
-                    )}
-                    {profile.paypal_email && (
-                      <div>
-                        <span className="text-muted-foreground">PayPal: </span>
-                        <a href={`mailto:${profile.paypal_email}`} className="text-accent hover:underline">
-                          {profile.paypal_email}
-                        </a>
-                      </div>
-                    )}
+                    <div>
+                      <span className="text-muted-foreground">Phone: </span>
+                      <a href={`tel:${profile.phone}`} className="text-accent hover:underline">
+                        {profile.phone}
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>
