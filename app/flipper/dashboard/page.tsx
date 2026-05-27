@@ -32,6 +32,18 @@ export default async function FlipperDashboardPage() {
         .in('gig_id', gigIds)
     : { data: [] }
 
+  // Load payout records for this flipper's gigs. We use this for
+  // the "Paid Out" tile so the number matches what /admin/payouts
+  // shows (which is the actual money moved by Stripe, NOT just the
+  // count of gigs marked completed).
+  const { data: payoutsRaw } = gigIds.length > 0
+    ? await supabase
+        .from('payout_records')
+        .select('gig_id, amount, payout_status')
+        .in('gig_id', gigIds)
+    : { data: [] }
+  const payouts = (payoutsRaw ?? []) as { gig_id: string; amount: number; payout_status: string }[]
+
   // Load gig images so we can show a thumbnail per gig.
   // One batched query, then we pick the lowest sort_order image per gig.
   const { data: imagesRaw } = gigIds.length > 0
@@ -78,13 +90,19 @@ export default async function FlipperDashboardPage() {
   const totalGigs = gigs.filter(
     (g) => g.status !== 'archived' && g.status !== 'draft',
   ).length
+  // 'Active' means actively being worked on — matches the 'in_progress'
+  // filter on the gig list below so the tile count and the filtered
+  // list are guaranteed to agree.
   const activeGigs = gigs.filter((g) =>
-    ['open', 'claimed', 'in_review'].includes(g.status)
+    ['claimed', 'in_review'].includes(g.status)
   ).length
   const completedGigs = gigs.filter((g) => g.status === 'completed').length
-  const totalPayout = gigs
-    .filter((g) => g.status === 'completed')
-    .reduce((sum, g) => sum + Number(g.pay_amount), 0)
+  // Total paid out = sum of payout_records rows in 'paid' status for this
+  // flipper's gigs. Same source as /admin/payouts so the dashboard tile
+  // and the payouts page never disagree.
+  const totalPayout = payouts
+    .filter((p) => p.payout_status === 'paid')
+    .reduce((sum, p) => sum + Number(p.amount), 0)
 
   // Count gigs that have any pending applicants — these are the ones that
   // need the flipper to pick a worker
@@ -185,10 +203,10 @@ export default async function FlipperDashboardPage() {
             </div>
             <div>
               <p className="text-2xl font-mono font-semibold text-foreground">
-                {totalPendingApplicants}
+                {gigsNeedingReview}
               </p>
               <p className="text-xs text-muted-foreground">
-                Pending applicant{totalPendingApplicants === 1 ? '' : 's'}
+                Gig{gigsNeedingReview === 1 ? '' : 's'} with applicants
               </p>
             </div>
           </div>
