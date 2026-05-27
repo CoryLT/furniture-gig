@@ -236,7 +236,7 @@ export default async function FlipperDashboardPage() {
               <p className="text-xs text-muted-foreground">Paid Out</p>
             </div>
           </div>
-        </FilterTile>
+        </div>
       </div>
 
       {/* Gig list */}
