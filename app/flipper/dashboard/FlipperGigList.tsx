@@ -74,6 +74,32 @@ export default function FlipperGigList({
   const [actionError, setActionError] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
 
+  // Read filter from URL hash (e.g. #filter=completed) so the
+  // hero stat tiles on the dashboard page can drive this list.
+  // Runs on mount and any time the hash changes (e.g. user clicks
+  // a tile after the page loaded).
+  useEffect(() => {
+    const validKeys = new Set<FilterKey>([
+      'all',
+      'needs_review',
+      'open',
+      'in_progress',
+      'completed',
+    ])
+    const readHash = () => {
+      const hash = window.location.hash.replace(/^#/, '')
+      const params = new URLSearchParams(hash)
+      const f = params.get('filter') as FilterKey | null
+      if (f && validKeys.has(f)) {
+        setFilter(f)
+      }
+    }
+    readHash()
+    window.addEventListener('hashchange', readHash)
+    return () => window.removeEventListener('hashchange', readHash)
+  }, [])
+
+
   // Close the popover when clicking outside it.
   useEffect(() => {
     if (!openMenuId) return
@@ -208,7 +234,19 @@ export default function FlipperGigList({
               <button
                 key={f.key}
                 type="button"
-                onClick={() => setFilter(f.key)}
+                onClick={() => {
+                  setFilter(f.key)
+                  // Keep the URL in sync so refresh keeps the choice and so
+                  // the hero tiles + pills always agree on the active filter.
+                  if (typeof window !== 'undefined') {
+                    const newHash = f.key === 'all' ? '' : `#filter=${f.key}`
+                    history.replaceState(
+                      null,
+                      '',
+                      window.location.pathname + window.location.search + newHash
+                    )
+                  }
+                }}
                 className={
                   active
                     ? 'px-3 py-1.5 rounded-full text-xs font-medium bg-foreground text-background border border-foreground'

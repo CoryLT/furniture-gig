@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { formatCurrency } from '@/lib/utils'
 import { Plus, Users, DollarSign, Briefcase, Clock, AlertCircle } from 'lucide-react'
 import FlipperGigList, { FlipperGig } from './FlipperGigList'
+import FilterTile from './FilterTile'
 
 // Always fetch fresh — dashboard data changes constantly
 export const dynamic = 'force-dynamic'
@@ -139,9 +140,12 @@ export default async function FlipperDashboardPage() {
         </a>
       )}
 
-      {/* Stats — 5 tiles now */}
+      {/* Stats — 5 tiles, all clickable.
+          The first 4 set a hash like #filter=completed which the
+          FlipperGigList client component reads to scope the list.
+          The 5th (Paid Out) links to the admin payouts page. */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <div className="card card-body">
+        <FilterTile href="#filter=all">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
               <Briefcase className="w-4 h-4 text-accent" />
@@ -153,8 +157,8 @@ export default async function FlipperDashboardPage() {
               <p className="text-xs text-muted-foreground">Total Gigs</p>
             </div>
           </div>
-        </div>
-        <div className="card card-body">
+        </FilterTile>
+        <FilterTile href="#filter=in_progress">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
               <Clock className="w-4 h-4 text-blue-600" />
@@ -166,12 +170,13 @@ export default async function FlipperDashboardPage() {
               <p className="text-xs text-muted-foreground">Active</p>
             </div>
           </div>
-        </div>
-        <div
+        </FilterTile>
+        <FilterTile
+          href="#filter=needs_review"
           className={
             gigsNeedingReview > 0
-              ? 'card card-body border-accent/40 ring-1 ring-accent/20'
-              : 'card card-body'
+              ? 'border-accent/40 ring-1 ring-accent/20'
+              : ''
           }
         >
           <div className="flex items-center gap-3">
@@ -187,8 +192,8 @@ export default async function FlipperDashboardPage() {
               </p>
             </div>
           </div>
-        </div>
-        <div className="card card-body">
+        </FilterTile>
+        <FilterTile href="#filter=completed">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
               <Users className="w-4 h-4 text-green-600" />
@@ -200,8 +205,8 @@ export default async function FlipperDashboardPage() {
               <p className="text-xs text-muted-foreground">Completed</p>
             </div>
           </div>
-        </div>
-        <div className="card card-body">
+        </FilterTile>
+        <FilterTile href="/admin/payouts">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
               <DollarSign className="w-4 h-4 text-accent" />
@@ -213,7 +218,7 @@ export default async function FlipperDashboardPage() {
               <p className="text-xs text-muted-foreground">Paid Out</p>
             </div>
           </div>
-        </div>
+        </FilterTile>
       </div>
 
       {/* Gig list */}
