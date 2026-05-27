@@ -10,7 +10,7 @@ export default async function AdminPayoutsPage() {
     .select(`
       *,
       gigs(title),
-      worker_profiles!inner(first_name, last_name, paypal_email)
+      worker_profiles(first_name, last_name)
     `)
     .order('created_at', { ascending: false })
 
