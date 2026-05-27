@@ -23,7 +23,6 @@ export default function OnboardingPage() {
     phone: '',
     state: '',
     city: '',
-    paypalEmail: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -71,9 +70,6 @@ export default function OnboardingPage() {
       if (!formData.city) {
         throw new Error('Please select a city');
       }
-      if (!formData.paypalEmail.trim()) {
-        throw new Error('PayPal email is required');
-      }
 
       // Create or update worker profile
       const { error: upsertError } = await supabase.from('worker_profiles').upsert(
@@ -83,7 +79,6 @@ export default function OnboardingPage() {
           phone: formData.phone,
           state: formData.state,
           city: formData.city,
-          paypal_email: formData.paypalEmail,
           onboarding_complete: true,
         },
         { onConflict: 'user_id' }
@@ -166,23 +161,6 @@ export default function OnboardingPage() {
               onCityChange={handleCityChange}
               disabled={loading}
             />
-
-            {/* PayPal Email */}
-            <div>
-              <label htmlFor="paypalEmail" className="block text-sm font-medium text-slate-700 mb-1">
-                PayPal Email
-              </label>
-              <input
-                id="paypalEmail"
-                type="email"
-                name="paypalEmail"
-                value={formData.paypalEmail}
-                onChange={handleChange}
-                disabled={loading}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
-                placeholder="your@paypal.email"
-              />
-            </div>
 
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? 'Saving...' : 'Continue to Agreements'}

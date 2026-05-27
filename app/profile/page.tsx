@@ -26,7 +26,6 @@ export default function ProfilePage() {
     // Personal (worker fields)
     fullName: '',
     phone: '',
-    paypalEmail: '',
     // Business (flipper fields)
     businessName: '',
     bio: '',
@@ -62,7 +61,7 @@ export default function ProfilePage() {
         const [workerResult, flipperResult, workerPhotosResult, flipperPhotosResult] = await Promise.all([
           supabase
             .from('worker_profiles')
-            .select('full_name, username, phone, state, city, paypal_email, avatar_url')
+            .select('full_name, username, phone, state, city, avatar_url')
             .eq('user_id', user.id)
             .maybeSingle(),
           supabase
@@ -94,7 +93,6 @@ export default function ProfilePage() {
           city: worker?.city || flipper?.city || '',
           fullName: worker?.full_name || '',
           phone: worker?.phone || '',
-          paypalEmail: worker?.paypal_email || '',
           businessName: flipper?.business_name || '',
           bio: flipper?.bio || '',
           website: flipper?.website || '',
@@ -279,9 +277,6 @@ export default function ProfilePage() {
       if (!formData.city) {
         throw new Error('Please select a city');
       }
-      if (!formData.paypalEmail.trim()) {
-        throw new Error('PayPal email is required');
-      }
 
       const response = await fetch('/api/profile/unified-save', {
         method: 'POST',
@@ -454,25 +449,6 @@ export default function ProfilePage() {
                 onCityChange={handleCityChange}
                 disabled={saving}
               />
-
-              <div>
-                <label htmlFor="paypalEmail" className="block text-sm font-medium text-slate-700 mb-1">
-                  PayPal Email
-                </label>
-                <input
-                  id="paypalEmail"
-                  type="email"
-                  name="paypalEmail"
-                  value={formData.paypalEmail}
-                  onChange={handleChange}
-                  disabled={saving}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
-                  placeholder="your@paypal.email"
-                />
-                <p className="mt-1 text-xs text-slate-500">
-                  Where you'll receive payment when you claim and complete a gig.
-                </p>
-              </div>
             </section>
 
             {/* About You (for when you post gigs) */}

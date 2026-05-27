@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const sharedCity = body.city || ''
     const sharedState = body.state || ''
 
-    // Worker profile fields (personal stuff: name, phone, paypal)
+    // Worker profile fields (personal stuff: name, phone)
     const workerData = {
       user_id: user.id,
       full_name: body.fullName || '',
@@ -29,7 +29,6 @@ export async function POST(request: NextRequest) {
       phone: body.phone || '',
       state: sharedState,
       city: sharedCity,
-      paypal_email: body.paypalEmail || '',
       avatar_url: sharedAvatar,
       onboarding_complete: true,
     }
