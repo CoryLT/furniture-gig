@@ -224,7 +224,7 @@ export default async function FlipperDashboardPage() {
             </div>
           </div>
         </FilterTile>
-        <FilterTile href="/flipper/payouts">
+        <div className="card card-body">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
               <DollarSign className="w-4 h-4 text-accent" />
