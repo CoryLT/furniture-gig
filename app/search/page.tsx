@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import { Search, User, Briefcase, ShoppingBag, Hammer } from 'lucide-react'
+import SearchPageBar from '@/components/shared/SearchPageBar'
 
 export const dynamic = 'force-dynamic'
 
@@ -151,6 +152,7 @@ export default async function SearchPage({
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+      <SearchPageBar initialQuery={q} />
       <div>
         <h1 className="text-2xl font-serif text-foreground flex items-center gap-2">
           <Search className="w-6 h-6 text-accent" />
