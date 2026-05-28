@@ -16,7 +16,7 @@ interface Message {
   pending?: boolean
 }
 
-type ConversationKind = 'gig' | 'listing'
+type ConversationKind = 'gig' | 'listing' | 'user'
 
 interface Props {
   conversationId: string
@@ -77,7 +77,12 @@ export default function ChatClient({
   const [otherIsTyping, setOtherIsTyping] = useState(false)
 
   // The Postgres table name we read/write messages from
-  const messagesTable = conversationKind === 'gig' ? 'gig_messages' : 'listing_messages'
+  const messagesTable =
+    conversationKind === 'gig'
+      ? 'gig_messages'
+      : conversationKind === 'user'
+      ? 'user_messages'
+      : 'listing_messages'
   // Realtime channel name — must be unique per conversation per kind
   const channelName = `${conversationKind}-conversation:${conversationId}`
 
