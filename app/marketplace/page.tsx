@@ -125,6 +125,85 @@ export default async function MarketplacePage() {
     }
   })
 
+  // ============================================================
+  // Services — what members offer to do for hire.
+  // These live in worker_services (not marketplace_listings) and have
+  // no photos or location of their own. The provider's profile city is
+  // used for the city filter on the client.
+  // ============================================================
+  const { data: servicesRaw } = await supabase
+    .from('worker_services')
+    .select(
+      'id, blurb, price_type, price_amount, worker_user_id, sort_order, category:service_categories(label)'
+    )
+    .eq('active', true)
+    .order('created_at', { ascending: false })
+    .limit(60)
+
+  const serviceRows = (servicesRaw ?? []) as any[]
+
+  // Look up each provider's username, name, and city (one pass over both
+  // profile tables, same approach as sellers above).
+  const providerIds = Array.from(
+    new Set(serviceRows.map((s) => s.worker_user_id))
+  )
+  const providersById = new Map<
+    string,
+    { username: string | null; display_name: string | null; city: string | null }
+  >()
+
+  if (providerIds.length > 0) {
+    const { data: pWorkers } = await supabase
+      .from('worker_profiles')
+      .select('user_id, username, first_name, last_name, city')
+      .in('user_id', providerIds)
+
+    for (const w of pWorkers ?? []) {
+      const name = [w.first_name, w.last_name].filter(Boolean).join(' ').trim()
+      providersById.set(w.user_id, {
+        username: w.username,
+        display_name: name || null,
+        city: w.city ?? null,
+      })
+    }
+
+    const missingProviders = providerIds.filter((id) => !providersById.has(id))
+    if (missingProviders.length > 0) {
+      const { data: pFlippers } = await supabase
+        .from('flipper_profiles')
+        .select('user_id, username, display_name, city')
+        .in('user_id', missingProviders)
+
+      for (const f of pFlippers ?? []) {
+        providersById.set(f.user_id, {
+          username: f.username,
+          display_name: f.display_name,
+          city: f.city ?? null,
+        })
+      }
+    }
+  }
+
+  const services = serviceRows.map((s) => {
+    const provider = providersById.get(s.worker_user_id) ?? {
+      username: null,
+      display_name: null,
+      city: null,
+    }
+    return {
+      id: s.id,
+      categoryLabel: Array.isArray(s.category)
+        ? s.category[0]?.label || 'Service'
+        : s.category?.label || 'Service',
+      blurb: s.blurb || '',
+      price_type: s.price_type,
+      price_amount: s.price_amount,
+      provider_username: provider.username,
+      provider_display_name: provider.display_name,
+      provider_city: provider.city,
+    }
+  })
+
   // Look up the viewer's role for nav rendering + city for auto-filter
   let userRole: 'worker' | 'admin' | 'flipper' = 'worker'
   let userName: string | undefined
@@ -173,6 +252,7 @@ export default async function MarketplacePage() {
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
           <MarketplaceFeed
             initialListings={enriched}
+            initialServices={services}
             isLoggedIn={!!user}
             viewerCity={viewerCity}
           />

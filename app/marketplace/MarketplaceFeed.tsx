@@ -4,20 +4,25 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Search, MapPin } from 'lucide-react'
 import ListingCard, { type ListingCardData } from './ListingCard'
+import ServiceCard, { type ServiceCardData } from './ServiceCard'
 
 interface Props {
   initialListings: ListingCardData[]
+  initialServices: ServiceCardData[]
   isLoggedIn: boolean
   viewerCity: string | null
 }
 
 type SortKey = 'newest' | 'oldest' | 'price_low' | 'price_high'
+type Mode = 'items' | 'services'
 
 export default function MarketplaceFeed({
   initialListings,
+  initialServices,
   isLoggedIn,
   viewerCity,
 }: Props) {
+  const [mode, setMode] = useState<Mode>('items')
   const [search, setSearch] = useState('')
   const [freeOnly, setFreeOnly] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('newest')
@@ -62,10 +67,53 @@ export default function MarketplaceFeed({
     return out
   }, [initialListings, search, freeOnly, sortKey, cityFilterOn, viewerCityKey])
 
+  // Services: filter by search (category + blurb) and by provider city.
+  // No free/price filters — services price differently.
+  const filteredServices = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return initialServices.filter((s) => {
+      if (cityFilterOn && viewerCityKey) {
+        const providerCity = (s.provider_city ?? '').trim().toLowerCase()
+        if (providerCity !== viewerCityKey) return false
+      }
+      if (q) {
+        const hay = `${s.categoryLabel} ${s.blurb}`.toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      return true
+    })
+  }, [initialServices, search, cityFilterOn, viewerCityKey])
+
   const showCityChip = !!viewerCity
 
   return (
     <div className="space-y-3">
+      {/* Mode toggle: Items vs Services */}
+      <div className="inline-flex rounded-lg border border-border bg-card p-0.5 text-sm">
+        <button
+          type="button"
+          onClick={() => setMode('items')}
+          className={
+            mode === 'items'
+              ? 'px-4 py-1.5 rounded-md font-medium bg-foreground text-background transition'
+              : 'px-4 py-1.5 rounded-md font-medium text-muted-foreground hover:text-foreground transition'
+          }
+        >
+          Items
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('services')}
+          className={
+            mode === 'services'
+              ? 'px-4 py-1.5 rounded-md font-medium bg-foreground text-background transition'
+              : 'px-4 py-1.5 rounded-md font-medium text-muted-foreground hover:text-foreground transition'
+          }
+        >
+          Services
+        </button>
+      </div>
+
       {/* Sticky slim toolbar — no header above it */}
       <div className="sticky top-14 z-20 -mx-3 sm:-mx-4 px-3 sm:px-4 py-2 bg-background/95 backdrop-blur border-b border-border">
         <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
@@ -103,7 +151,8 @@ export default function MarketplaceFeed({
               </button>
             )}
 
-            {/* Free only */}
+            {/* Free only — items only */}
+            {mode === 'items' && (
             <label
               className={
                 freeOnly
@@ -119,8 +168,10 @@ export default function MarketplaceFeed({
               />
               Free only
             </label>
+            )}
 
-            {/* Sort */}
+            {/* Sort — items only */}
+            {mode === 'items' && (
             <select
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as SortKey)}
@@ -131,18 +182,29 @@ export default function MarketplaceFeed({
               <option value="price_low">Price ↑</option>
               <option value="price_high">Price ↓</option>
             </select>
+            )}
 
             {/* Result count */}
             <div className="text-xs text-muted-foreground whitespace-nowrap">
-              {filteredSorted.length}{' '}
-              {filteredSorted.length === 1 ? 'listing' : 'listings'}
+              {mode === 'items' ? (
+                <>
+                  {filteredSorted.length}{' '}
+                  {filteredSorted.length === 1 ? 'listing' : 'listings'}
+                </>
+              ) : (
+                <>
+                  {filteredServices.length}{' '}
+                  {filteredServices.length === 1 ? 'service' : 'services'}
+                </>
+              )}
             </div>
           </div>
         </div>
       </div>
 
       {/* Grid */}
-      {filteredSorted.length === 0 ? (
+      {mode === 'items' && (
+        filteredSorted.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border bg-card text-center py-16 px-4">
           {initialListings.length === 0 ? (
             <>
@@ -221,6 +283,80 @@ export default function MarketplaceFeed({
             <ListingCard key={l.id} listing={l} />
           ))}
         </div>
+        )
+      )}
+
+      {/* Services grid */}
+      {mode === 'services' && (
+        filteredServices.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border bg-card text-center py-16 px-4">
+            {initialServices.length === 0 ? (
+              <>
+                <p className="text-sm text-foreground font-medium">
+                  No services listed yet.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+                  Members can list the work they do for hire — like repairs,
+                  refinishing, or delivery. Be one of the first.
+                </p>
+                <div className="flex flex-wrap gap-2 justify-center mt-4">
+                  {isLoggedIn ? (
+                    <Link
+                      href="/profile/worker/services"
+                      className="text-xs font-medium px-3 py-1.5 rounded-md bg-foreground text-background hover:opacity-90 transition"
+                    >
+                      List a service
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/auth/signup"
+                      className="text-xs font-medium px-3 py-1.5 rounded-md bg-foreground text-background hover:opacity-90 transition"
+                    >
+                      Sign up to offer services
+                    </Link>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-foreground font-medium">
+                  No services match your filters.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {cityFilterOn && viewerCity
+                    ? `Nothing in ${viewerCity} fits — try clearing the city filter.`
+                    : 'Try clearing your search to see everything.'}
+                </p>
+                <div className="flex flex-wrap gap-2 justify-center mt-4">
+                  {cityFilterOn && viewerCity && (
+                    <button
+                      type="button"
+                      onClick={() => setCityFilterOn(false)}
+                      className="text-xs font-medium px-3 py-1.5 rounded-md border border-input bg-card hover:bg-secondary transition"
+                    >
+                      Show all locations
+                    </button>
+                  )}
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch('')}
+                      className="text-xs font-medium px-3 py-1.5 rounded-md border border-input bg-card hover:bg-secondary transition"
+                    >
+                      Clear search
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-2.5">
+            {filteredServices.map((s) => (
+              <ServiceCard key={s.id} service={s} />
+            ))}
+          </div>
+        )
       )}
     </div>
   )
