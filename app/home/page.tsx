@@ -10,7 +10,6 @@ import {
   DollarSign,
   Briefcase,
   TrendingUp,
-  Wallet,
   Plus,
   Search,
   AlertCircle,
@@ -544,37 +543,6 @@ export default async function HomePage() {
           </div>
         ) : (
           <>
-            {/* HERO STATS */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <StatTile
-                icon={<DollarSign className="w-4 h-4 text-accent" />}
-                tint="accent"
-                value={formatCurrency(totalEarned)}
-                label="Total earned"
-              />
-              <StatTile
-                icon={<Wallet className="w-4 h-4 text-blue-600" />}
-                tint="blue"
-                value={formatCurrency(totalInvested)}
-                label="Total invested"
-              />
-              <StatTile
-                icon={<Trophy className="w-4 h-4 text-green-600" />}
-                tint="green"
-                value={String(gigsCompletedTotal)}
-                label="Gigs completed"
-              />
-              <StatTile
-                icon={<Briefcase className="w-4 h-4 text-foreground" />}
-                tint="neutral"
-                value={String(activeTotal)}
-                label="Active right now"
-              />
-            </div>
-
-            {/* CHART */}
-            <ActivityChart data={chartData} />
-
             {/* ACTION SECTIONS */}
             <div className="grid sm:grid-cols-2 gap-4">
               {needsReview.length > 0 && (
@@ -672,32 +640,9 @@ export default async function HomePage() {
               )}
             </div>
 
-            {/* YOU VS COMMUNITY */}
-            {(percentileEarnings !== null || percentileGigsCompleted !== null) && (
-              <div className="card card-body space-y-3">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-accent" />
-                  <h2 className="text-sm font-semibold text-foreground">
-                    You vs. the community
-                  </h2>
-                </div>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {percentileEarnings !== null && (
-                    <PercentileBar
-                      label="Earnings"
-                      pct={percentileEarnings}
-                      detail={`You've out-earned ${percentileEarnings}% of workers`}
-                    />
-                  )}
-                  {percentileGigsCompleted !== null && (
-                    <PercentileBar
-                      label="Gigs completed"
-                      pct={percentileGigsCompleted}
-                      detail={`More completed gigs than ${percentileGigsCompleted}% of users`}
-                    />
-                  )}
-                </div>
-              </div>
+            {/* CHART — only shown once real gig money has moved */}
+            {(totalEarned > 0 || totalInvested > 0) && (
+              <ActivityChart data={chartData} />
             )}
 
             {/* RECENT ACTIVITY */}
@@ -743,22 +688,17 @@ export default async function HomePage() {
               </div>
             )}
 
-            {/* QUICK ACTIONS — always at the bottom */}
-            <div className="flex gap-3 flex-wrap">
-              <Link
-                href="/flipper/post-gig"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent/90 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Post a gig
-              </Link>
-              <Link
-                href="/gigs"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-card text-sm font-medium hover:bg-muted transition-colors"
-              >
-                <Search className="w-4 h-4" />
-                Browse gigs
-              </Link>
+            {/* GO TO — navigation hub into each area of the app */}
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-foreground">Go to</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <NavTile href="/gigs" icon={<Search className="w-5 h-5" />} title="Browse gigs" subtitle="Find work to pick up" />
+                <NavTile href="/my-gigs" icon={<Briefcase className="w-5 h-5" />} title="My gigs" subtitle="Work you're doing" />
+                <NavTile href="/flipper/post-gig" icon={<Plus className="w-5 h-5" />} title="Post a gig" subtitle="Get help on a project" />
+                <NavTile href="/marketplace" icon={<Sparkles className="w-5 h-5" />} title="Marketplace" subtitle="Buy & sell items" />
+                <NavTile href="/messages" icon={<MessageSquare className="w-5 h-5" />} title="Messages" subtitle="Your conversations" />
+                <NavTile href="/connections" icon={<TrendingUp className="w-5 h-5" />} title="Connections" subtitle="People you work with" />
+              </div>
             </div>
           </>
         )}
@@ -771,41 +711,28 @@ export default async function HomePage() {
 // Small presentational helpers (server-rendered, no client hooks)
 // ============================================================
 
-function StatTile({
+function NavTile({
+  href,
   icon,
-  value,
-  label,
-  tint,
+  title,
+  subtitle,
 }: {
+  href: string
   icon: React.ReactNode
-  value: string
-  label: string
-  tint: 'accent' | 'blue' | 'green' | 'neutral'
+  title: string
+  subtitle: string
 }) {
-  const bg =
-    tint === 'accent'
-      ? 'bg-accent/10'
-      : tint === 'blue'
-      ? 'bg-blue-50'
-      : tint === 'green'
-      ? 'bg-green-50'
-      : 'bg-muted'
   return (
-    <div className="card card-body">
-      <div className="flex items-center gap-3">
-        <div
-          className={`w-9 h-9 rounded-lg ${bg} flex items-center justify-center shrink-0`}
-        >
-          {icon}
-        </div>
-        <div className="min-w-0">
-          <p className="text-2xl font-mono font-semibold text-foreground truncate">
-            {value}
-          </p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </div>
+    <Link
+      href={href}
+      className="card card-body hover:border-accent hover:bg-stone-50 transition-colors group"
+    >
+      <div className="text-foreground group-hover:text-accent transition-colors">
+        {icon}
       </div>
-    </div>
+      <div className="mt-2 text-sm font-medium text-foreground">{title}</div>
+      <div className="text-xs text-muted-foreground">{subtitle}</div>
+    </Link>
   )
 }
 
@@ -854,32 +781,6 @@ function ActionCard({
     )
   }
   return <div className={className}>{inner}</div>
-}
-
-function PercentileBar({
-  label,
-  pct,
-  detail,
-}: {
-  label: string
-  pct: number
-  detail: string
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-baseline justify-between">
-        <span className="text-xs text-muted-foreground">{label}</span>
-        <span className="font-mono text-sm text-foreground">{pct}%</span>
-      </div>
-      <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-        <div
-          className="h-full bg-accent rounded-full transition-all"
-          style={{ width: `${Math.min(100, Math.max(2, pct))}%` }}
-        />
-      </div>
-      <p className="text-xs text-muted-foreground">{detail}</p>
-    </div>
-  )
 }
 
 function ActivityIcon({ icon }: { icon: string }) {
