@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { LocationSelect } from '@/components/ui/location-select';
-import { ArrowLeft, Upload } from 'lucide-react';
+import { ArrowLeft, Upload, Briefcase, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -388,6 +388,27 @@ export default function WorkerProfilePage() {
             </div>
           </form>
         </div>
+
+        {/* Services I Offer card */}
+        <Link
+          href="/profile/worker/services"
+          className="mt-6 block bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-md bg-amber-50 flex items-center justify-center shrink-0">
+                <Briefcase className="w-5 h-5 text-amber-700" />
+              </div>
+              <div>
+                <h2 className="text-lg font-medium text-slate-900">Services I Offer</h2>
+                <p className="text-sm text-slate-600 mt-0.5">
+                  Add up to 10 services to your public profile so people can hire you.
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-slate-400 shrink-0" />
+          </div>
+        </Link>
       </div>
     </div>
   );
