@@ -24,6 +24,7 @@ import Nav from '@/components/shared/Nav'
 import { FoundingMemberBadge } from '@/components/shared/FoundingMemberBadge'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import { FollowButton } from '@/components/profile/FollowButton'
+import ContactButton from '@/components/shared/ContactButton'
 import { formatCurrency, formatDate, formatPriceFromCents } from '@/lib/utils'
 
 interface MergedProfile {
@@ -250,11 +251,14 @@ export function PublicProfileClient({
                   </div>
                 ) : (
                   isLoggedIn && (
-                    <div className="pt-2">
+                    <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-3">
                       <FollowButton
                         followedUserId={profile.user_id}
                         initialFollowing={viewerIsFollowing}
                       />
+                      <div className="w-auto">
+                        <ContactButton otherUserId={profile.user_id} />
+                      </div>
                     </div>
                   )
                 )}
