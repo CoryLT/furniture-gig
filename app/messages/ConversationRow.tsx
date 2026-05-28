@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -36,8 +36,20 @@ export default function ConversationRow({
 }: Props) {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [openUp, setOpenUp] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const btnRef = useRef<HTMLButtonElement>(null)
+
+  function toggleMenu() {
+    if (!menuOpen && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      // Menu is roughly 130px tall; flip up if not enough room below.
+      setOpenUp(spaceBelow < 160)
+    }
+    setMenuOpen((o) => !o)
+  }
 
   async function doAction(action: 'archive' | 'unarchive' | 'delete') {
     setBusy(true)
@@ -118,8 +130,9 @@ export default function ConversationRow({
       {/* Actions menu */}
       <div className="relative flex-shrink-0">
         <button
+          ref={btnRef}
           type="button"
-          onClick={() => setMenuOpen((o) => !o)}
+          onClick={toggleMenu}
           disabled={busy}
           className="p-2 rounded-lg text-stone-500 hover:bg-stone-200 transition-colors disabled:opacity-50"
           aria-label="Conversation options"
@@ -134,7 +147,11 @@ export default function ConversationRow({
               className="fixed inset-0 z-10"
               onClick={() => setMenuOpen(false)}
             />
-            <div className="absolute right-0 top-full mt-1 z-20 w-44 bg-white border border-stone-200 rounded-lg shadow-lg overflow-hidden py-1">
+            <div
+              className={`absolute right-0 z-20 w-44 bg-white border border-stone-200 rounded-lg shadow-lg overflow-hidden py-1 ${
+                openUp ? 'bottom-full mb-1' : 'top-full mt-1'
+              }`}
+            >
               {isArchived ? (
                 <button
                   type="button"
