@@ -134,7 +134,7 @@ export default async function MarketplacePage() {
   const { data: servicesRaw } = await supabase
     .from('worker_services')
     .select(
-      'id, blurb, price_type, price_amount, worker_user_id, sort_order, category:service_categories(label)'
+      'id, blurb, price_type, price_amount, worker_user_id, sort_order, image_path, category:service_categories(label)'
     )
     .eq('active', true)
     .order('created_at', { ascending: false })
@@ -198,6 +198,7 @@ export default async function MarketplacePage() {
       blurb: s.blurb || '',
       price_type: s.price_type,
       price_amount: s.price_amount,
+      image_path: s.image_path ?? null,
       provider_username: provider.username,
       provider_display_name: provider.display_name,
       provider_city: provider.city,

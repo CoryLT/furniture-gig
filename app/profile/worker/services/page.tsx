@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, Trash2, Pencil, X } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Pencil, X, ImagePlus } from 'lucide-react';
 import Link from 'next/link';
 
 const MAX_SERVICES = 10;
@@ -24,6 +24,7 @@ type Service = {
   price_amount: number | null;
   sort_order: number;
   active: boolean;
+  image_path?: string | null;
   // joined
   category?: Category;
 };
@@ -59,6 +60,7 @@ export default function WorkerServicesPage() {
   // Form state for adding / editing
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [formCategoryId, setFormCategoryId] = useState('');
   const [formBlurb, setFormBlurb] = useState('');
   const [formPriceType, setFormPriceType] = useState<Service['price_type']>('contact_for_quote');
@@ -90,7 +92,7 @@ export default function WorkerServicesPage() {
         // Load this worker's services with category joined
         const { data: svcs, error: svcsError } = await supabase
           .from('worker_services')
-          .select('id, category_id, blurb, price_type, price_amount, sort_order, active, category:service_categories(id, slug, label, sort_order)')
+          .select('id, category_id, blurb, price_type, price_amount, sort_order, active, image_path, category:service_categories(id, slug, label, sort_order)')
           .eq('worker_user_id', user.id)
           .order('sort_order', { ascending: true });
 
@@ -215,7 +217,7 @@ export default function WorkerServicesPage() {
       // Reload services
       const { data: svcs } = await supabase
         .from('worker_services')
-        .select('id, category_id, blurb, price_type, price_amount, sort_order, active, category:service_categories(id, slug, label, sort_order)')
+        .select('id, category_id, blurb, price_type, price_amount, sort_order, active, image_path, category:service_categories(id, slug, label, sort_order)')
         .eq('worker_user_id', user.id)
         .order('sort_order', { ascending: true });
       const normalized = (svcs || []).map((s: any) => ({
@@ -246,6 +248,77 @@ export default function WorkerServicesPage() {
       setSuccess('Service removed.');
     } catch (err: any) {
       setError(err?.message || 'Failed to remove service.');
+      console.error(err);
+    }
+  }
+
+  async function handleImageUpload(
+    serviceId: string,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // reset so the same file can be re-picked later
+    if (!file) return;
+
+    setError('');
+    setSuccess('');
+    setUploadingId(serviceId);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('serviceId', serviceId);
+
+      const res = await fetch('/api/upload-service-image', {
+        method: 'POST',
+        body: fd,
+      });
+
+      let json: { image?: { file_path: string; url: string }; error?: string } = {};
+      try {
+        json = await res.json();
+      } catch {
+        throw new Error(
+          res.status === 413
+            ? 'That image is too large. Try a smaller photo.'
+            : `Upload failed (server error ${res.status}).`
+        );
+      }
+
+      if (!res.ok || !json.image) {
+        throw new Error(json.error || 'Upload failed. Please try a different image.');
+      }
+
+      setServices((prev) =>
+        prev.map((s) =>
+          s.id === serviceId ? { ...s, image_path: json.image!.file_path } : s
+        )
+      );
+      setSuccess('Photo added.');
+    } catch (err: any) {
+      setError(err?.message || 'Failed to upload photo.');
+      console.error(err);
+    } finally {
+      setUploadingId(null);
+    }
+  }
+
+  async function handleRemoveImage(serviceId: string) {
+    if (!confirm('Remove this photo?')) return;
+    setError('');
+    setSuccess('');
+    try {
+      const { error: updErr } = await supabase
+        .from('worker_services')
+        // @ts-expect-error supabase update generics
+        .update({ image_path: null })
+        .eq('id', serviceId);
+      if (updErr) throw updErr;
+      setServices((prev) =>
+        prev.map((s) => (s.id === serviceId ? { ...s, image_path: null } : s))
+      );
+      setSuccess('Photo removed.');
+    } catch (err: any) {
+      setError(err?.message || 'Failed to remove photo.');
       console.error(err);
     }
   }
@@ -311,17 +384,75 @@ export default function WorkerServicesPage() {
               key={s.id}
               className="p-4 bg-white rounded-lg border border-stone-200 flex items-start justify-between gap-3"
             >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium">{s.category?.label || 'Uncategorized'}</span>
-                  <span className="text-stone-400 text-sm">·</span>
-                  <span className="text-sm text-stone-700">{formatPrice(s)}</span>
+              <div className="flex items-start gap-3 flex-1 min-w-0">
+                {/* Cover image / uploader */}
+                <div className="shrink-0">
+                  {s.image_path ? (
+                    <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-stone-200 bg-stone-50">
+                      <img
+                        src={
+                          supabase.storage
+                            .from('marketplace-photos')
+                            .getPublicUrl(s.image_path).data.publicUrl
+                        }
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <label
+                      className={`w-16 h-16 rounded-lg border border-dashed border-stone-300 flex items-center justify-center text-stone-400 cursor-pointer hover:border-accent hover:text-accent transition ${
+                        uploadingId === s.id ? 'opacity-50 pointer-events-none' : ''
+                      }`}
+                      title="Add a photo"
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => handleImageUpload(s.id, e)}
+                      />
+                      <ImagePlus className="w-5 h-5" />
+                    </label>
+                  )}
                 </div>
-                {s.blurb && (
-                  <p className="text-sm text-stone-600 mt-1 whitespace-pre-wrap break-words">
-                    {s.blurb}
-                  </p>
-                )}
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">{s.category?.label || 'Uncategorized'}</span>
+                    <span className="text-stone-400 text-sm">·</span>
+                    <span className="text-sm text-stone-700">{formatPrice(s)}</span>
+                  </div>
+                  {s.blurb && (
+                    <p className="text-sm text-stone-600 mt-1 whitespace-pre-wrap break-words">
+                      {s.blurb}
+                    </p>
+                  )}
+                  {/* Photo change/remove controls (only when a photo exists) */}
+                  {s.image_path && (
+                    <div className="flex items-center gap-3 mt-2">
+                      <label className="text-xs text-stone-600 hover:text-accent cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={(e) => handleImageUpload(s.id, e)}
+                        />
+                        {uploadingId === s.id ? 'Uploading…' : 'Change photo'}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(s.id)}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Remove photo
+                      </button>
+                    </div>
+                  )}
+                  {uploadingId === s.id && !s.image_path && (
+                    <p className="text-xs text-stone-500 mt-1">Uploading…</p>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button
