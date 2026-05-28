@@ -41,12 +41,21 @@ interface MergedProfile {
   isVerified?: boolean
 }
 
+interface ProfileService {
+  id: string
+  blurb: string
+  price_type: 'flat' | 'hourly' | 'starting_at' | 'contact_for_quote'
+  price_amount: number | null
+  categoryLabel: string
+}
+
 interface PublicProfileClientProps {
   profile: MergedProfile
   openGigs: any[]
   gigThumbnails: Record<string, string>
   listings: any[]
   listingThumbnails: Record<string, string>
+  services: ProfileService[]
   completedCount: number
   workerPhotos: any[]
   flipperPhotos: any[]
@@ -61,6 +70,7 @@ export function PublicProfileClient({
   gigThumbnails,
   listings,
   listingThumbnails,
+  services,
   completedCount,
   workerPhotos: initialWorkerPhotos,
   flipperPhotos: initialFlipperPhotos,
@@ -436,6 +446,78 @@ export function PublicProfileClient({
                     Post a gig
                   </Link>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Services offered — what this person can be hired to do.
+            Shown to everyone when there are services; the owner sees an
+            empty-state nudge to add some. */}
+        {(services.length > 0 || isOwnProfile) && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h2 className="text-2xl font-serif text-foreground flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-accent" strokeWidth={1.5} />
+                Services offered
+                {services.length > 0 && (
+                  <span className="text-base font-sans text-muted-foreground font-normal">
+                    ({services.length})
+                  </span>
+                )}
+              </h2>
+              {isOwnProfile && (
+                <Link
+                  href="/profile/worker/services"
+                  className="text-sm text-accent hover:underline"
+                >
+                  + Manage services
+                </Link>
+              )}
+            </div>
+
+            {services.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {services.map((svc) => {
+                  let priceLabel = 'Contact for quote'
+                  const amt =
+                    svc.price_amount != null
+                      ? `$${Number(svc.price_amount).toFixed(2)}`
+                      : ''
+                  if (svc.price_type === 'flat') priceLabel = amt ? `${amt} flat` : 'Flat rate'
+                  else if (svc.price_type === 'hourly') priceLabel = amt ? `${amt}/hr` : 'Hourly'
+                  else if (svc.price_type === 'starting_at') priceLabel = amt ? `Starting at ${amt}` : 'Starting at'
+                  return (
+                    <div
+                      key={svc.id}
+                      className="p-4 rounded-lg border border-border bg-card"
+                    >
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="font-medium text-foreground">
+                          {svc.categoryLabel}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {priceLabel}
+                        </span>
+                      </div>
+                      {svc.blurb && (
+                        <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap break-words">
+                          {svc.blurb}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="p-6 border border-dashed border-border rounded-lg text-center text-muted-foreground">
+                You haven&apos;t added any services yet.{' '}
+                <Link
+                  href="/profile/worker/services"
+                  className="text-accent hover:underline"
+                >
+                  Add your first one.
+                </Link>
               </div>
             )}
           </div>
