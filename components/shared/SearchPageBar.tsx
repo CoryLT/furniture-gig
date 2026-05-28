@@ -4,7 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, X } from 'lucide-react'
 
-export default function SearchPageBar({ initialQuery }: { initialQuery: string }) {
+export default function SearchPageBar({
+  initialQuery,
+  loggedIn,
+}: {
+  initialQuery: string
+  loggedIn: boolean
+}) {
   const router = useRouter()
   const [q, setQ] = useState(initialQuery)
 
@@ -42,7 +48,7 @@ export default function SearchPageBar({ initialQuery }: { initialQuery: string }
       </form>
       <button
         type="button"
-        onClick={() => router.back()}
+        onClick={() => router.push(loggedIn ? '/home' : '/')}
         className="px-3 py-2.5 text-sm rounded-lg border border-stone-300 text-stone-600 hover:bg-stone-50 transition-colors whitespace-nowrap"
       >
         Cancel
