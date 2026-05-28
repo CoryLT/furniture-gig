@@ -274,7 +274,7 @@ export default function WorkerServicesPage() {
           className="inline-flex items-center text-sm text-stone-600 hover:text-stone-900 mb-6"
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
-          Back to profile
+          Back to edit profile
         </Link>
 
         <header className="mb-6">
