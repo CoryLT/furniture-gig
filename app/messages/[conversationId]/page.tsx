@@ -75,6 +75,22 @@ export default async function ConversationPage({ params }: Props) {
     })
   }
 
+  // --- 3) Otherwise, try user-to-user conversation ---
+  const { data: userConv } = await supabase
+    .from('user_conversations')
+    .select('id, user_a_id, user_b_id, created_at')
+    .eq('id', params.conversationId)
+    .maybeSingle<{
+      id: string
+      user_a_id: string
+      user_b_id: string
+      created_at: string
+    }>()
+
+  if (userConv) {
+    return renderUserConversation({ supabase, user, conversation: userConv })
+  }
+
   notFound()
 }
 
@@ -225,6 +241,77 @@ async function renderListingConversation({
         contextLabel="About listing"
         contextTitle={listing?.title ?? 'Listing'}
         contextHref={listing?.slug ? `/marketplace/${listing.slug}` : null}
+        initialMessages={
+          (messages as Array<{
+            id: string
+            sender_user_id: string
+            body: string
+            read_at: string | null
+            created_at: string
+          }>) ?? []
+        }
+      />
+    </div>
+  )
+}
+
+// ----- USER-to-USER conversation -----
+async function renderUserConversation({
+  supabase,
+  user,
+  conversation,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any
+  user: { id: string }
+  conversation: {
+    id: string
+    user_a_id: string
+    user_b_id: string
+    created_at: string
+  }
+}) {
+  const isA = conversation.user_a_id === user.id
+  const isB = conversation.user_b_id === user.id
+  if (!isA && !isB) notFound()
+
+  const otherUserId = isA ? conversation.user_b_id : conversation.user_a_id
+
+  const { otherName, otherAvatarUrl, otherUsername } = await fetchOtherUser({
+    supabase,
+    otherUserId,
+    preferFlipperBusinessName: false,
+  })
+
+  // Load messages from user_messages
+  const { data: messages } = await supabase
+    .from('user_messages')
+    .select('id, sender_user_id, body, read_at, created_at')
+    .eq('conversation_id', conversation.id)
+    .order('created_at', { ascending: true })
+    .limit(200)
+
+  return (
+    <div className="space-y-4">
+      <Link
+        href="/messages"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to messages
+      </Link>
+
+      <ChatClient
+        conversationId={conversation.id}
+        conversationKind="user"
+        currentUserId={user.id}
+        otherUserId={otherUserId}
+        otherName={otherName}
+        otherAvatarUrl={otherAvatarUrl}
+        otherUsername={otherUsername}
+        contextLabel="Direct message"
+        contextTitle={otherName}
+        contextHref={otherUsername ? `/u/${otherUsername}` : null}
         initialMessages={
           (messages as Array<{
             id: string
