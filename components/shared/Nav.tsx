@@ -14,22 +14,28 @@ interface NavProps {
   userUsername?: string
 }
 
-const userLinks = [
+type NavItem = { href: string; label: string } | { divider: true }
+
+const userLinks: NavItem[] = [
   { href: '/home', label: 'Dashboard' },
+  { divider: true },
   { href: '/gigs', label: 'Browse Gigs' },
   { href: '/my-gigs', label: 'My Gigs' },
+  { href: '/my-gigs/payouts', label: 'Payouts' },
+  { divider: true },
   { href: '/flipper/post-gig', label: 'Post a Gig' },
   { href: '/flipper/dashboard', label: 'My Posted Gigs' },
+  { divider: true },
   { href: '/marketplace', label: 'Marketplace' },
   { href: '/marketplace/new', label: 'List an Item' },
   { href: '/marketplace/mine', label: 'My Listings' },
-  { href: '/profile/worker/services', label: 'Services I Offer' },
+  { divider: true },
   { href: '/messages', label: 'Messages' },
   { href: '/connections', label: 'My Connections' },
-  { href: '/my-gigs/payouts', label: 'Payouts' },
+  { href: '/profile/worker/services', label: 'Services I Offer' },
 ]
 
-const adminLinks = [
+const adminLinks: NavItem[] = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/gigs', label: 'Gigs' },
   { href: '/admin/payouts', label: 'Payouts' },
@@ -311,25 +317,29 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
             {dropdownOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-white border border-stone-200 rounded-lg shadow-lg py-1 z-50">
                 {/* Primary nav (now collapsed into here on every viewport) */}
-                {links.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setDropdownOpen(false)}
-                    className={`flex items-center justify-between gap-2 px-4 py-2 text-sm transition-colors ${
-                      pathname === link.href
-                        ? 'text-accent bg-stone-50'
-                        : 'text-foreground hover:bg-stone-50 hover:text-accent'
-                    }`}
-                  >
-                    <span>{link.label}</span>
-                    {link.href === '/messages' && unreadMessages > 0 && (
-                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-accent text-accent-foreground text-[10px] font-semibold leading-none">
-                        {unreadMessages > 99 ? '99+' : unreadMessages}
-                      </span>
-                    )}
-                  </Link>
-                ))}
+                {links.map((link, i) =>
+                  'divider' in link ? (
+                    <hr key={`div-${i}`} className="my-1" />
+                  ) : (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setDropdownOpen(false)}
+                      className={`flex items-center justify-between gap-2 px-4 py-2 text-sm transition-colors ${
+                        pathname === link.href
+                          ? 'text-accent bg-stone-50'
+                          : 'text-foreground hover:bg-stone-50 hover:text-accent'
+                      }`}
+                    >
+                      <span>{link.label}</span>
+                      {link.href === '/messages' && unreadMessages > 0 && (
+                        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-accent text-accent-foreground text-[10px] font-semibold leading-none">
+                          {unreadMessages > 99 ? '99+' : unreadMessages}
+                        </span>
+                      )}
+                    </Link>
+                  )
+                )}
                 <hr className="my-1" />
                 {getPublicProfileUrl() && (
                   <Link
