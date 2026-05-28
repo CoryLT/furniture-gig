@@ -247,6 +247,11 @@ export default async function MessagesInboxPage({
     return !isArchived
   })
 
+  // Hide conversations that have no messages yet. A conversation row gets
+  // created the moment someone clicks "Contact" / "Message", but it
+  // shouldn't clutter the inbox until a real message is sent.
+  conversations = conversations.filter((c) => lastByConv.has(c.id))
+
   // -------- Other-user profiles --------
   const otherUserIds = Array.from(
     new Set(conversations.map((c) => c.other_user_id))
