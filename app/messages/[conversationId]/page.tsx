@@ -346,12 +346,12 @@ async function fetchOtherUser({
 
   const { data: otherWorker } = await supabase
     .from('worker_profiles')
-    .select('first_name, last_name, username, avatar_url')
+    .select('full_name, username, avatar_url')
     .eq('user_id', otherUserId)
     .maybeSingle()
 
   if (otherWorker) {
-    const full = `${otherWorker.first_name ?? ''} ${otherWorker.last_name ?? ''}`.trim()
+    const full = (otherWorker.full_name ?? '').trim()
     if (full) otherName = full
     if (otherWorker.avatar_url) otherAvatarUrl = otherWorker.avatar_url
     if (otherWorker.username) otherUsername = otherWorker.username
