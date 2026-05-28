@@ -152,7 +152,7 @@ export default async function SearchPage({
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
-      <SearchPageBar initialQuery={q} />
+      <SearchPageBar initialQuery={q} loggedIn={isLoggedIn} />
       <div>
         <h1 className="text-2xl font-serif text-foreground flex items-center gap-2">
           <Search className="w-6 h-6 text-accent" />
