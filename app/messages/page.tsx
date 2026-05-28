@@ -1,51 +1,36 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { MessageCircle, User } from 'lucide-react'
-import Image from 'next/image'
+import { MessageCircle } from 'lucide-react'
+import ConversationRow from './ConversationRow'
 
 // ----- Types -----
 
-interface GigConvRow {
+interface BaseConv {
   id: string
+  other_user_id: string
+  last_message_at: string | null
+  created_at: string
+  contextTitle: string
+  contextHref: string | null
+  contextLabel: string
+}
+interface GigConvRow extends BaseConv {
   kind: 'gig'
   flipper_user_id: string
   worker_user_id: string
-  other_user_id: string
-  last_message_at: string | null
-  created_at: string
-  contextTitle: string
-  contextHref: string | null
-  contextLabel: string
 }
-
-interface ListingConvRow {
-  id: string
+interface ListingConvRow extends BaseConv {
   kind: 'listing'
   seller_user_id: string
   buyer_user_id: string
-  other_user_id: string
-  last_message_at: string | null
-  created_at: string
-  contextTitle: string
-  contextHref: string | null
-  contextLabel: string
 }
-
-type ConvRow = GigConvRow | ListingConvRow | UserConvRow
-
-interface UserConvRow {
-  id: string
+interface UserConvRow extends BaseConv {
   kind: 'user'
   user_a_id: string
   user_b_id: string
-  other_user_id: string
-  last_message_at: string | null
-  created_at: string
-  contextLabel: string
-  contextTitle: string
-  contextHref: string | null
 }
+type ConvRow = GigConvRow | ListingConvRow | UserConvRow
 
 interface MsgRow {
   id: string
@@ -62,7 +47,6 @@ interface WorkerProfile {
   username: string | null
   avatar_url: string
 }
-
 interface FlipperProfile {
   user_id: string
   business_name: string
@@ -70,36 +54,30 @@ interface FlipperProfile {
   avatar_url: string
 }
 
-function timeAgo(iso: string | null) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  const now = Date.now()
-  const diffMs = now - d.getTime()
-  const min = Math.floor(diffMs / 60000)
-  if (min < 1) return 'just now'
-  if (min < 60) return `${min}m`
-  const hr = Math.floor(min / 60)
-  if (hr < 24) return `${hr}h`
-  const day = Math.floor(hr / 24)
-  if (day < 7) return `${day}d`
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+interface StateRow {
+  conversation_kind: 'gig' | 'listing' | 'user'
+  conversation_id: string
+  archived_at: string | null
+  deleted_at: string | null
 }
 
-export default async function MessagesInboxPage() {
+export default async function MessagesInboxPage({
+  searchParams,
+}: {
+  searchParams: { view?: string }
+}) {
   const supabase = createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
+  const view = searchParams?.view === 'archived' ? 'archived' : 'inbox'
+
   // -------- Gig conversations --------
   const { data: gigConvsData } = await supabase
     .from('gig_conversations')
     .select(`
-      id,
-      flipper_user_id,
-      worker_user_id,
-      last_message_at,
-      created_at,
+      id, flipper_user_id, worker_user_id, last_message_at, created_at,
       gigs ( id, title, slug )
     `)
     .or(`flipper_user_id.eq.${user.id},worker_user_id.eq.${user.id}`)
@@ -132,11 +110,7 @@ export default async function MessagesInboxPage() {
   const { data: listingConvsData } = await supabase
     .from('listing_conversations')
     .select(`
-      id,
-      seller_user_id,
-      buyer_user_id,
-      last_message_at,
-      created_at,
+      id, seller_user_id, buyer_user_id, last_message_at, created_at,
       marketplace_listings ( id, title, slug )
     `)
     .or(`seller_user_id.eq.${user.id},buyer_user_id.eq.${user.id}`)
@@ -170,13 +144,7 @@ export default async function MessagesInboxPage() {
   // -------- User-to-user conversations --------
   const { data: userConvsData } = await supabase
     .from('user_conversations')
-    .select(`
-      id,
-      user_a_id,
-      user_b_id,
-      last_message_at,
-      created_at
-    `)
+    .select('id, user_a_id, user_b_id, last_message_at, created_at')
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
 
   const userConvsRaw =
@@ -201,63 +169,83 @@ export default async function MessagesInboxPage() {
     contextHref: null,
   }))
 
-  // -------- Merge + sort --------
-  const conversations: ConvRow[] = [...gigConvs, ...listingConvs, ...userConvs].sort((a, b) => {
-    const at = a.last_message_at ?? a.created_at
-    const bt = b.last_message_at ?? b.created_at
-    return bt.localeCompare(at)
-  })
+  // -------- Merge + sort (newest first) --------
+  let conversations: ConvRow[] = [...gigConvs, ...listingConvs, ...userConvs].sort(
+    (a, b) => {
+      const at = a.last_message_at ?? a.created_at
+      const bt = b.last_message_at ?? b.created_at
+      return bt.localeCompare(at)
+    }
+  )
 
-  // -------- Pull messages for both tables --------
+  // -------- Messages for all three tables --------
   const gigConvIds = gigConvs.map((c) => c.id)
   const listingConvIds = listingConvs.map((c) => c.id)
-
-  let gigMessages: MsgRow[] = []
-  if (gigConvIds.length > 0) {
-    const { data: m } = await supabase
-      .from('gig_messages')
-      .select('id, conversation_id, sender_user_id, body, read_at, created_at')
-      .in('conversation_id', gigConvIds)
-      .order('created_at', { ascending: false })
-      .limit(500)
-    gigMessages = (m as MsgRow[] | null) ?? []
-  }
-
-  let listingMessages: MsgRow[] = []
-  if (listingConvIds.length > 0) {
-    const { data: m } = await supabase
-      .from('listing_messages')
-      .select('id, conversation_id, sender_user_id, body, read_at, created_at')
-      .in('conversation_id', listingConvIds)
-      .order('created_at', { ascending: false })
-      .limit(500)
-    listingMessages = (m as MsgRow[] | null) ?? []
-  }
-
   const userConvIds = userConvs.map((c) => c.id)
-  let userMessages: MsgRow[] = []
-  if (userConvIds.length > 0) {
-    const { data: m } = await supabase
-      .from('user_messages')
+
+  async function loadMessages(table: string, ids: string[]) {
+    if (ids.length === 0) return [] as MsgRow[]
+    const { data } = await supabase
+      .from(table)
       .select('id, conversation_id, sender_user_id, body, read_at, created_at')
-      .in('conversation_id', userConvIds)
+      .in('conversation_id', ids)
       .order('created_at', { ascending: false })
       .limit(500)
-    userMessages = (m as MsgRow[] | null) ?? []
+    return (data as MsgRow[] | null) ?? []
   }
+
+  const [gigMessages, listingMessages, userMessages] = await Promise.all([
+    loadMessages('gig_messages', gigConvIds),
+    loadMessages('listing_messages', listingConvIds),
+    loadMessages('user_messages', userConvIds),
+  ])
 
   const allMessages = [...gigMessages, ...listingMessages, ...userMessages]
 
-  // Last message per conversation (messages already sorted desc, so first hit is latest)
   const lastByConv = new Map<string, MsgRow>()
-  // Unread count: messages received by ME (not sent by me) with read_at = null
   const unreadByConv = new Map<string, number>()
   for (const m of allMessages) {
     if (!lastByConv.has(m.conversation_id)) lastByConv.set(m.conversation_id, m)
     if (m.sender_user_id !== user.id && m.read_at === null) {
-      unreadByConv.set(m.conversation_id, (unreadByConv.get(m.conversation_id) ?? 0) + 1)
+      unreadByConv.set(
+        m.conversation_id,
+        (unreadByConv.get(m.conversation_id) ?? 0) + 1
+      )
     }
   }
+
+  // -------- Per-user archive/delete state --------
+  const { data: stateData } = await supabase
+    .from('conversation_user_state')
+    .select('conversation_kind, conversation_id, archived_at, deleted_at')
+    .eq('user_id', user.id)
+
+  const stateByConv = new Map<string, StateRow>()
+  for (const s of (stateData as StateRow[] | null) ?? []) {
+    stateByConv.set(s.conversation_id, s)
+  }
+
+  // Apply archive/delete filtering. "Deleted reappears on new message":
+  // a conversation hidden by deleted_at comes back if its latest message
+  // is newer than deleted_at.
+  conversations = conversations.filter((c) => {
+    const st = stateByConv.get(c.id)
+    const lastAt = c.last_message_at ?? c.created_at
+
+    // Deleted? Hidden unless a newer message arrived after deletion.
+    if (st?.deleted_at) {
+      if (lastAt && lastAt.localeCompare(st.deleted_at) > 0) {
+        // Newer message — treat as restored, show in inbox view only
+        return view === 'inbox'
+      }
+      return false
+    }
+
+    // Archived? Show only in archived view; otherwise show in inbox view.
+    const isArchived = !!st?.archived_at
+    if (view === 'archived') return isArchived
+    return !isArchived
+  })
 
   // -------- Other-user profiles --------
   const otherUserIds = Array.from(
@@ -291,41 +279,31 @@ export default async function MessagesInboxPage() {
 
     let name = 'User'
     let avatarUrl: string | null = null
-    let username: string | null = null
 
     if (wp) {
       const full = (wp.full_name ?? '').trim()
       if (full) name = full
       if (wp.avatar_url) avatarUrl = wp.avatar_url
-      if (wp.username) username = wp.username
     }
 
-    // For gig convs: if the OTHER side is the flipper, prefer business_name.
-    // For listing convs: prefer business_name if it's set (whether the other
-    //   side is buyer or seller — either may have a flipper profile).
     let preferBusinessName = false
     if (c.kind === 'gig') {
       preferBusinessName = c.worker_user_id === user!.id
     } else if (c.kind === 'user') {
-      // Direct message: just use the person's name, no business override
       preferBusinessName = false
     } else {
-      // listing conv: prefer business_name if available
       preferBusinessName = true
     }
 
     if (preferBusinessName && fp) {
       if (fp.business_name && fp.business_name.trim()) name = fp.business_name
       if (fp.avatar_url) avatarUrl = fp.avatar_url
-      if (fp.username) username = fp.username
     } else if (!wp && fp) {
-      // No worker profile, use flipper as fallback
       if (fp.business_name && fp.business_name.trim()) name = fp.business_name
       if (fp.avatar_url) avatarUrl = fp.avatar_url
-      if (fp.username) username = fp.username
     }
 
-    return { name, avatarUrl, username }
+    return { name, avatarUrl }
   }
 
   const totalUnread = Array.from(unreadByConv.values()).reduce((a, b) => a + b, 0)
@@ -340,21 +318,52 @@ export default async function MessagesInboxPage() {
             Messages
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {totalUnread > 0
+            {view === 'archived'
+              ? 'Archived conversations.'
+              : totalUnread > 0
               ? `You have ${totalUnread} unread message${totalUnread === 1 ? '' : 's'}.`
               : 'All caught up.'}
           </p>
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex items-center gap-2 text-sm">
+        <Link
+          href="/messages"
+          className={`px-3 py-1.5 rounded-lg border transition-colors ${
+            view === 'inbox'
+              ? 'bg-accent text-accent-foreground border-accent'
+              : 'bg-card border-border text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Inbox
+        </Link>
+        <Link
+          href="/messages?view=archived"
+          className={`px-3 py-1.5 rounded-lg border transition-colors ${
+            view === 'archived'
+              ? 'bg-accent text-accent-foreground border-accent'
+              : 'bg-card border-border text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Archived
+        </Link>
+      </div>
+
       {/* List */}
       {conversations.length === 0 ? (
         <div className="border border-stone-200 bg-white rounded-lg p-12 text-center space-y-3">
           <MessageCircle className="w-10 h-10 text-muted-foreground mx-auto" />
-          <h2 className="font-medium text-foreground">No conversations yet</h2>
+          <h2 className="font-medium text-foreground">
+            {view === 'archived'
+              ? 'No archived conversations'
+              : 'No conversations yet'}
+          </h2>
           <p className="text-sm text-muted-foreground">
-            Conversations appear here when you apply to a gig, get one
-            claimed, or message a seller about a marketplace listing.
+            {view === 'archived'
+              ? 'Conversations you archive will show up here.'
+              : 'Conversations appear here when you apply to a gig, get one claimed, message a seller, or contact someone from their profile.'}
           </p>
         </div>
       ) : (
@@ -367,66 +376,43 @@ export default async function MessagesInboxPage() {
             const preview = last
               ? `${lastFromMe ? 'You: ' : ''}${last.body}`
               : 'No messages yet'
-            const when = timeAgo(c.last_message_at ?? c.created_at)
+            const when = timeAgoStr(c.last_message_at ?? c.created_at)
+            const st = stateByConv.get(c.id)
 
             return (
-              <Link
+              <ConversationRow
                 key={c.id}
+                conversationId={c.id}
+                conversationKind={c.kind}
                 href={`/messages/${c.id}`}
-                className="flex items-center gap-3 p-4 hover:bg-stone-50 transition-colors"
-              >
-                {/* Avatar */}
-                <div className="flex-shrink-0">
-                  {avatarUrl ? (
-                    <div className="relative w-11 h-11 rounded-full overflow-hidden bg-stone-200">
-                      <Image src={avatarUrl} alt={name} fill sizes="44px" className="object-cover" />
-                    </div>
-                  ) : (
-                    <div className="w-11 h-11 rounded-full bg-stone-200 text-stone-600 flex items-center justify-center font-medium">
-                      {(name
-                        .split(' ')
-                        .map((p) => p[0])
-                        .filter(Boolean)
-                        .slice(0, 2)
-                        .join('')
-                        .toUpperCase()) || <User className="w-5 h-5" />}
-                    </div>
-                  )}
-                </div>
-
-                {/* Middle: name, context, preview */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className={`truncate ${unread > 0 ? 'font-semibold text-foreground' : 'font-medium text-foreground'}`}>
-                        {name}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {c.contextTitle
-                          ? `${c.contextLabel}: ${c.contextTitle}`
-                          : c.contextLabel}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span className={`text-xs ${unread > 0 ? 'text-accent font-medium' : 'text-muted-foreground'}`}>
-                        {when}
-                      </span>
-                      {unread > 0 && (
-                        <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-accent text-accent-foreground text-[10px] font-semibold">
-                          {unread > 99 ? '99+' : unread}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <p className={`text-sm truncate mt-1 ${unread > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
-                    {preview}
-                  </p>
-                </div>
-              </Link>
+                name={name}
+                avatarUrl={avatarUrl}
+                contextLabel={c.contextLabel}
+                contextTitle={c.contextTitle}
+                preview={preview}
+                when={when}
+                unread={unread}
+                isArchived={!!st?.archived_at}
+                view={view}
+              />
             )
           })}
         </div>
       )}
     </div>
   )
+}
+
+function timeAgoStr(iso: string | null) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const diffMs = Date.now() - d.getTime()
+  const min = Math.floor(diffMs / 60000)
+  if (min < 1) return 'just now'
+  if (min < 60) return `${min}m`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h`
+  const day = Math.floor(hr / 24)
+  if (day < 7) return `${day}d`
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
