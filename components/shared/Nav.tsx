@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Armchair, Menu } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 import { NotificationBell } from '@/components/shared/NotificationBell'
+import { MessageBell } from '@/components/shared/MessageBell'
 import HeaderSearch from '@/components/shared/HeaderSearch'
 
 interface NavProps {
@@ -297,6 +298,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
         <HeaderSearch />
 
         <div className="flex items-center gap-2 sm:gap-3">
+          {role !== 'admin' && <MessageBell />}
           {role !== 'admin' && <NotificationBell />}
           <div className="relative" ref={dropdownRef}>
             <button
