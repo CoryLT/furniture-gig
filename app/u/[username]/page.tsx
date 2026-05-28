@@ -154,6 +154,28 @@ export default async function PublicProfilePage({
     }
   }
 
+  // Pull this user's active services (what they offer) with the
+  // category label joined in. Cap at 10 (the per-worker max).
+  const { data: servicesRaw } = userId
+    ? await supabase
+        .from('worker_services')
+        .select('id, blurb, price_type, price_amount, sort_order, category:service_categories(label, slug)')
+        .eq('worker_user_id', userId)
+        .eq('active', true)
+        .order('sort_order', { ascending: true })
+        .limit(10)
+    : { data: [] }
+
+  const services = ((servicesRaw ?? []) as any[]).map((s) => ({
+    id: s.id,
+    blurb: s.blurb || '',
+    price_type: s.price_type,
+    price_amount: s.price_amount,
+    categoryLabel: Array.isArray(s.category)
+      ? s.category[0]?.label || 'Service'
+      : s.category?.label || 'Service',
+  }))
+
   // Pull photo galleries from BOTH worker and flipper tables, combine
   const [workerPhotosResult, flipperPhotosResult] = userId
     ? await Promise.all([
@@ -204,6 +226,7 @@ export default async function PublicProfilePage({
       gigThumbnails={gigThumbnails}
       listings={listings}
       listingThumbnails={listingThumbnails}
+      services={services}
       completedCount={completedCount}
       workerPhotos={workerPhotosResult.data || []}
       flipperPhotos={flipperPhotosResult.data || []}
