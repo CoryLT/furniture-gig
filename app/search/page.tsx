@@ -60,7 +60,9 @@ export default async function SearchPage({
       .eq('profile_public', true)
       .or(`full_name.ilike.${like},username.ilike.${like}`)
       .limit(12)
-    people = (peopleData as PersonResult[] | null) ?? []
+    people = ((peopleData as PersonResult[] | null) ?? []).filter(
+      (p) => !!p.username
+    )
 
     // Services — match category label or blurb. Two-step: find matching
     // category ids, then services by category OR by blurb text.
@@ -122,7 +124,7 @@ export default async function SearchPage({
           profilePublic: wk?.profile_public !== false,
         }
       })
-      .filter((s) => s.profilePublic)
+      .filter((s) => s.profilePublic && !!s.workerUsername)
       .slice(0, 12)
 
     // Listings — active only, match title or description
@@ -211,7 +213,7 @@ export default async function SearchPage({
                 </div>
               )
               return p.username ? (
-                <Link key={p.user_id} href={`/u/${p.username}`} className="block">{inner}</Link>
+                <Link key={p.user_id} href={`/u/${p.username}`}>{inner}</Link>
               ) : (
                 <div key={p.user_id}>{inner}</div>
               )
@@ -240,7 +242,7 @@ export default async function SearchPage({
                 </div>
               )
               return s.workerUsername ? (
-                <Link key={s.id} href={`/u/${s.workerUsername}`} className="block">{inner}</Link>
+                <Link key={s.id} href={`/u/${s.workerUsername}`}>{inner}</Link>
               ) : (
                 <div key={s.id}>{inner}</div>
               )
@@ -257,7 +259,7 @@ export default async function SearchPage({
           </h2>
           <div className="divide-y divide-stone-200 border border-stone-200 rounded-lg overflow-hidden bg-white">
             {listings.map((l) => (
-              <Link key={l.id} href={`/marketplace/${l.slug}`} className="block">
+              <Link key={l.id} href={`/marketplace/${l.slug}`}>
                 <div className="p-3 hover:bg-stone-50 transition-colors">
                   <p className="font-medium text-foreground truncate">{l.title}</p>
                 </div>
@@ -275,7 +277,7 @@ export default async function SearchPage({
           </h2>
           <div className="divide-y divide-stone-200 border border-stone-200 rounded-lg overflow-hidden bg-white">
             {gigs.map((g) => (
-              <Link key={g.id} href={`/gigs/${g.slug}`} className="block">
+              <Link key={g.id} href={`/gigs/${g.slug}`}>
                 <div className="p-3 hover:bg-stone-50 transition-colors">
                   <p className="font-medium text-foreground truncate">{g.title}</p>
                   {g.summary && (
