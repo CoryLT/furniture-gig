@@ -37,9 +37,11 @@ export default function ConversationRow({
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
 
   async function doAction(action: 'archive' | 'unarchive' | 'delete') {
     setBusy(true)
+    setErr('')
     try {
       const res = await fetch('/api/conversations/state', {
         method: 'POST',
@@ -49,7 +51,12 @@ export default function ConversationRow({
       if (res.ok) {
         setMenuOpen(false)
         router.refresh()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setErr(data?.error || 'Action failed')
       }
+    } catch {
+      setErr('Network error')
     } finally {
       setBusy(false)
     }
@@ -155,6 +162,11 @@ export default function ConversationRow({
                 <Trash2 className="w-4 h-4" />
                 Delete
               </button>
+              {err && (
+                <p className="px-3 py-2 text-xs text-red-600 border-t border-stone-100">
+                  {err}
+                </p>
+              )}
             </div>
           </>
         )}
