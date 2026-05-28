@@ -128,21 +128,21 @@ export default async function SearchPage({
       .filter((s) => s.profilePublic && !!s.workerUsername)
       .slice(0, 12)
 
-    // Listings — active only, match title or description
+    // Listings — active only, match title only (descriptions are noisy)
     const { data: listingData } = await supabase
       .from('marketplace_listings')
       .select('id, slug, title')
       .eq('status', 'active')
-      .or(`title.ilike.${like},description.ilike.${like}`)
+      .ilike('title', like)
       .limit(12)
     listings = (listingData as ListingResult[] | null) ?? []
 
-    // Gigs — open only, match title or summary
+    // Gigs — open only, match title only
     const { data: gigData } = await supabase
       .from('gigs')
       .select('id, slug, title, summary')
       .eq('status', 'open')
-      .or(`title.ilike.${like},summary.ilike.${like}`)
+      .ilike('title', like)
       .limit(12)
     gigs = (gigData as GigResult[] | null) ?? []
   }
