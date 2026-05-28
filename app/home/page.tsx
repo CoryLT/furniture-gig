@@ -493,6 +493,13 @@ export default async function HomePage() {
     day: 'numeric',
   })
 
+  // How many action cards will actually show — used to stretch a lone card
+  const actionCardCount =
+    (needsReview.length > 0 ? 1 : 0) +
+    (pendingApplicants.length > 0 ? 1 : 0) +
+    (unreadCount > 0 ? 1 : 0) +
+    (workInProgress.length > 0 ? 1 : 0)
+
   return (
     <div className="min-h-screen bg-background">
       {showWelcomeModal && <WelcomeModal />}
@@ -544,7 +551,7 @@ export default async function HomePage() {
         ) : (
           <>
             {/* ACTION SECTIONS */}
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className={`grid gap-4 ${actionCardCount === 1 ? 'grid-cols-1' : 'sm:grid-cols-2'}`}>
               {needsReview.length > 0 && (
                 <ActionCard
                   icon={<ClipboardCheck className="w-5 h-5 text-accent" />}
