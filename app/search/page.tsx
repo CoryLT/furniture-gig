@@ -211,7 +211,7 @@ export default async function SearchPage({
                 </div>
               )
               return p.username ? (
-                <Link key={p.user_id} href={`/u/${p.username}`}>{inner}</Link>
+                <Link key={p.user_id} href={`/u/${p.username}`} className="block">{inner}</Link>
               ) : (
                 <div key={p.user_id}>{inner}</div>
               )
@@ -240,7 +240,7 @@ export default async function SearchPage({
                 </div>
               )
               return s.workerUsername ? (
-                <Link key={s.id} href={`/u/${s.workerUsername}`}>{inner}</Link>
+                <Link key={s.id} href={`/u/${s.workerUsername}`} className="block">{inner}</Link>
               ) : (
                 <div key={s.id}>{inner}</div>
               )
@@ -257,7 +257,7 @@ export default async function SearchPage({
           </h2>
           <div className="divide-y divide-stone-200 border border-stone-200 rounded-lg overflow-hidden bg-white">
             {listings.map((l) => (
-              <Link key={l.id} href={`/marketplace/${l.slug}`}>
+              <Link key={l.id} href={`/marketplace/${l.slug}`} className="block">
                 <div className="p-3 hover:bg-stone-50 transition-colors">
                   <p className="font-medium text-foreground truncate">{l.title}</p>
                 </div>
@@ -275,7 +275,7 @@ export default async function SearchPage({
           </h2>
           <div className="divide-y divide-stone-200 border border-stone-200 rounded-lg overflow-hidden bg-white">
             {gigs.map((g) => (
-              <Link key={g.id} href={`/gigs/${g.slug}`}>
+              <Link key={g.id} href={`/gigs/${g.slug}`} className="block">
                 <div className="p-3 hover:bg-stone-50 transition-colors">
                   <p className="font-medium text-foreground truncate">{g.title}</p>
                   {g.summary && (
