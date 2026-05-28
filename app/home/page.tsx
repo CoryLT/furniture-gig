@@ -23,6 +23,7 @@ import {
   Package,
   Hammer,
   Users,
+  User,
 } from 'lucide-react'
 
 // Always fetch fresh — this page IS about live data
@@ -688,6 +689,7 @@ export default async function HomePage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <NavTile href="/messages" icon={<MessageSquare className="w-5 h-5" />} title="Messages" subtitle="Your conversations" />
                   <NavTile href="/connections" icon={<Users className="w-5 h-5" />} title="Connections" subtitle="People you work with" />
+                  <NavTile href="/profile" icon={<User className="w-5 h-5" />} title="Profile" subtitle="Your account & details" />
                 </div>
               </div>
             </div>
