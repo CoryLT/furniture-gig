@@ -640,6 +640,19 @@ export default async function HomePage() {
               )}
             </div>
 
+            {/* GO TO — navigation hub into each area of the app */}
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-foreground">Go to</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <NavTile href="/gigs" icon={<Search className="w-5 h-5" />} title="Browse gigs" subtitle="Find work to pick up" />
+                <NavTile href="/my-gigs" icon={<Briefcase className="w-5 h-5" />} title="My gigs" subtitle="Work you're doing" />
+                <NavTile href="/flipper/post-gig" icon={<Plus className="w-5 h-5" />} title="Post a gig" subtitle="Get help on a project" />
+                <NavTile href="/marketplace" icon={<Sparkles className="w-5 h-5" />} title="Marketplace" subtitle="Buy & sell items" />
+                <NavTile href="/messages" icon={<MessageSquare className="w-5 h-5" />} title="Messages" subtitle="Your conversations" />
+                <NavTile href="/connections" icon={<TrendingUp className="w-5 h-5" />} title="Connections" subtitle="People you work with" />
+              </div>
+            </div>
+
             {/* CHART — only shown once real gig money has moved */}
             {(totalEarned > 0 || totalInvested > 0) && (
               <ActivityChart data={chartData} />
@@ -687,19 +700,6 @@ export default async function HomePage() {
                 </ul>
               </div>
             )}
-
-            {/* GO TO — navigation hub into each area of the app */}
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-foreground">Go to</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <NavTile href="/gigs" icon={<Search className="w-5 h-5" />} title="Browse gigs" subtitle="Find work to pick up" />
-                <NavTile href="/my-gigs" icon={<Briefcase className="w-5 h-5" />} title="My gigs" subtitle="Work you're doing" />
-                <NavTile href="/flipper/post-gig" icon={<Plus className="w-5 h-5" />} title="Post a gig" subtitle="Get help on a project" />
-                <NavTile href="/marketplace" icon={<Sparkles className="w-5 h-5" />} title="Marketplace" subtitle="Buy & sell items" />
-                <NavTile href="/messages" icon={<MessageSquare className="w-5 h-5" />} title="Messages" subtitle="Your conversations" />
-                <NavTile href="/connections" icon={<TrendingUp className="w-5 h-5" />} title="Connections" subtitle="People you work with" />
-              </div>
-            </div>
           </>
         )}
       </main>
