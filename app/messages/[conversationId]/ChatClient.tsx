@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Send, User, ExternalLink } from 'lucide-react'
+import ChatSafetyMenu from './ChatSafetyMenu'
 
 interface Message {
   id: string
@@ -30,6 +31,7 @@ interface Props {
   contextLabel: string
   contextTitle: string
   contextHref: string | null
+  initialBlocked?: boolean
   initialMessages: Array<{
     id: string
     sender_user_id: string
@@ -67,6 +69,7 @@ export default function ChatClient({
   contextLabel,
   contextTitle,
   contextHref,
+  initialBlocked,
   initialMessages,
 }: Props) {
   const supabase = createClient()
@@ -316,6 +319,12 @@ export default function ChatClient({
             )}
           </div>
         </div>
+        <ChatSafetyMenu
+          otherUserId={otherUserId}
+          conversationKind={conversationKind}
+          conversationId={conversationId}
+          initialBlocked={initialBlocked}
+        />
       </div>
 
       {/* Messages */}
