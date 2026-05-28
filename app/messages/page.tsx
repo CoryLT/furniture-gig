@@ -32,7 +32,20 @@ interface ListingConvRow {
   contextLabel: string
 }
 
-type ConvRow = GigConvRow | ListingConvRow
+type ConvRow = GigConvRow | ListingConvRow | UserConvRow
+
+interface UserConvRow {
+  id: string
+  kind: 'user'
+  user_a_id: string
+  user_b_id: string
+  other_user_id: string
+  last_message_at: string | null
+  created_at: string
+  contextLabel: string
+  contextTitle: string
+  contextHref: string | null
+}
 
 interface MsgRow {
   id: string
@@ -45,8 +58,7 @@ interface MsgRow {
 
 interface WorkerProfile {
   user_id: string
-  first_name: string
-  last_name: string
+  full_name: string
   username: string | null
   avatar_url: string
 }
@@ -155,8 +167,42 @@ export default async function MessagesInboxPage() {
       : null,
   }))
 
+  // -------- User-to-user conversations --------
+  const { data: userConvsData } = await supabase
+    .from('user_conversations')
+    .select(`
+      id,
+      user_a_id,
+      user_b_id,
+      last_message_at,
+      created_at
+    `)
+    .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
+
+  const userConvsRaw =
+    (userConvsData as Array<{
+      id: string
+      user_a_id: string
+      user_b_id: string
+      last_message_at: string | null
+      created_at: string
+    }> | null) ?? []
+
+  const userConvs: UserConvRow[] = userConvsRaw.map((c) => ({
+    id: c.id,
+    kind: 'user',
+    user_a_id: c.user_a_id,
+    user_b_id: c.user_b_id,
+    other_user_id: c.user_a_id === user.id ? c.user_b_id : c.user_a_id,
+    last_message_at: c.last_message_at,
+    created_at: c.created_at,
+    contextLabel: 'Direct message',
+    contextTitle: '',
+    contextHref: null,
+  }))
+
   // -------- Merge + sort --------
-  const conversations: ConvRow[] = [...gigConvs, ...listingConvs].sort((a, b) => {
+  const conversations: ConvRow[] = [...gigConvs, ...listingConvs, ...userConvs].sort((a, b) => {
     const at = a.last_message_at ?? a.created_at
     const bt = b.last_message_at ?? b.created_at
     return bt.localeCompare(at)
@@ -188,7 +234,19 @@ export default async function MessagesInboxPage() {
     listingMessages = (m as MsgRow[] | null) ?? []
   }
 
-  const allMessages = [...gigMessages, ...listingMessages]
+  const userConvIds = userConvs.map((c) => c.id)
+  let userMessages: MsgRow[] = []
+  if (userConvIds.length > 0) {
+    const { data: m } = await supabase
+      .from('user_messages')
+      .select('id, conversation_id, sender_user_id, body, read_at, created_at')
+      .in('conversation_id', userConvIds)
+      .order('created_at', { ascending: false })
+      .limit(500)
+    userMessages = (m as MsgRow[] | null) ?? []
+  }
+
+  const allMessages = [...gigMessages, ...listingMessages, ...userMessages]
 
   // Last message per conversation (messages already sorted desc, so first hit is latest)
   const lastByConv = new Map<string, MsgRow>()
@@ -212,7 +270,7 @@ export default async function MessagesInboxPage() {
   if (otherUserIds.length > 0) {
     const { data: workerProfiles } = await supabase
       .from('worker_profiles')
-      .select('user_id, first_name, last_name, username, avatar_url')
+      .select('user_id, full_name, username, avatar_url')
       .in('user_id', otherUserIds)
     for (const wp of (workerProfiles as WorkerProfile[] | null) ?? []) {
       workerProfilesById.set(wp.user_id, wp)
@@ -236,7 +294,7 @@ export default async function MessagesInboxPage() {
     let username: string | null = null
 
     if (wp) {
-      const full = `${wp.first_name ?? ''} ${wp.last_name ?? ''}`.trim()
+      const full = (wp.full_name ?? '').trim()
       if (full) name = full
       if (wp.avatar_url) avatarUrl = wp.avatar_url
       if (wp.username) username = wp.username
@@ -248,6 +306,9 @@ export default async function MessagesInboxPage() {
     let preferBusinessName = false
     if (c.kind === 'gig') {
       preferBusinessName = c.worker_user_id === user!.id
+    } else if (c.kind === 'user') {
+      // Direct message: just use the person's name, no business override
+      preferBusinessName = false
     } else {
       // listing conv: prefer business_name if available
       preferBusinessName = true
@@ -341,7 +402,9 @@ export default async function MessagesInboxPage() {
                         {name}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
-                        {c.contextLabel}: {c.contextTitle}
+                        {c.contextTitle
+                          ? `${c.contextLabel}: ${c.contextTitle}`
+                          : c.contextLabel}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
