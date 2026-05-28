@@ -9,7 +9,6 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import {
   DollarSign,
   Briefcase,
-  TrendingUp,
   Plus,
   Search,
   AlertCircle,
@@ -19,6 +18,11 @@ import {
   Sparkles,
   ArrowRight,
   Trophy,
+  Store,
+  Tag,
+  Package,
+  Hammer,
+  Users,
 } from 'lucide-react'
 
 // Always fetch fresh — this page IS about live data
@@ -648,15 +652,42 @@ export default async function HomePage() {
             </div>
 
             {/* GO TO — navigation hub into each area of the app */}
-            <div className="space-y-3">
+            <div className="space-y-5">
               <h2 className="text-sm font-semibold text-foreground">Go to</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <NavTile href="/gigs" icon={<Search className="w-5 h-5" />} title="Browse gigs" subtitle="Find work to pick up" />
-                <NavTile href="/my-gigs" icon={<Briefcase className="w-5 h-5" />} title="My gigs" subtitle="Work you're doing" />
-                <NavTile href="/flipper/post-gig" icon={<Plus className="w-5 h-5" />} title="Post a gig" subtitle="Get help on a project" />
-                <NavTile href="/marketplace" icon={<Sparkles className="w-5 h-5" />} title="Marketplace" subtitle="Buy & sell items" />
-                <NavTile href="/messages" icon={<MessageSquare className="w-5 h-5" />} title="Messages" subtitle="Your conversations" />
-                <NavTile href="/connections" icon={<TrendingUp className="w-5 h-5" />} title="Connections" subtitle="People you work with" />
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Gigs</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <NavTile href="/gigs" icon={<Search className="w-5 h-5" />} title="Browse gigs" subtitle="Find work to pick up" />
+                  <NavTile href="/my-gigs" icon={<Briefcase className="w-5 h-5" />} title="My gigs" subtitle="Work you're doing" />
+                  <NavTile href="/my-gigs/payouts" icon={<DollarSign className="w-5 h-5" />} title="Payouts" subtitle="Money you've earned" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Flipper</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <NavTile href="/flipper/post-gig" icon={<Plus className="w-5 h-5" />} title="Post a gig" subtitle="Get help on a project" />
+                  <NavTile href="/flipper/dashboard" icon={<ClipboardCheck className="w-5 h-5" />} title="My posted gigs" subtitle="Gigs you've posted" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Marketplace</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <NavTile href="/marketplace" icon={<Store className="w-5 h-5" />} title="Marketplace" subtitle="Buy & sell items" />
+                  <NavTile href="/marketplace/new" icon={<Tag className="w-5 h-5" />} title="List an item" subtitle="Put something up for sale" />
+                  <NavTile href="/marketplace/mine" icon={<Package className="w-5 h-5" />} title="My listings" subtitle="Items you're selling" />
+                  <NavTile href="/profile/worker/services" icon={<Hammer className="w-5 h-5" />} title="Services I offer" subtitle="Work you do for hire" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Connect</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <NavTile href="/messages" icon={<MessageSquare className="w-5 h-5" />} title="Messages" subtitle="Your conversations" />
+                  <NavTile href="/connections" icon={<Users className="w-5 h-5" />} title="Connections" subtitle="People you work with" />
+                </div>
               </div>
             </div>
 
