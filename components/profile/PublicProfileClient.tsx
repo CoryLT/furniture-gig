@@ -664,7 +664,7 @@ export function PublicProfileClient({
         {/* CTA — only for logged-out visitors */}
         {!loadingUser && !isLoggedIn && (
           <div className="card card-body text-center space-y-3 bg-secondary/50">
-            <p className="text-foreground font-medium">Looking for furniture flipping work?</p>
+            <p className="text-foreground font-medium">Looking for skilled help nearby?</p>
             <p className="text-sm text-muted-foreground">
               Sign up to claim gigs from {primaryName} and others in your area.
             </p>

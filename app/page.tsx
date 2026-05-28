@@ -46,18 +46,18 @@ export default async function HomePage() {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-16 pb-20 sm:pt-24 sm:pb-28 text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-medium font-mono mb-6">
               <Armchair className="w-3.5 h-3.5" strokeWidth={2} />
-              FURNITURE FLIPPING, MADE EASY
+              PROFITS, NOT PAYCHECKS
             </div>
             <h1 className="font-serif text-4xl sm:text-6xl leading-tight tracking-tight text-foreground mb-5">
-              Hire a flipper.
+              Hire help.
               <br />
-              <span className="text-accent">Or become one.</span>
+              <span className="text-accent">Or get hired.</span>
             </h1>
             <p className="max-w-2xl mx-auto text-base sm:text-lg text-muted-foreground mb-8 leading-relaxed">
-              FlipWork connects people who have furniture to flip with skilled
-              workers who do the flipping. Post a project, pick a worker, get
-              a refinished piece. Or sign up to work and get paid for projects
-              near you.
+              FlipWork is where working people take back control of their
+              income. Post a gig and hire skilled help, or pick up work near
+              you and get paid for what you do. Be a poster, a worker, or
+              both — it's your call.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link href="/auth/signup">
@@ -112,7 +112,7 @@ export default async function HomePage() {
                 number="1"
                 icon={<Hammer className="w-6 h-6" strokeWidth={1.5} />}
                 title="Post or apply"
-                body="Have furniture? Post a gig with photos, a budget, and a checklist. Want work? Browse gigs near you and apply to ones that match your skills."
+                body="Need something done? Post a gig with photos, a budget, and a checklist. Looking to earn? Browse gigs near you and apply to the ones that fit your skills."
               />
               <Step
                 number="2"
@@ -140,12 +140,12 @@ export default async function HomePage() {
                   <Armchair className="w-6 h-6" strokeWidth={1.5} />
                 </div>
                 <h3 className="font-serif text-2xl text-foreground mb-2">
-                  Got a piece to flip?
+                  Need to hire help?
                 </h3>
                 <p className="text-muted-foreground mb-6 leading-relaxed">
-                  Skip the weekend project. Post your gig, set your budget, and
-                  let a skilled flipper handle the sanding, staining, and
-                  finishing. You approve the final look before any money moves.
+                  Post your gig, set your budget, and bring on skilled local
+                  help to get it done. You approve the work before any money
+                  moves.
                 </p>
                 <Link href="/auth/signup?as=flipper">
                   <Button variant="default" size="default">
@@ -160,12 +160,13 @@ export default async function HomePage() {
                   <Hammer className="w-6 h-6" strokeWidth={1.5} />
                 </div>
                 <h3 className="font-serif text-2xl text-foreground mb-2">
-                  Want to flip for money?
+                  Want to earn on your terms?
                 </h3>
                 <p className="text-muted-foreground mb-6 leading-relaxed">
                   Turn your skills into income. Browse local gigs, apply to the
-                  ones you like, and get paid through Stripe when the work is
-                  approved. Build a profile and a portfolio over time.
+                  ones you want, and get paid through Stripe when the work is
+                  approved. Build a profile and a portfolio as you go — profits,
+                  not paychecks.
                 </p>
                 <Link href="/auth/signup?as=worker">
                   <Button variant="default" size="default">
@@ -210,10 +211,13 @@ export default async function HomePage() {
                       every single time.
                     </p>
                     <p>
-                      So I built somewhere better — a real place for buyers,
-                      sellers, and the workers who do the flipping. It's
-                      brand new, so we're still filling in. But every
-                      listing, every gig, and every dollar paid is real.
+                      So I built somewhere better — a real place for people to
+                      hire help, find work, and earn from what they create. It
+                      started with furniture flipping, but it's grown into
+                      something bigger: a platform for working people who'd
+                      rather build their own income than wait on a callback.
+                      It's brand new, so we're still filling in. But every gig
+                      and every dollar paid is real.
                     </p>
                   </div>
                 </div>
@@ -242,9 +246,9 @@ export default async function HomePage() {
               Plus a marketplace
             </h2>
             <p className="max-w-xl mx-auto text-muted-foreground mb-6 leading-relaxed">
-              Looking to buy a finished piece? Or sell one of yours?
-              FlipWork has a public marketplace where flippers list their
-              completed work for sale.
+              Looking to buy or sell? FlipWork has a public marketplace where
+              people list finished pieces for sale and offer their services to
+              neighbors nearby.
             </p>
             <Link href="/marketplace">
               <Button variant="outline" size="default">

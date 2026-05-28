@@ -26,15 +26,15 @@ const dmMono = DM_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL('https://myflipwork.com'),
   title: {
-    default: 'FlipWork — The marketplace for furniture flippers',
+    default: 'FlipWork — Profits, not paychecks',
     template: '%s · FlipWork',
   },
   description:
-    'The marketplace for furniture flippers. Post gigs, find work, get paid.',
+    'Where working people take back control of their income. Post gigs, find work, get paid.',
   openGraph: {
-    title: 'FlipWork — The marketplace for furniture flippers',
+    title: 'FlipWork — Profits, not paychecks',
     description:
-      'The marketplace for furniture flippers. Post gigs, find work, get paid.',
+      'Where working people take back control of their income. Post gigs, find work, get paid.',
     url: 'https://myflipwork.com',
     siteName: 'FlipWork',
     type: 'website',
@@ -44,15 +44,15 @@ export const metadata: Metadata = {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'FlipWork — The marketplace for furniture flippers. Post gigs, find work, get paid.',
+        alt: 'FlipWork — Profits, not paychecks. Post gigs, find work, get paid.',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'FlipWork — The marketplace for furniture flippers',
+    title: 'FlipWork — Profits, not paychecks',
     description:
-      'The marketplace for furniture flippers. Post gigs, find work, get paid.',
+      'Where working people take back control of their income. Post gigs, find work, get paid.',
     images: ['/og-image.png'],
   },
 }

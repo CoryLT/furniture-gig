@@ -247,7 +247,7 @@ export function PublicFlipperProfileClient({
 
         {/* CTA for workers */}
         <div className="card card-body text-center space-y-3 bg-secondary/50">
-          <p className="text-foreground font-medium">Looking for furniture flipping work?</p>
+          <p className="text-foreground font-medium">Looking for skilled help nearby?</p>
           <p className="text-sm text-muted-foreground">
             Sign up as a worker to claim gigs from {displayName} and others in your area.
           </p>

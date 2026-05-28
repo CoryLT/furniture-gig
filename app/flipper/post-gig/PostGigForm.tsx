@@ -335,7 +335,7 @@ export default function PostGigForm({ existingDraft }: Props) {
                 <label htmlFor="description" className="field-label">Full Description</label>
                 <textarea id="description" name="description" value={form.description}
                   onChange={handleChange} className="field-input min-h-[120px] resize-none"
-                  placeholder="Describe the furniture, condition, what needs to be done, any special requirements..."
+                  placeholder="Describe the gig — what needs doing, the condition of anything involved, and any details that matter..."
                   required />
               </div>
 
