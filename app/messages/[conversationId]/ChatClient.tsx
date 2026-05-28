@@ -287,6 +287,14 @@ export default function ChatClient({
     }
 
     setSending(false)
+
+    // Best-effort: ping the server to email the other participant about
+    // this new message. Fire-and-forget — never block or error the send.
+    fetch('/api/messages/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversationKind, conversationId }),
+    }).catch(() => {})
   }
 
   return (
