@@ -126,6 +126,12 @@ async function renderGigConversation({
     preferFlipperBusinessName: isWorker,
   })
 
+  const initialBlocked = await isBlockedByMe({
+    supabase,
+    myId: user.id,
+    otherUserId,
+  })
+
   // Load messages
   const { data: messages } = await supabase
     .from('gig_messages')
@@ -151,6 +157,7 @@ async function renderGigConversation({
         conversationId={conversation.id}
         conversationKind="gig"
         currentUserId={user.id}
+        initialBlocked={initialBlocked}
         otherUserId={otherUserId}
         otherName={otherName}
         otherAvatarUrl={otherAvatarUrl}
@@ -205,6 +212,12 @@ async function renderListingConversation({
     preferFlipperBusinessName: false,
   })
 
+  const initialBlocked = await isBlockedByMe({
+    supabase,
+    myId: user.id,
+    otherUserId,
+  })
+
   // Load the listing for the header
   const { data: listing } = await supabase
     .from('marketplace_listings')
@@ -234,6 +247,7 @@ async function renderListingConversation({
         conversationId={conversation.id}
         conversationKind="listing"
         currentUserId={user.id}
+        initialBlocked={initialBlocked}
         otherUserId={otherUserId}
         otherName={otherName}
         otherAvatarUrl={otherAvatarUrl}
@@ -291,6 +305,12 @@ async function renderUserConversation({
     .order('created_at', { ascending: true })
     .limit(200)
 
+  const initialBlocked = await isBlockedByMe({
+    supabase,
+    myId: user.id,
+    otherUserId,
+  })
+
   return (
     <div className="space-y-4">
       <Link
@@ -305,6 +325,7 @@ async function renderUserConversation({
         conversationId={conversation.id}
         conversationKind="user"
         currentUserId={user.id}
+        initialBlocked={initialBlocked}
         otherUserId={otherUserId}
         otherName={otherName}
         otherAvatarUrl={otherAvatarUrl}
@@ -330,6 +351,26 @@ async function renderUserConversation({
 // Tries worker_profiles, then flipper_profiles. For gig conversations
 // when the OTHER side is the flipper, we prefer business_name from
 // flipper_profiles if set.
+// Has the current user blocked the other user?
+async function isBlockedByMe({
+  supabase,
+  myId,
+  otherUserId,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any
+  myId: string
+  otherUserId: string
+}) {
+  const { data } = await supabase
+    .from('user_blocks')
+    .select('id')
+    .eq('blocker_user_id', myId)
+    .eq('blocked_user_id', otherUserId)
+    .maybeSingle()
+  return !!data
+}
+
 async function fetchOtherUser({
   supabase,
   otherUserId,
