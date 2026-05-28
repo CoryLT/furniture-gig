@@ -40,16 +40,10 @@ export async function POST(req: Request) {
     )
   }
 
-  // Confirm the other user actually exists
-  const { data: otherUser } = await supabase
-    .from('users')
-    .select('id')
-    .eq('id', otherUserId)
-    .maybeSingle<{ id: string }>()
-
-  if (!otherUser) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 })
-  }
+  // Note: we don't pre-check that otherUserId exists in the users table —
+  // RLS hides other users' rows from a normal caller, so that lookup would
+  // wrongly fail. The foreign keys on user_conversations enforce a real
+  // user ID at insert time instead.
 
   // Block check — either direction stops the conversation
   const { data: block } = await supabase
