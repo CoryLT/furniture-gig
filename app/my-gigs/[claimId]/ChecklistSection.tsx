@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useOptimistic } from 'react'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { CheckCircle2, Circle } from 'lucide-react'
 import type { GigChecklistItemRow, GigTaskCompletionRow } from '@/types/database'
@@ -15,6 +16,7 @@ interface Props {
 
 export default function ChecklistSection({ checklist, completionMap, userId, readOnly }: Props) {
   const supabase = createClient()
+  const router = useRouter()
 
   // Local state for completions
   const [localMap, setLocalMap] = useState<Map<string, boolean>>(() => {
@@ -49,16 +51,23 @@ export default function ChecklistSection({ checklist, completionMap, userId, rea
 
     const { error } = await supabase
       .from('gig_task_completions')
-      .upsert({
-        checklist_item_id: itemId,
-        worker_user_id: userId,
-        completed: next,
-        notes: notes.get(itemId) ?? '',
-      })
+      .upsert(
+        {
+          checklist_item_id: itemId,
+          worker_user_id: userId,
+          completed: next,
+          notes: notes.get(itemId) ?? '',
+        },
+        { onConflict: 'checklist_item_id,worker_user_id' }
+      )
 
     if (error) {
       // Revert
       setLocalMap((m) => new Map(m).set(itemId, current))
+    } else {
+      // Re-run the server component so the Submit button re-checks whether
+      // all required items are done (its data is loaded server-side).
+      router.refresh()
     }
     setSaving(null)
   }
@@ -69,12 +78,15 @@ export default function ChecklistSection({ checklist, completionMap, userId, rea
 
     await supabase
       .from('gig_task_completions')
-      .upsert({
-        checklist_item_id: itemId,
-        worker_user_id: userId,
-        completed: localMap.get(itemId) ?? false,
-        notes: notes.get(itemId) ?? '',
-      })
+      .upsert(
+        {
+          checklist_item_id: itemId,
+          worker_user_id: userId,
+          completed: localMap.get(itemId) ?? false,
+          notes: notes.get(itemId) ?? '',
+        },
+        { onConflict: 'checklist_item_id,worker_user_id' }
+      )
 
     setSaving(null)
   }
