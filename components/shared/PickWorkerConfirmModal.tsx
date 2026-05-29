@@ -4,6 +4,10 @@ import { useEffect } from 'react'
 import { CreditCard, Lock, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
+import {
+  calculatePaymentBreakdown,
+  DEFAULT_PLATFORM_FEE_PERCENT,
+} from '@/lib/payment-math'
 
 // ============================================================
 // PickWorkerConfirmModal
@@ -63,6 +67,11 @@ export default function PickWorkerConfirmModal({
 
   if (!open) return null
 
+  // Real charge breakdown: worker gets the full gig amount; the flipper pays
+  // the platform fee + card processing fee on top. This is the SAME math the
+  // server uses to charge the card, so the numbers shown here match exactly.
+  const b = calculatePaymentBreakdown(payAmount)
+
   // Format brand for display ("visa" -> "Visa")
   const brandLabel = savedCard?.brand
     ? savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1)
@@ -109,27 +118,46 @@ export default function PickWorkerConfirmModal({
             You're about to pick{' '}
             <span className="font-medium text-foreground">{workerName}</span>{' '}
             for <span className="font-medium text-foreground">{gigTitle}</span>.
-            We'll hold the gig amount on your card now. Money is{' '}
+            We'll place a hold on your card now. Money is{' '}
             <span className="font-medium">not</span> charged until you approve
             their finished work.
           </p>
 
-          {/* Amount row */}
-          <div className="rounded-md border border-border bg-background/60 p-3 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground">Amount to hold</p>
-              <p className="text-2xl font-semibold text-foreground tabular-nums mt-0.5">
-                {formatCurrency(payAmount)}
-              </p>
+          {/* Payment breakdown */}
+          <div className="rounded-md border border-border bg-background/60 p-3 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Worker receives</span>
+              <span className="font-medium text-foreground tabular-nums">
+                {formatCurrency(b.workerReceivesDollars)}
+              </span>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Payment</p>
-              <div className="flex items-center justify-end gap-1.5 mt-1">
-                <CreditCard className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">
-                  {brandLabel} •••• {last4}
-                </span>
-              </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                Platform fee ({DEFAULT_PLATFORM_FEE_PERCENT}%)
+              </span>
+              <span className="font-medium text-foreground tabular-nums">
+                {formatCurrency(b.platformFeeDollars)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Card processing fee</span>
+              <span className="font-medium text-foreground tabular-nums">
+                {formatCurrency(b.stripeFeeDollars)}
+              </span>
+            </div>
+            <div className="border-t border-border pt-2 flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">
+                Total hold
+              </span>
+              <span className="text-2xl font-semibold text-foreground tabular-nums">
+                {formatCurrency(b.grossDollars)}
+              </span>
+            </div>
+            <div className="flex items-center justify-end gap-1.5 pt-1">
+              <CreditCard className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">
+                {brandLabel} •••• {last4}
+              </span>
             </div>
           </div>
 
@@ -159,7 +187,7 @@ export default function PickWorkerConfirmModal({
             loading={loading}
             className="sm:w-auto w-full"
           >
-            Hold {formatCurrency(payAmount)} & pick
+            Hold {formatCurrency(b.grossDollars)} & pick
           </Button>
         </div>
       </div>

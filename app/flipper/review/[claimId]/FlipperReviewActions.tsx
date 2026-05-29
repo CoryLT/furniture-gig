@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
+import { calculatePaymentBreakdown } from '@/lib/payment-math'
 
 interface Props {
   claimId: string
@@ -23,6 +24,10 @@ export default function FlipperReviewActions({
   const supabase = createClient()
   const [loading, setLoading] = useState<'approve' | 'reject' | null>(null)
   const [error, setError] = useState('')
+
+  // Real charge: capturing the hold charges the full total (gig + your fee +
+  // card processing) and sends the worker the full gig amount.
+  const b = calculatePaymentBreakdown(payAmount)
 
   async function handleApprove() {
     setLoading('approve')
@@ -163,7 +168,8 @@ export default function FlipperReviewActions({
         <h3 className="font-sans font-semibold text-foreground">Review decision</h3>
         <p className="text-sm text-muted-foreground mt-1">
           Approving will charge your card{' '}
-          <strong>{formatCurrency(payAmount)}</strong> and send the worker their
+          <strong>{formatCurrency(b.grossDollars)}</strong> and send the worker
+          their full <strong>{formatCurrency(b.workerReceivesDollars)}</strong>{' '}
           payout automatically via Stripe. Rejecting sends the work back to the
           worker (the hold stays in place).
         </p>

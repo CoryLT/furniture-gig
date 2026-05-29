@@ -1,4 +1,5 @@
 import Stripe from 'stripe'
+import { calculatePaymentBreakdown as computeBreakdown } from './payment-math'
 
 // Build marker: 2026-05-25 live-mode cutover — forces cold start of cached Stripe client.
 
@@ -28,55 +29,16 @@ export function getPlatformFeePercent(): number {
 }
 
 /**
- * Calculate the full payment breakdown for a gig.
+ * Calculate the full payment breakdown for a gig, using the platform fee
+ * percent configured in the environment.
  *
- * Flipper pays: gig amount + Stripe fees on top.
- * Worker gets: full gig amount (paid as transfer).
+ * Flipper pays: gig amount + platform fee + Stripe fees on top.
+ * Worker gets: the FULL gig amount (paid as transfer).
  * Platform gets: configured % of the gig amount.
  *
- * All amounts are returned in CENTS (Stripe's unit).
+ * The math lives in lib/payment-math.ts so the confirm modal can reuse it
+ * on the client without pulling in the Stripe SDK. All amounts in CENTS.
  */
 export function calculatePaymentBreakdown(gigAmountDollars: number) {
-  const platformFeePercent = getPlatformFeePercent()
-
-  // The full amount the worker earns for the gig — they now receive ALL of this.
-  const gigAmountCents = Math.round(gigAmountDollars * 100)
-
-  // Platform's revenue: our % of the gig amount. The flipper pays this ON TOP —
-  // it is NOT deducted from the worker's pay anymore.
-  const platformFeeCents = Math.round((gigAmountCents * platformFeePercent) / 100)
-
-  // Stripe's processing fee (2.9% + 30¢ on US cards) is paid by the platform on
-  // the destination charge, so the flipper covers it on top too. Solve for the
-  // total charge so that, after Stripe takes its cut, the worker's full gig
-  // amount PLUS the platform fee still remain in the platform balance.
-  // total - (0.029 * total + 30) = gigAmountCents + platformFeeCents
-  // total = (gigAmountCents + platformFeeCents + 30) / 0.971
-  const grossCents = Math.ceil((gigAmountCents + platformFeeCents + 30) / 0.971)
-  const stripeFeeCents = grossCents - gigAmountCents - platformFeeCents
-
-  // Stripe transfers (grossCents - applicationFeeCents) to the worker. To pay the
-  // worker the FULL gig amount, we keep everything above it as the application
-  // fee; the platform then nets ~platformFeeCents after Stripe takes its cut.
-  const applicationFeeCents = grossCents - gigAmountCents
-
-  return {
-    // What the flipper is charged (in cents): gig + platform fee + Stripe fee
-    grossCents,
-    // What the worker receives (in cents) — now the FULL gig amount
-    workerReceivesCents: gigAmountCents,
-    // What Stripe collects as application_fee_amount (platform fee + Stripe fee)
-    applicationFeeCents,
-    // Stripe's processing fee (in cents)
-    stripeFeeCents,
-    // Platform's net revenue (in cents) — our cut
-    platformFeeCents,
-    // Original gig amount (in cents)
-    gigAmountCents,
-    // Helpful dollar versions for display
-    grossDollars: grossCents / 100,
-    workerReceivesDollars: gigAmountCents / 100,
-    stripeFeeDollars: stripeFeeCents / 100,
-    platformFeeDollars: platformFeeCents / 100,
-  }
+  return computeBreakdown(gigAmountDollars, getPlatformFeePercent())
 }
