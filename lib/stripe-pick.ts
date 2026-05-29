@@ -82,9 +82,9 @@ export async function authorizePickPayment(
   }
 
   // Create the PaymentIntent.
-  // - amount: what flipper pays (gig + Stripe processing fees on top)
-  // - application_fee_amount: our 2% cut, deducted before transfer to worker
-  // - transfer_data.destination: worker's Connect account (gets gig amount - 2%)
+  // - amount: what flipper pays (gig + our 2% + Stripe processing fees on top)
+  // - application_fee_amount: 2% cut + Stripe fee; what's left transfers to worker
+  // - transfer_data.destination: worker's Connect account (gets the FULL gig amount)
   // - capture_method: 'manual' → hold only, no money moves yet
   // - off_session + confirm: charge the saved card right now without user interaction
   try {
@@ -97,7 +97,7 @@ export async function authorizePickPayment(
         off_session: true,
         confirm: true,
         capture_method: 'manual',
-        application_fee_amount: breakdown.platformFeeCents,
+        application_fee_amount: breakdown.applicationFeeCents,
         transfer_data: {
           destination: input.workerStripeAccountId,
         },

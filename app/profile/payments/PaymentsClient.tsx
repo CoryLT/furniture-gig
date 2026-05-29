@@ -187,7 +187,7 @@ export default function PaymentsClient({ initial, hasWorkerProfile }: Props) {
               <div>
                 <h3 className="text-sm font-semibold text-slate-900">How payouts work</h3>
                 <p className="text-sm text-slate-600 mt-1">
-                  When a flipper picks you, their card is held for the gig amount. Once your work is approved, the money is automatically sent to your bank (minus a small platform fee).
+                  When a flipper picks you, their card is held for the gig amount. Once your work is approved, the full gig amount is automatically sent to your bank.
                 </p>
               </div>
             </div>
