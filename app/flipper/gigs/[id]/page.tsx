@@ -6,6 +6,8 @@ import { formatCurrency, formatDate, gigStatusClass, gigStatusLabel, claimStatus
 import { MapPin, Calendar, Wrench, ArrowLeft, User, Pencil, Check, StickyNote } from 'lucide-react'
 import OpenChatButton from '@/components/shared/OpenChatButton'
 import ApplicantActions from './ApplicantActions'
+import CancelPickButton from '@/components/shared/CancelPickButton'
+import ReinstateApplicantButton from '@/components/shared/ReinstateApplicantButton'
 import GigReferenceImages from '@/components/shared/GigReferenceImages'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import type { GigImageRow } from '@/types/database'
@@ -165,7 +167,9 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
   const renderApplicantCard = (
     claim: ClaimRow,
     showActions: boolean,
-    showReviewLink: boolean = false
+    showReviewLink: boolean = false,
+    showCancel: boolean = false,
+    showReinstate: boolean = false
   ) => {
     const wp = claim.worker_profiles
 
@@ -308,6 +312,12 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
             >
               Review work
             </Link>
+          )}
+          {showCancel && (
+            <CancelPickButton claimId={claim.id} workerName={workerName} />
+          )}
+          {showReinstate && (
+            <ReinstateApplicantButton claimId={claim.id} workerName={workerName} />
           )}
         </div>
       </div>
@@ -452,7 +462,7 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
       {activeClaim && !submittedClaim && (
         <div>
           <h2 className="text-lg font-semibold text-foreground mb-4">Picked worker</h2>
-          {renderApplicantCard(activeClaim, false)}
+          {renderApplicantCard(activeClaim, false, false, true)}
         </div>
       )}
 
@@ -486,7 +496,18 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
             Past applicants ({otherClaims.length})
           </summary>
           <div className="space-y-3 mt-4">
-            {otherClaims.map((claim) => renderApplicantCard(claim, false))}
+            {otherClaims.map((claim) =>
+              renderApplicantCard(
+                claim,
+                false,
+                false,
+                false,
+                gig.status === 'open' &&
+                  !activeClaim &&
+                  !submittedClaim &&
+                  (claim.status === 'rejected' || claim.status === 'cancelled')
+              )
+            )}
           </div>
         </details>
       )}
