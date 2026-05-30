@@ -17,8 +17,6 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 type WorkerProfile = {
-  first_name: string
-  last_name: string
   full_name: string | null
   city: string
   state: string
@@ -93,15 +91,13 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
   const { data: profilesRaw } = workerIds.length > 0
     ? await supabase
         .from('worker_profiles')
-        .select('user_id, first_name, last_name, full_name, city, state, username, bio, skills, avatar_url, stripe_charges_enabled, stripe_payouts_enabled')
+        .select('user_id, full_name, city, state, username, bio, skills, avatar_url, stripe_charges_enabled, stripe_payouts_enabled')
         .in('user_id', workerIds)
     : { data: [] }
 
   const profileByUserId = new Map<string, WorkerProfile>()
   for (const p of (profilesRaw ?? []) as any[]) {
     profileByUserId.set(p.user_id, {
-      first_name: p.first_name,
-      last_name: p.last_name,
       full_name: p.full_name ?? null,
       city: p.city,
       state: p.state,
@@ -173,14 +169,11 @@ export default async function FlipperGigDetailPage({ params }: { params: { id: s
   ) => {
     const wp = claim.worker_profiles
 
-    // Build the best display name from whatever we have. We try
-    // full_name first (newer field), then first+last, then @username,
-    // then a generic fallback. Trim to avoid lone leading/trailing
-    // spaces if one of first/last is missing.
-    const firstLast = wp ? `${wp.first_name ?? ''} ${wp.last_name ?? ''}`.trim() : ''
+    // Build the best display name from whatever we have. We use
+    // full_name first, then fall back to @username, then a generic
+    // label. (The old first_name/last_name columns are gone.)
     const workerName =
       wp?.full_name?.trim() ||
-      firstLast ||
       (wp?.username ? `@${wp.username}` : '') ||
       'Worker'
 
