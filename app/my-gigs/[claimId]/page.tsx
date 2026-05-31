@@ -5,6 +5,7 @@ import { MapPin, Calendar } from 'lucide-react'
 import ChecklistSection from './ChecklistSection'
 import PhotoSection from './PhotoSection'
 import SubmitSection from './SubmitSection'
+import ConfirmReceivedCard from '@/components/shared/ConfirmReceivedCard'
 import OpenChatButton from '@/components/shared/OpenChatButton'
 
 interface Props {
@@ -121,12 +122,14 @@ export default async function MyGigDetailPage({ params }: Props) {
         />
       )}
 
-      {isReadOnly && (
+      {claim.status === 'approved' && (
+        <ConfirmReceivedCard gigId={gig.id} amount={Number(gig.pay_amount)} />
+      )}
+
+      {isReadOnly && claim.status !== 'approved' && (
         <div className="card card-body text-center text-sm text-muted-foreground">
           {claim.status === 'submitted_for_review'
             ? 'Your work has been submitted and is awaiting review.'
-            : claim.status === 'approved'
-            ? '✓ This gig has been approved. Payment is being transferred to your bank through Stripe.'
             : 'This gig claim is closed.'}
         </div>
       )}
