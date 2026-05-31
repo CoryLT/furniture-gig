@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { MapPin, Calendar, ArrowLeft } from 'lucide-react'
 import FlipperReviewActions from './FlipperReviewActions'
+import PayWorkerCard from '@/components/shared/PayWorkerCard'
 import type { GigImageRow } from '@/types/database'
 
 // Always fetch fresh — claim status changes frequently in this flow.
@@ -289,7 +290,17 @@ export default async function FlipperReviewPage({ params }: Props) {
         />
       )}
 
-      {claimStatus !== 'submitted_for_review' && (
+      {claimStatus === 'approved' && (
+        <PayWorkerCard
+          gigId={(gig as any).id}
+          workerId={(claim as any).worker_user_id}
+          workerName={workerName}
+          amount={Number((gig as any).pay_amount)}
+          flipperUserId={user.id}
+        />
+      )}
+
+      {claimStatus !== 'submitted_for_review' && claimStatus !== 'approved' && (
         <div className="card card-body text-center text-sm text-muted-foreground">
           This submission has already been {claimStatus}.
         </div>
