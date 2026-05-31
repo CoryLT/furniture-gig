@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import type { GigRow, GigClaimRow } from '@/types/database'
@@ -27,8 +26,6 @@ export default function ClaimButton({
   hasActiveClaim,
   pendingApplicantCount,
   userId,
-  stripeReady,
-  stripeStarted,
 }: Props) {
   const router = useRouter()
   const supabase = createClient()
@@ -106,28 +103,9 @@ export default function ClaimButton({
     )
   }
 
-  // Block apply if worker's Stripe isn't fully set up
-  if (!stripeReady) {
-    return (
-      <div className="card card-body space-y-3">
-        <div>
-          <h3 className="font-sans font-semibold text-foreground">
-            {stripeStarted ? 'Finish Stripe setup to apply' : 'Set up payments to apply'}
-          </h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            {stripeStarted
-              ? "You started connecting Stripe but didn't finish. Wrap it up so you can get paid for this gig."
-              : 'Before you can apply, connect a Stripe account so we can pay you when this work is approved.'}
-          </p>
-        </div>
-        <Link href="/profile/payments">
-          <Button variant="accent" className="w-full sm:w-auto">
-            {stripeStarted ? 'Finish Stripe setup' : 'Set up payments'}
-          </Button>
-        </Link>
-      </div>
-    )
-  }
+  // Stripe pre-apply gate removed — workers no longer need a payment-processor
+  // account to apply. They add a pay handle (Cash App/Venmo/etc.) to their
+  // profile and get paid directly. (FlipWork is moving off Stripe.)
 
   // Available — show Apply button
   async function handleApply() {
