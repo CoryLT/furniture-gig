@@ -9,8 +9,8 @@
 
 - **App:** FlipWork — a two-sided platform for the flipping economy. People post gigs, claim gigs, sell items on a marketplace, and (new) advertise services they offer. Furniture was the origin; it's now "anything that can legally be flipped."
 - **Repo:** `github.com/CoryLT/furniture-gig` (code name stayed `furniture-gig`; brand is FlipWork).
-- **Stack:** Next.js 14.1 (App Router) · Supabase (Postgres + Auth + Storage) · Tailwind 3.3 · Stripe Connect · Resend (email) · Sightengine (image moderation) · Anthropic (AI support). Deployed on Vercel.
-- **Domain:** myflipwork.com (live, Stripe in live mode).
+- **Stack:** Next.js 14.1 (App Router) · Supabase (Postgres + Auth + Storage) · Tailwind 3.3 · Resend (email) · Sightengine (image moderation) · Anthropic (AI support). Deployed on Vercel.
+- **Domain:** myflipwork.com (live). **Payments are now direct & off-platform — Stripe removed. See Payments below.**
 - **Operating entity:** Groovy Greens, LLC (NC) d/b/a FlipWork. NC governing law, binding arbitration + class waiver in TOS.
 
 ---
@@ -54,12 +54,18 @@ After you push, Cory runs in VS Code: `git pull` → `git push` → waits ~45-60
 - Marketplace at `/marketplace`: post/edit/sell/hide items. Public feed.
 - **Landing/front door:** `/` is the public landing (`app/page.tsx`, founder note + photo). Logged-in post-auth landing and logo destination is `/home`. `/home` is a protected route (middleware redirects logged-out → `/auth/login`).
 
-**Payments (Stripe Connect, LIVE)**
-- Phase 1: workers connect a Stripe Express account before applying.
-- Phase 2: flipper saves a card (SetupIntent) when picking a worker.
-- Phase 3: authorize-on-pick — PaymentIntent holds funds (`capture_method: manual`), worker is `transfer_data.destination`, 2% `application_fee_amount`.
-- Phase 4: capture-on-approval at `/flipper/review/[claimId]` → captures hold, auto-transfers (amount − 2%) to worker.
-- Phase 7: webhook at `/api/stripe/webhook` — signature-verified, logs to `stripe_webhook_events` (idempotent), handles 8 event types, always 200 unless sig fails. Dashboard has ONE event destination scoped to "Connected accounts". Use `transfer.reversed` (not deprecated `transfer.failed`).
+**Payments (DIRECT PAY — Stripe REMOVED, May 31 pivot)**
+- **No processor, no fee, no holds.** FlipWork never touches gig money. The poster pays the worker **directly** on whatever app the worker already uses (Cash App, Venmo, PayPal, Zelle, or cash). The old 2%-per-gig fee is gone.
+- **Why:** Stripe forced workers through heavy onboarding (bank + ID) — a wall for low-tech, Cash-App-only workers (the 64-yo with the busted Android couldn't onboard). Free + direct kills that wall.
+- **The live flow:**
+  1. Worker saves their pay handle on `/profile` ("How you get paid" — `components/profile/PayoutHandlesSection.tsx`).
+  2. Worker applies — no Stripe wall.
+  3. Poster picks the worker — no card, no hold (pick route gutted to just the `approve_applicant` RPC).
+  4. Worker does checklist + photos → "Submit for review."
+  5. Poster **approves the work** (no charge) at `/flipper/review/[claimId]` → a **"Pay [worker]" card** (`components/shared/PayWorkerCard.tsx`) shows the handle + amount + "Mark as paid" (Cash App/Venmo/PayPal/Zelle/Cash).
+  6. Worker taps **"Did you get paid?"** (`components/shared/ConfirmReceivedCard.tsx`) → confirms → both sides show "Paid & confirmed."
+- **New tables:** `worker_payout_handles` (worker's pay-app handles; RLS-gated so only a booked poster can read them) and `gig_payments` (one row per gig: `marked_paid_at` + `worker_confirmed_at` = the two-sided handshake). SQL: `schema_worker_payout_handles_20260530.sql`, `schema_gig_payments_20260530.sql` (both run).
+- **Stripe is NOT yet removed from the codebase** — lots of dormant Stripe code remains. See the "Stripe / PayPal removal" section. One live landmine: the **admin** review path (`app/admin/review/[claimId]/ReviewActions.tsx`) still calls the dead `capture-payment` route.
 
 **Other shipped**
 - AI support chat at `/support` (Haiku 4.5; reads user's own gigs/payouts/Stripe; escalates; admin queue at `/admin/support`).
@@ -130,12 +136,64 @@ Workers advertise up to 10 services on their public profile.
 
 ---
 
+## Stripe / PayPal removal — cleanup list (May 31 pivot)
+
+The live flow is Stripe-free, but old Stripe code still sits dormant in the repo.
+It isn't breaking the live flow; sweep it when convenient.
+
+**Delete entirely (dead, nothing live uses them):**
+- API routes: `app/api/stripe/capture-payment/`, `app/api/stripe/connect/*`, `app/api/stripe/payment-method/*`, `app/api/stripe/webhook/`, `app/api/stripe/health/`, `app/api/paypal/health/`
+- Libs: `lib/stripe.ts`, `lib/stripe-capture.ts`, `lib/stripe-pick.ts`, `lib/stripe-webhook-handlers.ts`, `lib/payment-math.ts`, `lib/paypal.ts`
+- Worker Connect onboarding UI: `app/profile/payments/` (page, PaymentsClient, return/page)
+- Components: `components/profile/ProfilePaymentsSection.tsx`, `components/shared/AddPaymentMethodModal.tsx`, `components/shared/PickWorkerConfirmModal.tsx`
+- Old payout admin pages: `app/admin/payouts/page.tsx`, `app/admin/payouts/PayoutRow.tsx` (old `payout_records` flow; new flow uses `gig_payments`)
+
+**Keep — still used, just Stripe-named:**
+- `app/api/stripe/pick-worker/route.ts` — now only calls `approve_applicant` (no Stripe). The "pick" path.
+- `app/api/stripe/cancel-pick/route.ts` + `components/shared/CancelPickButton.tsx` — the "un-pick / reopen" path (use it for the no-show button).
+
+**Edit to remove Stripe bits (file stays):**
+- ⚠️ `app/admin/review/[claimId]/ReviewActions.tsx` — **still calls the dead `capture-payment` route. Fix this first** (approve = no charge, like the flipper review), or retire the path.
+- `app/flipper/gigs/[id]/page.tsx` — reads `stripe_*` columns for display; harmless until columns dropped.
+- `app/gigs/[slug]/page.tsx` + `ClaimButton.tsx` — leftover Stripe props from the old apply-gate.
+- `app/u/[username]/page.tsx`, `app/page.tsx`, `components/shared/VerifiedBadge.tsx` — verified-badge refs (badge is parked).
+- `app/api/gigs/[id]/delete/route.ts` — cleans up Stripe rows on delete; simplify.
+- Minor text refs: `lib/agreements-gate.ts`, `lib/support-prompt.ts`, `lib/support-tools.ts`.
+
+**DB columns — do LAST, carefully:** drop the `stripe_*` columns only AFTER re-pointing `is_user_verified` (currently Stripe-derived). Dropping early breaks the "edit" files above until they're scrubbed. Leaving them is harmless.
+
+**Doc discrepancy to reconcile:** the "watch out" note below says `worker_profiles` uses `full_name`, but `supabase/schema.sql` and several SQL helpers use `first_name`/`last_name` (and the flipper review page reads first/last with a safe "Worker" fallback). Confirm which is actually live before relying on either.
+
+---
+
 ## What's next (candidates, not committed)
+
+**From the May 31 payments pivot — do these first:**
+
+1. **Stripe / PayPal cleanup** — sweep the dormant code (full list in the next section). **Start by fixing the admin `ReviewActions.tsx` capture call** — it's the only live landmine.
+2. **Ratings & reputation** — NEW build, nothing exists yet. Trust comes from track record now (e.g. "completed 47 gigs, all confirmed paid"). This is the **keystone** — the badge and no-show handling both lean on it. Needs a spec first.
+3. **Verified badge** — currently parked/hidden (it ran on Stripe only). Bring back as a track-record badge (from #2) + an optional ID check (good for in-home safety). Lean on history/ID, not photos.
+4. **No-show button** — "worker didn't show → reopen the gig" (the un-pick plumbing already exists: `cancel-pick` + `CancelPickButton`). Later, count a no-show against the worker's record (ties to #2). Low priority; not a money issue anymore.
+5. **Monetization** — later, NOT a cut of payments: a flat fee to unlock a new worker connection + an optional business subscription (records/crew/tax exports). Workers always free. Charge nothing during the test phase.
+
+**Pre-pivot candidates (still valid):**
 
 1. **Admin screen to review `message_reports`** — reports are being filed with nowhere to view/action them. Highest-value loose end.
 2. **Blocked-users management page** — see/unblock all blocks in one place (currently only from inside a thread).
 3. **Browse services by category** — the real "find everyone who offers Delivery near me" experience; the proper home for category discovery (search is text-only). Data model already supports it.
 4. **Minor cleanup:** notify route should use `getSiteUrl()` instead of hardcoded domain. Place the existing image-report and listing-report buttons + build their admin queues (backends exist, UI doesn't).
+
+---
+
+## This session (May 31, 2026) — summary
+
+The big payments pivot. **Dropped Stripe and the 2% fee entirely**; payments are now free, direct, and off-platform, closed by a two-sided handshake. Built and pushed (live test pending):
+- Removed the Stripe apply-gate so workers apply with no onboarding.
+- `worker_payout_handles` table + `PayoutHandlesSection` ("How you get paid").
+- Hold-free picking (pick route gutted to the `approve_applicant` RPC; dropped the card/hold modals).
+- `gig_payments` table + `PayWorkerCard` (poster approves work → pays direct → marks paid) + `ConfirmReceivedCard` (worker confirms receipt).
+- Decisions logged: monetization moves to a flat connection fee + later business subscription (not a payment cut); verified badge parked; no-show is no longer a money problem (just reopen the gig).
+- **Not done:** the dormant-Stripe-code cleanup (see the cleanup list above) — the only live landmine is the admin `ReviewActions.tsx` capture call.
 
 ---
 
