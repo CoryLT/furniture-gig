@@ -10,7 +10,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { PhotoUploadForm } from '@/components/ui/PhotoUploadForm';
 import { PhotoGallery, type GalleryPhoto } from '@/components/ui/PhotoGallery';
-import ProfilePaymentsSection from '@/components/profile/ProfilePaymentsSection';
+import PayoutHandlesSection from '@/components/profile/PayoutHandlesSection';
 import { compressImageForUpload } from '@/lib/imageCompression';
 
 export default function ProfilePage() {
@@ -542,8 +542,8 @@ export default function ProfilePage() {
           </form>
         </div>
 
-        {/* Payments — Stripe Connect status */}
-        <ProfilePaymentsSection />
+        {/* How you get paid — direct pay handles (Cash App/Venmo/etc.) */}
+        <PayoutHandlesSection />
 
         {/* Work Samples Gallery — separate card so it has its own context */}
         <div className="bg-white rounded-lg shadow p-8 mt-6">
