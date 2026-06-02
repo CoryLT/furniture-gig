@@ -96,17 +96,23 @@ export default async function CrewPage() {
   // 5) My existing private notes/ratings for these workers.
   const { data: noteRaw } = await supabase
     .from('crew_members')
-    .select('worker_user_id, rating, notes, would_rehire')
+    .select('worker_user_id, rating, notes, would_rehire, hidden')
     .eq('operator_user_id', me)
   const noteById: Record<
     string,
-    { rating: number | null; notes: string; would_rehire: boolean | null }
+    {
+      rating: number | null
+      notes: string
+      would_rehire: boolean | null
+      hidden: boolean
+    }
   > = {}
   for (const n of (noteRaw ?? []) as any[]) {
     noteById[n.worker_user_id] = {
       rating: n.rating ?? null,
       notes: n.notes ?? '',
       would_rehire: n.would_rehire ?? null,
+      hidden: n.hidden ?? false,
     }
   }
 
@@ -124,9 +130,13 @@ export default async function CrewPage() {
         rating: note?.rating ?? null,
         notes: note?.notes ?? '',
         wouldRehire: note?.would_rehire ?? null,
+        hidden: note?.hidden ?? false,
       }
     })
     .sort((a, b) => b.jobs - a.jobs)
+
+  const visible = crew.filter((c) => !c.hidden)
+  const removed = crew.filter((c) => c.hidden)
 
   return (
     <div className="space-y-8">
@@ -146,7 +156,7 @@ export default async function CrewPage() {
           </p>
         </div>
       ) : (
-        <CrewList operatorId={me} crew={crew} />
+        <CrewList operatorId={me} crew={visible} removed={removed} />
       )}
     </div>
   )

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Star, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Star, ThumbsUp, ThumbsDown, Trash2, RotateCcw } from 'lucide-react'
 
 type CrewRow = {
   workerId: string
@@ -22,15 +22,31 @@ type CrewRow = {
 export default function CrewList({
   operatorId,
   crew,
+  removed,
 }: {
   operatorId: string
   crew: CrewRow[]
+  removed: CrewRow[]
 }) {
   return (
-    <div className="space-y-4">
-      {crew.map((c) => (
-        <CrewCard key={c.workerId} operatorId={operatorId} row={c} />
-      ))}
+    <div className="space-y-6">
+      {crew.length === 0 ? (
+        <div className="card card-body text-center py-12">
+          <p className="text-sm text-muted-foreground">
+            Everyone has been removed from your list. Restore someone below to bring them back.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {crew.map((c) => (
+            <CrewCard key={c.workerId} operatorId={operatorId} row={c} />
+          ))}
+        </div>
+      )}
+
+      {removed.length > 0 && (
+        <RemovedSection operatorId={operatorId} removed={removed} />
+      )}
     </div>
   )
 }
@@ -47,6 +63,19 @@ function initials(name: string) {
   )
 }
 
+async function setHidden(operatorId: string, workerId: string, hidden: boolean) {
+  const supabase = createClient()
+  return (supabase.from('crew_members') as any).upsert(
+    {
+      operator_user_id: operatorId,
+      worker_user_id: workerId,
+      hidden,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'operator_user_id,worker_user_id' }
+  )
+}
+
 function CrewCard({ operatorId, row }: { operatorId: string; row: CrewRow }) {
   const router = useRouter()
   const supabase = createClient()
@@ -56,6 +85,7 @@ function CrewCard({ operatorId, row }: { operatorId: string; row: CrewRow }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [removing, setRemoving] = useState(false)
 
   async function save() {
     setSaving(true)
@@ -79,6 +109,22 @@ function CrewCard({ operatorId, row }: { operatorId: string; row: CrewRow }) {
     }
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
+    router.refresh()
+  }
+
+  async function remove() {
+    const ok = window.confirm(
+      `Remove ${row.name} from your crew list?\n\nTheir work history is kept and you can restore them later.`
+    )
+    if (!ok) return
+    setRemoving(true)
+    setError('')
+    const { error: err } = await setHidden(operatorId, row.workerId, true)
+    setRemoving(false)
+    if (err) {
+      setError('Could not remove. Try again.')
+      return
+    }
     router.refresh()
   }
 
@@ -174,14 +220,81 @@ function CrewCard({ operatorId, row }: { operatorId: string; row: CrewRow }) {
         <p className="text-xs text-muted-foreground mt-1">Only you can see this.</p>
       </div>
 
-      {/* Save */}
-      <div className="flex items-center gap-3">
+      {/* Actions */}
+      <div className="flex items-center gap-3 flex-wrap">
         <Button variant="accent" onClick={save} disabled={saving}>
           {saving ? 'Saving…' : 'Save'}
         </Button>
         {saved && <span className="text-sm text-green-600">Saved ✓</span>}
         {error && <span className="text-sm text-red-600">{error}</span>}
+        <button
+          type="button"
+          onClick={remove}
+          disabled={removing}
+          className="ml-auto inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-red-600 transition-colors disabled:opacity-50"
+        >
+          <Trash2 className="w-4 h-4" />
+          {removing ? 'Removing…' : 'Remove'}
+        </button>
       </div>
+    </div>
+  )
+}
+
+function RemovedSection({
+  operatorId,
+  removed,
+}: {
+  operatorId: string
+  removed: CrewRow[]
+}) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  async function restore(workerId: string) {
+    setBusyId(workerId)
+    const { error: err } = await setHidden(operatorId, workerId, false)
+    setBusyId(null)
+    if (!err) router.refresh()
+  }
+
+  return (
+    <div className="pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {open ? 'Hide' : 'Show'} removed ({removed.length})
+      </button>
+
+      {open && (
+        <div className="mt-3 space-y-2">
+          {removed.map((c) => (
+            <div key={c.workerId} className="card card-body flex items-center gap-3 py-3">
+              <div className="w-9 h-9 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-sm font-semibold shrink-0">
+                {initials(c.name)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {c.jobs} job{c.jobs === 1 ? '' : 's'} · ${c.paid.toFixed(2)} paid
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => restore(c.workerId)}
+                disabled={busyId === c.workerId}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border border-border text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                <RotateCcw className="w-4 h-4" />
+                {busyId === c.workerId ? 'Restoring…' : 'Restore'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
