@@ -672,20 +672,20 @@ export default async function HomePage() {
               <h2 className="text-sm font-semibold text-foreground">Go to</h2>
 
               <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Gigs</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <NavTile href="/gigs" icon={<Search className="w-5 h-5" />} title="Browse gigs" subtitle="Find work to pick up" />
-                  <NavTile href="/my-gigs" icon={<Briefcase className="w-5 h-5" />} title="My gigs" subtitle="Work you're doing" />
-                  <NavTile href="/my-gigs/payouts" icon={<DollarSign className="w-5 h-5" />} title="Payouts" subtitle="Money you've earned" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Flipper</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <NavTile href="/flipper/post-gig" icon={<Plus className="w-5 h-5" />} title="Post a gig" subtitle="Get help on a project" />
                   <NavTile href="/flipper/dashboard" icon={<ClipboardCheck className="w-5 h-5" />} title="My posted gigs" subtitle="Gigs you've posted" />
                   <NavTile href="/flipper/payouts" icon={<DollarSign className="w-5 h-5" />} title="Payouts" subtitle="Money you've spent" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Gigs</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <NavTile href="/gigs" icon={<Search className="w-5 h-5" />} title="Browse gigs" subtitle="Find work to pick up" />
+                  <NavTile href="/my-gigs" icon={<Briefcase className="w-5 h-5" />} title="My gigs" subtitle="Work you're doing" />
+                  <NavTile href="/my-gigs/payouts" icon={<DollarSign className="w-5 h-5" />} title="Payouts" subtitle="Money you've earned" />
                 </div>
               </div>
 
