@@ -6,6 +6,7 @@ import ActivityChart from '@/components/home/ActivityChart'
 import { WelcomeModal } from '@/components/shared/WelcomeModal'
 import { lastNDays, isoDayOf, buildBuckets } from '@/lib/home-dashboard'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import BusinessSetupCard from './BusinessSetupCard'
 import {
   DollarSign,
   Briefcase,
@@ -62,6 +63,14 @@ export default async function HomePage() {
     .select('business_name, username')
     .eq('user_id', user.id)
     .maybeSingle()).data
+
+  const { data: businessProfile } = await supabase
+    .from('business_profiles')
+    .select(
+      'business_name, structure, business_state, ein, bank_name, bookkeeping_tool, contractor_paperwork_ready'
+    )
+    .eq('user_id', user.id)
+    .maybeSingle()
 
   const publicUsername =
     (workerProfile as any)?.username || (flipperProfile as any)?.username || null
@@ -522,6 +531,9 @@ export default async function HomePage() {
             <p className="text-muted-foreground mt-1 text-sm">{todayLabel}</p>
           </div>
         </div>
+
+        {/* Business setup → business-at-a-glance */}
+        <BusinessSetupCard userId={user.id} initial={businessProfile as any} />
 
         {/* Brand-new user welcome */}
         {isBrandNew ? (
