@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import ExportButton from './ExportButton'
 
 // Records reflect live payment data — always fresh.
 export const dynamic = 'force-dynamic'
@@ -131,13 +132,30 @@ export default async function RecordsPage({
   const grandTotal = workers.reduce((s, w) => s + w.total, 0)
   const flagged = workers.filter((w) => w.flag).length
 
+  // Flat one-row-per-payment list for the CSV export.
+  const exportRows = workers.flatMap((w) =>
+    w.lines.map((l) => ({
+      worker: w.name,
+      username: w.username ?? '',
+      date: l.date,
+      gig: l.gig,
+      method: l.method,
+      amount: l.amount,
+    }))
+  )
+
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl text-foreground">Payment Records</h1>
-        <p className="text-muted-foreground mt-1">
-          What you paid each worker, by year — for your own books and tax time.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl text-foreground">Payment Records</h1>
+          <p className="text-muted-foreground mt-1">
+            What you paid each worker, by year — for your own books and tax time.
+          </p>
+        </div>
+        {workers.length > 0 && (
+          <ExportButton year={selectedYear} rows={exportRows} />
+        )}
       </div>
 
       {/* Year selector */}
