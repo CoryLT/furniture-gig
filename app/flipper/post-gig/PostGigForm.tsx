@@ -224,7 +224,7 @@ export default function PostGigForm({ existingDraft }: Props) {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl text-foreground">Post a Gig</h1>
+        <h1 className="text-3xl text-foreground">Post a Job</h1>
         <p className="text-muted-foreground mt-1">
           {step === 'details'
             ? 'Describe the project and what you need help with.'
@@ -243,8 +243,8 @@ export default function PostGigForm({ existingDraft }: Props) {
                   Picking up where you left off
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  You have an unfinished draft: <span className="font-medium text-foreground">{existingDraft.title || 'Untitled gig'}</span>.
-                  Add photos below and hit <span className="font-medium text-foreground">Finish &amp; post gig</span> to make it live,
+                  You have an unfinished draft: <span className="font-medium text-foreground">{existingDraft.title || 'Untitled job'}</span>.
+                  Add photos below and hit <span className="font-medium text-foreground">Finish &amp; post job</span> to make it live,
                   or start over.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -278,7 +278,7 @@ export default function PostGigForm({ existingDraft }: Props) {
               : 'bg-stone-100 text-muted-foreground'}`}>
             {step === 'photos' ? <Check className="h-4 w-4" /> : '1'}
           </div>
-          <span>Gig details</span>
+          <span>Job details</span>
         </div>
         <ChevronRight className="h-4 w-4 text-stone-300" />
         <div className={`flex items-center gap-2 ${step === 'photos' ? 'text-foreground' : 'text-muted-foreground'}`}>
@@ -423,7 +423,7 @@ export default function PostGigForm({ existingDraft }: Props) {
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
             <p className="text-sm text-muted-foreground">
-              Photos save as soon as they upload. Your gig isn&apos;t live until you hit Finish &amp; post.
+              Photos save as soon as they upload. Your job isn&apos;t live until you hit Finish &amp; post.
             </p>
             <Button
               type="button"
@@ -432,7 +432,7 @@ export default function PostGigForm({ existingDraft }: Props) {
               disabled={discarding}
               onClick={handleFinish}
             >
-              Finish & post gig
+              Finish & post job
             </Button>
           </div>
         </div>

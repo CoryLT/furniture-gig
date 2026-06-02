@@ -85,9 +85,9 @@ export default async function FlipperDashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl text-foreground">My Posted Gigs</h1>
+          <h1 className="text-3xl text-foreground">My Jobs</h1>
           <p className="text-muted-foreground mt-1">
-            Manage gigs you&apos;ve posted
+            Post jobs and put your crew to work
           </p>
         </div>
         <Link
@@ -95,7 +95,7 @@ export default async function FlipperDashboardPage() {
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Post a Gig
+          Post a Job
         </Link>
       </div>
 
@@ -111,7 +111,7 @@ export default async function FlipperDashboardPage() {
             </div>
             <div className="flex-1">
               <p className="font-semibold text-foreground">
-                {gigsNeedingReview} gig{gigsNeedingReview === 1 ? '' : 's'} need
+                {gigsNeedingReview} job{gigsNeedingReview === 1 ? '' : 's'} need
                 {gigsNeedingReview === 1 ? 's' : ''} your review
               </p>
               <p className="text-sm text-muted-foreground">
@@ -126,22 +126,22 @@ export default async function FlipperDashboardPage() {
 
       {/* Gig list */}
       <div id="your-gigs" className="scroll-mt-4">
-        <h2 className="text-lg font-semibold text-foreground mb-4">Your Gigs</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-4">Your Jobs</h2>
 
         {gigs.length === 0 ? (
           <div className="card card-body text-center py-16 space-y-3">
             <p className="text-lg text-muted-foreground">
-              You haven&apos;t posted any gigs yet.
+              You haven&apos;t posted any jobs yet.
             </p>
             <p className="text-sm text-muted-foreground">
-              Post your first gig to find local workers.
+              Post your first job to put your crew to work.
             </p>
             <Link
               href="/flipper/post-gig"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent/90 transition-colors mt-2"
             >
               <Plus className="w-4 h-4" />
-              Post your first gig
+              Post your first job
             </Link>
           </div>
         ) : (
