@@ -27,6 +27,7 @@ const userLinks: NavItem[] = [
   { href: '/flipper/post-gig', label: 'Post a Gig' },
   { href: '/flipper/dashboard', label: 'My Posted Gigs' },
   { href: '/flipper/crew', label: 'My Crew' },
+  { href: '/flipper/records', label: 'Payment Records' },
   { divider: true },
   { href: '/marketplace', label: 'Marketplace' },
   { href: '/marketplace/new', label: 'List an Item' },
