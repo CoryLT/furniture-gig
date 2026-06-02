@@ -26,6 +26,7 @@ const userLinks: NavItem[] = [
   { divider: true },
   { href: '/flipper/post-gig', label: 'Post a Job' },
   { href: '/flipper/dashboard', label: 'My Jobs' },
+  { href: '/flipper/pipeline', label: 'Pipeline' },
   { href: '/flipper/crew', label: 'My Crew' },
   { href: '/flipper/records', label: 'Payment Records' },
   { divider: true },
