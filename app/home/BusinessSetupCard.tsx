@@ -126,7 +126,7 @@ const ITEMS: ItemDef[] = [
     title: 'Contractor paperwork',
     blurb:
       'Before you pay a worker, collect a W-9 and use a simple independent-contractor agreement. It protects you and makes your 1099s painless at tax time.',
-    link: { href: 'https://www.irs.gov/forms-pubs/about-form-w-9', text: 'Form W-9 (IRS)' },
+    link: { href: 'https://www.irs.gov/pub/irs-pdf/fw9.pdf', text: 'Print the W-9 form (PDF)' },
     inputs: [{ kind: 'check', field: 'contractor_paperwork_ready', label: 'I collect W-9s and use a contractor agreement' }],
     isDone: (p) => p.contractor_paperwork_ready === true,
     summary: () => 'Ready',
