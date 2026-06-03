@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { MessageCircle } from 'lucide-react'
 import ConversationRow from './ConversationRow'
+import EnableNotificationsButton from '@/components/notifications/EnableNotificationsButton'
 
 // ----- Types -----
 
@@ -331,6 +332,9 @@ export default async function MessagesInboxPage({
           </p>
         </div>
       </div>
+
+      {/* Push notifications opt-in */}
+      <EnableNotificationsButton />
 
       {/* Tabs */}
       <div className="flex items-center gap-2 text-sm">

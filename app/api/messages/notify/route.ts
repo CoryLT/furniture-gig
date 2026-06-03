@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
+import { sendPushToUser } from '@/lib/push'
 
 // POST /api/messages/notify
 // Body: { conversationKind: 'gig' | 'listing' | 'user', conversationId: string }
@@ -75,17 +76,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, reason: 'no_recipient' })
   }
 
-  // Look up the recipient's email + the sender's display name.
-  const { data: recipientRow } = await supabase
-    .from('users')
-    .select('email' as any)
-    .eq('id', recipientId)
-    .maybeSingle()
-  const recipientEmail = (recipientRow as any)?.email as string | null
-  if (!recipientEmail) {
-    return NextResponse.json({ ok: false, reason: 'no_email' })
-  }
-
   // Sender's name (best effort: worker_profiles.full_name, else "Someone")
   const { data: senderProfile } = await supabase
     .from('worker_profiles')
@@ -94,6 +84,28 @@ export async function POST(req: Request) {
     .maybeSingle<{ full_name: string }>()
   const senderName =
     (senderProfile?.full_name || '').trim() || 'Someone'
+
+  // Buzz the recipient's phone (Web Push). Best-effort and independent of
+  // email — it fires even if they have no email on file. Having a saved push
+  // subscription IS the opt-in, so there's no extra preference gate here.
+  await sendPushToUser({
+    userId: recipientId,
+    title: 'New message',
+    body: `${senderName} sent you a message`,
+    url: `/messages/${conversationId}`,
+    tag: `conv-${conversationId}`,
+  })
+
+  // Look up the recipient's email for the email notification.
+  const { data: recipientRow } = await supabase
+    .from('users')
+    .select('email' as any)
+    .eq('id', recipientId)
+    .maybeSingle()
+  const recipientEmail = (recipientRow as any)?.email as string | null
+  if (!recipientEmail) {
+    return NextResponse.json({ ok: true, push: true, email: false })
+  }
 
   const messagesUrl = `https://myflipwork.com/messages/${conversationId}`
 
