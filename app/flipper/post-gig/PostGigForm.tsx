@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -66,6 +66,24 @@ export default function PostGigForm({ existingDraft }: Props) {
   const [loading, setLoading] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [discarding, setDiscarding] = useState(false)
+  // Whether publishing also drops a piece into the Pipeline. Default on, but we
+  // remember the flipper's last choice so pipeline-skippers aren't re-nagged.
+  const [addToPipeline, setAddToPipeline] = useState(true)
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('fw_add_to_pipeline') === '0') {
+        setAddToPipeline(false)
+      }
+    } catch {}
+  }, [])
+
+  function toggleAddToPipeline(checked: boolean) {
+    setAddToPipeline(checked)
+    try {
+      localStorage.setItem('fw_add_to_pipeline', checked ? '1' : '0')
+    } catch {}
+  }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
@@ -186,7 +204,7 @@ export default function PostGigForm({ existingDraft }: Props) {
     // If this call actually flipped a draft to open (published is non-null),
     // drop a matching piece into the pipeline so it's tracked from day one.
     // Best-effort: a failure here must never trap the flipper on this screen.
-    if (published) {
+    if (published && addToPipeline) {
       try {
         const {
           data: { user },
@@ -444,6 +462,21 @@ export default function PostGigForm({ existingDraft }: Props) {
           />
 
           {error && <p className="text-sm text-destructive">{error}</p>}
+
+          <label className="flex items-start gap-2.5 text-sm cursor-pointer select-none pt-2">
+            <input
+              type="checkbox"
+              checked={addToPipeline}
+              onChange={(e) => toggleAddToPipeline(e.target.checked)}
+              className="mt-0.5 rounded border-border accent-accent"
+            />
+            <span>
+              <span className="font-medium text-foreground">Add this to my Pipeline</span>
+              <span className="block text-muted-foreground text-xs">
+                Creates a piece in your Pipeline to track this from sourced through to sold.
+              </span>
+            </span>
+          </label>
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
             <p className="text-sm text-muted-foreground">
