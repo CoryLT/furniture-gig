@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -189,19 +188,9 @@ export default function BusinessSetupCard({
   if (loadingInitial) return null
 
   // Where this card lives depends on whether the business is set up:
-  //  - dashboard: prompts until set up, then steps aside (info moves to settings)
+  //  - dashboard: prompts until set up, then disappears entirely (info is in settings)
   //  - settings:  appears only once set up, as the editable home for the info
-  if (mode === 'dashboard' && allDone && !editingAll) {
-    return (
-      <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-        <Check className="w-4 h-4 text-accent shrink-0" />
-        <span>Business set up.</span>
-        <Link href="/profile" className="text-accent hover:underline">
-          Manage it in Account Settings
-        </Link>
-      </div>
-    )
-  }
+  if (mode === 'dashboard' && allDone && !editingAll) return null
   if (mode === 'settings' && !allDone && !editingAll) return null
 
   // Completed state: business at a glance (unless they chose to edit).
