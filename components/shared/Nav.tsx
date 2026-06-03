@@ -320,7 +320,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white border border-stone-200 rounded-lg shadow-lg py-1 z-50">
+              <div className="absolute right-0 mt-2 w-56 max-h-[calc(100vh-5rem)] overflow-y-auto overscroll-contain bg-white border border-stone-200 rounded-lg shadow-lg py-1 z-50">
                 {getPublicProfileUrl() && (
                   <Link
                     href={getPublicProfileUrl()!}
