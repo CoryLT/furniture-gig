@@ -18,6 +18,7 @@ interface NavProps {
 type NavItem = { href: string; label: string } | { divider: true }
 
 const userLinks: NavItem[] = [
+  { href: '/messages', label: 'Messages' },
   { href: '/home', label: 'Dashboard' },
   { divider: true },
   { href: '/flipper/post-gig', label: 'Post a Job' },
@@ -34,7 +35,6 @@ const userLinks: NavItem[] = [
   { href: '/marketplace/new', label: 'List an Item' },
   { href: '/marketplace/mine', label: 'My Listings' },
   { divider: true },
-  { href: '/messages', label: 'Messages' },
   { href: '/connections', label: 'My Connections' },
   { href: '/profile/worker/services', label: 'Services I Offer' },
 ]
@@ -321,6 +321,15 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
 
             {dropdownOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-white border border-stone-200 rounded-lg shadow-lg py-1 z-50">
+                {getPublicProfileUrl() && (
+                  <Link
+                    href={getPublicProfileUrl()!}
+                    onClick={() => setDropdownOpen(false)}
+                    className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
+                  >
+                    My Profile
+                  </Link>
+                )}
                 {/* Primary nav (now collapsed into here on every viewport) */}
                 {links.map((link, i) =>
                   'divider' in link ? (
@@ -346,15 +355,6 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
                   )
                 )}
                 <hr className="my-1" />
-                {getPublicProfileUrl() && (
-                  <Link
-                    href={getPublicProfileUrl()!}
-                    className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
-                    onClick={() => setDropdownOpen(false)}
-                  >
-                    My Profile
-                  </Link>
-                )}
                 <Link
                   href="/profile"
                   className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
