@@ -168,17 +168,41 @@ export default function PostGigForm({ existingDraft }: Props) {
     setError('')
     setPublishing(true)
 
-    const { error: publishError } = await supabase
+    const { data: published, error: publishError } = await supabase
       .from('gigs')
       .update({ status: 'open' })
       .eq('id', savedGigId)
       .eq('status', 'draft') // safety: don't accidentally re-open an old gig
+      .select('id, title, summary, pay_amount')
+      .maybeSingle()
 
     if (publishError) {
       console.error('[post-gig] publish error:', publishError)
       setError(publishError.message ?? 'Could not publish the job.')
       setPublishing(false)
       return
+    }
+
+    // If this call actually flipped a draft to open (published is non-null),
+    // drop a matching piece into the pipeline so it's tracked from day one.
+    // Best-effort: a failure here must never trap the flipper on this screen.
+    if (published) {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (user) {
+          await supabase.from('inventory_pieces').insert({
+            owner_user_id: user.id,
+            title: published.title || form.title || 'New piece',
+            stage: 'sourced',
+            labor_cost: published.pay_amount ?? 0,
+            notes: published.summary || '',
+          })
+        }
+      } catch (e) {
+        console.error('[post-gig] pipeline auto-create failed (ignored):', e)
+      }
     }
 
     router.push('/flipper/dashboard')
