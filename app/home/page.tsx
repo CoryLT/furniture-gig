@@ -8,6 +8,7 @@ import { lastNDays, isoDayOf, buildBuckets } from '@/lib/home-dashboard'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import BusinessSetupCard from './BusinessSetupCard'
 import EnableNotificationsButton from '@/components/notifications/EnableNotificationsButton'
+import AddToHomeScreenPrompt from '@/components/notifications/AddToHomeScreenPrompt'
 import {
   DollarSign,
   Briefcase,
@@ -532,6 +533,9 @@ export default async function HomePage() {
             <p className="text-muted-foreground mt-1 text-sm">{todayLabel}</p>
           </div>
         </div>
+
+        {/* Add-to-home-screen guide (hides once installed or dismissed) */}
+        <AddToHomeScreenPrompt />
 
         {/* Notifications opt-in — front and center on the page you land on */}
         <EnableNotificationsButton />

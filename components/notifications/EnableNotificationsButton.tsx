@@ -149,15 +149,8 @@ export default function EnableNotificationsButton() {
   if (status === 'unsupported') return null // quietly hide on browsers that can't
 
   if (status === 'ios-needs-install') {
-    return (
-      <div className={card}>
-        <Bell className="w-5 h-5 text-accent shrink-0" />
-        <span className="text-muted-foreground">
-          To get buzzed about new messages, add FlipWork to your home screen,
-          then open it from that icon and come back here.
-        </span>
-      </div>
-    )
+    // The Add-to-Home-Screen guide covers this case, so don't duplicate it here.
+    return null
   }
 
   if (status === 'blocked') {
