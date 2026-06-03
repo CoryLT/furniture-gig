@@ -310,13 +310,6 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
               aria-label="Menu"
             >
               <Menu className="w-5 h-5 text-foreground" />
-              {/* At-a-glance unread badge on the hamburger so it's still visible
-                  when nav items are tucked inside */}
-              {unreadMessages > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-accent text-accent-foreground text-[10px] font-semibold leading-none">
-                  {unreadMessages > 99 ? '99+' : unreadMessages}
-                </span>
-              )}
             </button>
 
             {dropdownOpen && (
