@@ -40,7 +40,7 @@ const STAGES: { key: Stage; label: string }[] = [
   { key: 'sold', label: 'Sold' },
 ]
 const ORDER: Stage[] = ['sourced', 'in_progress', 'listed', 'sold']
-const CATEGORIES = ['materials', 'labor', 'transport', 'fees', 'other']
+const CATEGORIES = ['purchase', 'materials', 'labor', 'transport', 'fees', 'other']
 
 const n = (v: any) => Number(v ?? 0)
 const sumExpenses = (p: Piece) => (p.expenses ?? []).reduce((s, e) => s + n(e.amount), 0)
