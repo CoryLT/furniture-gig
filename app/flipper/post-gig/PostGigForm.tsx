@@ -85,6 +85,11 @@ export default function PostGigForm({ existingDraft }: Props) {
     } catch {}
   }
 
+  // What the flipper paid for the piece itself. Kept in form state only —
+  // it's poured into the pipeline piece at publish and NEVER saved on the
+  // gig, so it can't be seen by workers.
+  const [pieceCost, setPieceCost] = useState('')
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
@@ -214,6 +219,7 @@ export default function PostGigForm({ existingDraft }: Props) {
             owner_user_id: user.id,
             title: published.title || form.title || 'New piece',
             stage: 'sourced',
+            acquisition_cost: parseFloat(pieceCost) || 0,
             labor_cost: published.pay_amount ?? 0,
             notes: published.summary || '',
           })
@@ -477,6 +483,33 @@ export default function PostGigForm({ existingDraft }: Props) {
               </span>
             </span>
           </label>
+
+          {addToPipeline && (
+            <div className="pl-7">
+              <label className="block text-sm text-foreground mb-1">
+                What you paid for the piece{' '}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <div className="relative max-w-[170px]">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  $
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={pieceCost}
+                  onChange={(e) => setPieceCost(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full rounded-lg border border-border bg-background pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Only you see this — it&apos;s added to the piece&apos;s cost in your Pipeline and never shown to workers.
+              </p>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
             <p className="text-sm text-muted-foreground">
