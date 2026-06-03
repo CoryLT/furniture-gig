@@ -217,6 +217,7 @@ export default function PostGigForm({ existingDraft }: Props) {
         if (user) {
           await supabase.from('inventory_pieces').insert({
             owner_user_id: user.id,
+            source_gig_id: published.id,
             title: published.title || form.title || 'New piece',
             stage: 'sourced',
             acquisition_cost: parseFloat(pieceCost) || 0,

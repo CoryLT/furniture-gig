@@ -51,6 +51,7 @@ export default function PayWorkerCard({ gigId, workerId, workerName, amount, fli
   const [handles, setHandles] = useState<Handles>(EMPTY_HANDLES)
   const [payment, setPayment] = useState<any | null>(null)
   const [method, setMethod] = useState<string>('cash')
+  const [payAmount, setPayAmount] = useState<number>(amount)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -100,7 +101,7 @@ export default function PayWorkerCard({ gigId, workerId, workerName, amount, fli
         gig_id: gigId,
         worker_user_id: workerId,
         flipper_user_id: flipperUserId,
-        amount,
+        amount: payAmount,
         method,
         marked_paid_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -112,6 +113,15 @@ export default function PayWorkerCard({ gigId, workerId, workerName, amount, fli
       setSaving(false)
       return
     }
+    // Record what you actually paid as this piece's labor cost in the Pipeline.
+    // Best-effort: only matters if this job was added to the pipeline.
+    try {
+      await db
+        .from('inventory_pieces')
+        .update({ labor_cost: payAmount, updated_at: new Date().toISOString() })
+        .eq('source_gig_id', gigId)
+        .eq('owner_user_id', flipperUserId)
+    } catch {}
     const { data: p } = await db.from('gig_payments').select('*').eq('gig_id', gigId).maybeSingle()
     setPayment(p ?? null)
     setSaving(false)
@@ -130,7 +140,7 @@ export default function PayWorkerCard({ gigId, workerId, workerName, amount, fli
       <div className="card card-body space-y-2">
         <h3 className="font-sans font-semibold text-foreground">✓ Paid &amp; confirmed</h3>
         <p className="text-sm text-muted-foreground">
-          {workerName} confirmed they received {formatCurrency(amount)}
+          {workerName} confirmed they received {formatCurrency(payment.amount ?? amount)}
           {payment.method ? ` via ${METHOD_LABELS[payment.method] ?? payment.method}` : ''}. All done.
         </p>
       </div>
@@ -146,7 +156,7 @@ export default function PayWorkerCard({ gigId, workerId, workerName, amount, fli
         <p className="text-sm text-muted-foreground">
           You marked this paid
           {payment.method ? ` via ${METHOD_LABELS[payment.method] ?? payment.method}` : ''}. We&apos;ve
-          asked {workerName} to confirm they got their {formatCurrency(amount)}. The gig closes once
+          asked {workerName} to confirm they got their {formatCurrency(payment.amount ?? amount)}. The gig closes once
           they confirm.
         </p>
       </div>
@@ -162,7 +172,7 @@ export default function PayWorkerCard({ gigId, workerId, workerName, amount, fli
       <div>
         <h3 className="font-sans font-semibold text-foreground">Pay {workerName}</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Send {workerName} their <strong>{formatCurrency(amount)}</strong> on the app they chose,
+          Send {workerName} their <strong>{formatCurrency(payAmount)}</strong> on the app they chose,
           then mark it paid here.
         </p>
       </div>
@@ -204,6 +214,25 @@ export default function PayWorkerCard({ gigId, workerId, workerName, amount, fli
           </Button>
         </a>
       )}
+
+      <div className="space-y-1">
+        <label className="text-sm font-medium text-foreground">Amount paid</label>
+        <div className="relative max-w-[170px]">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            inputMode="decimal"
+            value={payAmount}
+            onChange={(e) => setPayAmount(parseFloat(e.target.value) || 0)}
+            className="w-full rounded-lg border border-border bg-background pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Defaults to the posted pay — change it if you paid a different amount.
+        </p>
+      </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
