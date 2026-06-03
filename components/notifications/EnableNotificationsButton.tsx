@@ -26,7 +26,11 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return output
 }
 
-export default function EnableNotificationsButton() {
+export default function EnableNotificationsButton({
+  placement = 'dashboard',
+}: {
+  placement?: 'dashboard' | 'settings'
+}) {
   const [status, setStatus] = useState<Status>('loading')
   const [error, setError] = useState<string | null>(null)
   const [testMsg, setTestMsg] = useState<string | null>(null)
@@ -211,6 +215,9 @@ export default function EnableNotificationsButton() {
   }
 
   if (status === 'on') {
+    // On the dashboard we go quiet once it's working — the on/off and test
+    // controls live in Account Settings instead, so the dashboard stays clean.
+    if (placement === 'dashboard') return null
     return (
       <div className="rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm">
         <div className="flex items-center justify-between gap-3">

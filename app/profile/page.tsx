@@ -12,6 +12,7 @@ import { PhotoUploadForm } from '@/components/ui/PhotoUploadForm';
 import { PhotoGallery, type GalleryPhoto } from '@/components/ui/PhotoGallery';
 import PayoutHandlesSection from '@/components/profile/PayoutHandlesSection';
 import BusinessSetupCard from '@/app/home/BusinessSetupCard';
+import EnableNotificationsButton from '@/components/notifications/EnableNotificationsButton';
 import { compressImageForUpload } from '@/lib/imageCompression';
 
 export default function ProfilePage() {
@@ -552,6 +553,14 @@ export default function ProfilePage() {
             <BusinessSetupCard userId={userId} mode="settings" />
           </div>
         )}
+
+        {/* Notifications — manage the phone buzz (and send a test) here */}
+        <div className="bg-white rounded-lg shadow p-8 mt-6">
+          <h2 className="text-2xl font-serif font-bold text-slate-900 mb-4">
+            Notifications
+          </h2>
+          <EnableNotificationsButton placement="settings" />
+        </div>
 
         {/* Work Samples Gallery — separate card so it has its own context */}
         <div className="bg-white rounded-lg shadow p-8 mt-6">
