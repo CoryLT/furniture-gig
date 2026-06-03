@@ -8,6 +8,9 @@
 > Last rewritten: June 1, 2026, after a full read of the live repo. The old
 > context file (simple worker/admin tool, PayPal-only, no marketplace, phases
 > 2–7 "not started") was ~6 months stale and was the cause of confused answers.
+>
+> June 3, 2026 update: refocused on the **operator-hub direction** — see
+> "Current direction" below. HANDOFF.md has the full session detail.
 
 ---
 
@@ -32,6 +35,34 @@ split anymore:
   law; binding arbitration + class waiver in the TOS.
 - **Admin:** Cory (single admin). `/admin` is **analytics + support queue only** —
   all gig posting/editing is user-side now.
+
+---
+
+## Current direction (June 2026) — Operator Hub
+
+The focus has narrowed from "two-sided everything-flippable marketplace" to ONE
+customer: the **flipping operator** — someone running a flipping business who wants
+to hire and manage contract help without Craigslist sketchiness or W-2 overhead.
+FlipWork is becoming their **hub / light resource-management ("tycoon") tool**. The
+worker/marketplace side still works but is de-emphasized; operator screens now say
+**"Jobs"** and **"crew."**
+
+Operator features built (HANDOFF.md has detail):
+- **Dashboard `/home`** has a **Business Setup** card — guided check-offs that capture
+  business details (name, structure, EIN, bank, bookkeeping, W-9/contractor) into a profile.
+- **My Crew** (`/flipper/crew`) — roster + private rating / notes / would-rehire.
+- **Payment Records** (`/flipper/records`) — per-worker per-year payouts, a year-correct
+  1099 flag ($600 ≤2025, $2,000 2026+), and CSV export.
+- **Pipeline** (`/flipper/pipeline`) — pieces Sourced→Sold with photos, an itemized
+  expense ledger, and a profit / cash-tied-up HUD (the resource-game core).
+
+New tables: `crew_members`, `business_profiles`, `inventory_pieces`, `piece_expenses`
+(`operator_business` is an unused orphan — drop when convenient).
+
+Monetization stays a pro/business subscription (never a cut of payments); validate by
+dogfooding + micro-influencer outreach before charging. Standing legal caution: the
+contractor model risks worker-misclassification — route Cory to a NC employment/tax
+attorney. Not legal advice.
 
 ---
 

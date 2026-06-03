@@ -5,6 +5,58 @@
 
 ---
 
+## Latest session — June 3, 2026 (Operator-Hub direction)
+
+**Strategic shift (drives everything below).** Stopped treating FlipWork as a
+two-sided "everything-flippable" marketplace and refocused on ONE customer: the
+**flipping *operator*** — someone running a flipping business who wants to hire and
+manage contract help without Craigslist sketchiness or W-2 overhead. The product
+is becoming an **operator hub / light resource-management ("tycoon") tool**. The
+worker/marketplace side still exists but is de-emphasized. Monetization thesis
+unchanged: pro/business subscription, never a cut of payments; validate before charging.
+
+**Go-to-market (agreed, not built):** dogfood it (Cory runs real jobs/flips through
+it) → micro-influencer outreach to flipping creators (e.g. Transcend Furniture
+Gallery on YouTube). The one build that serves the test is an operator-facing
+front door/landing. Public cross-operator reputation is deferred (scale problem;
+private My Crew ratings cover solo vetting for now).
+
+**Shipped this session (live on main; operator screens reframed "gigs"→"Jobs", people→"crew"):**
+- **My Crew** (`/flipper/crew`) — roster of everyone you've picked, with track record
+  + your private rating / notes / would-rehire. "Remove" = hide (restorable), not delete.
+- **Payment Records** (`/flipper/records`) — per-worker per-year payouts from
+  `gig_payments`, with a **year-correct 1099 flag** and one-tap **CSV export**.
+- **Business Setup card** on `/home` — interactive guided check-offs that capture real
+  details (name, structure, EIN, bank, bookkeeping, contractor paperwork) into a
+  business profile, with progress bar. Contractor item links to the printable **W-9** PDF.
+- **Pipeline board** (`/flipper/pipeline`) — the resource-game core. Pieces move
+  Sourced→In Progress→Listed→Sold; per-piece **photos** (moderated upload), an
+  **itemized expense ledger**, and a **profit / cash-tied-up / profit-this-month HUD**.
+- **Nav reordered** operator-first: My Profile, Messages, Dashboard, then Flipper,
+  Worker, Marketplace groups. Dashboard "Go to" is flipper-first too.
+
+**New tables (all run in Supabase):** `crew_members` (+`hidden`), `business_profiles`,
+`inventory_pieces`, `piece_expenses`. New route `/api/upload-piece-image` (mirrors
+upload-service-image; bucket `marketplace-photos`).
+
+**Cleanup TODO:** `operator_business` table + `supabase/schema_operator_business_20260601.sql`
+are an **orphan** from a duplicate attempt during a connection drop — the live Business
+Setup card uses `business_profiles`. Drop the dead table and delete the SQL file when convenient.
+
+**Decisions worth remembering:**
+- 1099-NEC threshold is **year-dependent**: $600 through 2025, **$2,000 for 2026+** (OBBBA).
+  The Records 1099 flag uses the selected year's threshold.
+- Use **W-9** (contractor TIN), not I-9 (employee) — matches the contractor model.
+- Pieces use the **itemized `piece_expenses` ledger**; old lump materials_cost/labor_cost
+  columns on `inventory_pieces` are retired/ignored in the UI.
+
+**Standing risk to keep flagging (not legal advice):** the "call everyone a contractor /
+avoid the govt" model is legally fragile (worker misclassification; the platform's
+checklists add "control" signals). Point Cory to a NC employment/tax attorney; don't help
+defeat the rules.
+
+---
+
 ## Project basics
 
 - **App:** FlipWork — a two-sided platform for the flipping economy. People post gigs, claim gigs, sell items on a marketplace, and (new) advertise services they offer. Furniture was the origin; it's now "anything that can legally be flipped."
