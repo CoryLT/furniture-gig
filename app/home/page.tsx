@@ -7,6 +7,7 @@ import { WelcomeModal } from '@/components/shared/WelcomeModal'
 import { lastNDays, isoDayOf, buildBuckets } from '@/lib/home-dashboard'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import BusinessSetupCard from './BusinessSetupCard'
+import EnableNotificationsButton from '@/components/notifications/EnableNotificationsButton'
 import {
   DollarSign,
   Briefcase,
@@ -531,6 +532,9 @@ export default async function HomePage() {
             <p className="text-muted-foreground mt-1 text-sm">{todayLabel}</p>
           </div>
         </div>
+
+        {/* Notifications opt-in — front and center on the page you land on */}
+        <EnableNotificationsButton />
 
         {/* Business setup → business-at-a-glance */}
         <BusinessSetupCard userId={user.id} initial={businessProfile as any} />

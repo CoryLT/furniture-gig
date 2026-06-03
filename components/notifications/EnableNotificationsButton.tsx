@@ -102,12 +102,19 @@ export default function EnableNotificationsButton() {
           userAgent: navigator.userAgent,
         }),
       })
-      if (!res.ok) throw new Error('save failed')
+      if (!res.ok) {
+        let detail = ''
+        try {
+          const j = await res.json()
+          detail = j?.error || ''
+        } catch {}
+        throw new Error(detail || `couldn't save (status ${res.status})`)
+      }
 
       setStatus('on')
     } catch (e: any) {
       console.error('enable notifications failed', e)
-      setError('Could not turn on notifications. Please try again.')
+      setError(`Couldn't turn on: ${e?.message || 'unknown error'}`)
       setStatus('off')
     }
   }
