@@ -61,14 +61,29 @@ export default function EnableNotificationsButton() {
         return
       }
 
-      // Already subscribed?
-      try {
-        const reg = await navigator.serviceWorker.getRegistration()
-        const existing = reg ? await reg.pushManager.getSubscription() : null
-        if (!cancelled) setStatus(existing ? 'on' : 'off')
-      } catch {
-        if (!cancelled) setStatus('off')
+      // Permission already granted → keep it working with zero taps:
+      // re-register and re-save the subscription automatically on every open,
+      // so it can never silently fall off the server.
+      if (Notification.permission === 'granted') {
+        try {
+          const reg = await navigator.serviceWorker.getRegistration()
+          const existing = reg ? await reg.pushManager.getSubscription() : null
+          if (existing) {
+            saveSubscription(existing).catch(() => {})
+            if (!cancelled) setStatus('on')
+          } else {
+            // Granted but no subscription yet — set one up silently.
+            await subscribeNow()
+            if (!cancelled) setStatus('on')
+          }
+        } catch {
+          if (!cancelled) setStatus('off')
+        }
+        return
       }
+
+      // Not decided yet → show the one-time "Turn on" prompt.
+      if (!cancelled) setStatus('off')
     }
 
     init()
@@ -76,6 +91,37 @@ export default function EnableNotificationsButton() {
       cancelled = true
     }
   }, [])
+
+  // Best-effort: make sure the server has this device's subscription on file.
+  async function saveSubscription(sub: PushSubscription): Promise<void> {
+    const res = await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription: sub.toJSON(),
+        userAgent: navigator.userAgent,
+      }),
+    })
+    if (!res.ok) {
+      let detail = ''
+      try {
+        const j = await res.json()
+        detail = j?.error || ''
+      } catch {}
+      throw new Error(detail || `couldn't save (status ${res.status})`)
+    }
+  }
+
+  // Register the service worker, subscribe to push, and save it. Throws on failure.
+  async function subscribeNow(): Promise<void> {
+    const reg = await navigator.serviceWorker.register('/sw.js')
+    await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+    })
+    await saveSubscription(sub)
+  }
 
   async function enable() {
     setError(null)
@@ -86,32 +132,7 @@ export default function EnableNotificationsButton() {
         setStatus(permission === 'denied' ? 'blocked' : 'off')
         return
       }
-
-      const reg = await navigator.serviceWorker.register('/sw.js')
-      await navigator.serviceWorker.ready
-
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
-      })
-
-      const res = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          subscription: sub.toJSON(),
-          userAgent: navigator.userAgent,
-        }),
-      })
-      if (!res.ok) {
-        let detail = ''
-        try {
-          const j = await res.json()
-          detail = j?.error || ''
-        } catch {}
-        throw new Error(detail || `couldn't save (status ${res.status})`)
-      }
-
+      await subscribeNow()
       setStatus('on')
     } catch (e: any) {
       console.error('enable notifications failed', e)
