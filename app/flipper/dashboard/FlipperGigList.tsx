@@ -492,24 +492,6 @@ export default function FlipperGigList({
                               <Edit className="w-4 h-4 text-stone-600" />
                               Edit
                             </Link>
-                            {gig.status === 'open' && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenMenuId(null)
-                                  setActionError(null)
-                                  setOffName('')
-                                  setOffAmount(
-                                    gig.pay_amount ? String(gig.pay_amount) : ''
-                                  )
-                                  setOffTarget(gig)
-                                }}
-                                className="w-full text-left px-3 py-2 hover:bg-secondary flex items-center gap-2"
-                              >
-                                <UserCheck className="w-4 h-4 text-stone-600" />
-                                Mark done (off-platform)
-                              </button>
-                            )}
                             {gig.status !== 'archived' && (
                               <button
                                 type="button"
@@ -541,6 +523,24 @@ export default function FlipperGigList({
                       </div>
                     </div>
                   </div>
+
+                  {gig.status === 'open' && (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActionError(null)
+                          setOffName('')
+                          setOffAmount(gig.pay_amount ? String(gig.pay_amount) : '')
+                          setOffTarget(gig)
+                        }}
+                        className="inline-flex items-center gap-2 text-sm font-medium text-accent hover:underline"
+                      >
+                        <UserCheck className="w-4 h-4" />
+                        Mark complete (offline)
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )
