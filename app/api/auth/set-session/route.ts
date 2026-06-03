@@ -99,7 +99,12 @@ export async function POST(request: NextRequest) {
 
     const projectRef = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname.split('.')[0]
     const cookieName = `sb-${projectRef}-auth-token`
-    const cookieExpires = new Date(resolvedExpiresAt * 1000)
+    // Keep the login cookie long-lived (1 year) so closing the app doesn't log
+    // you out. The short-lived access token INSIDE still refreshes itself; this
+    // only controls how long the browser holds onto the cookie. You stay signed
+    // in until you tap Logout (or the session is revoked server-side).
+    const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000
+    const cookieExpires = new Date(Date.now() + ONE_YEAR_MS)
     const cookieStore = cookies()
     const chunks = createChunks(cookieName, JSON.stringify(session))
 
