@@ -25,6 +25,7 @@ import {
   Store,
   Tag,
   Package,
+  TrendingUp,
   Hammer,
   Users,
   User,
@@ -666,6 +667,7 @@ export default async function HomePage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <NavTile href="/flipper/post-gig" icon={<Plus className="w-5 h-5" />} title="Post a Job" subtitle="Get help on a project" />
                   <NavTile href="/flipper/dashboard" icon={<ClipboardCheck className="w-5 h-5" />} title="My posted Jobs" subtitle="Jobs you've posted" />
+                  <NavTile href="/flipper/pipeline" icon={<TrendingUp className="w-5 h-5" />} title="Pipeline" subtitle="Track pieces & profit" />
                   <NavTile href="/flipper/payouts" icon={<DollarSign className="w-5 h-5" />} title="Payouts" subtitle="Money you've spent" />
                 </div>
               </div>
