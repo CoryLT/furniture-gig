@@ -11,6 +11,10 @@
 >
 > June 3, 2026 update: refocused on the **operator-hub direction** — see
 > "Current direction" below. HANDOFF.md has the full session detail.
+>
+> June 3, 2026 (later session): shipped installable app + push, "stay logged in,"
+> dashboard cleanup, the Jobs/Gigs wording split, the job→pipeline link (pay now
+> logs a labor expense that hits profit), and off-platform name-only crew.
 
 ---
 
@@ -48,16 +52,27 @@ worker/marketplace side still works but is de-emphasized; operator screens now s
 **"Jobs"** and **"crew."**
 
 Operator features built (HANDOFF.md has detail):
+- **Installable app + push** — FlipWork installs to the phone home screen (PWA) and
+  sends Web Push notifications (e.g. on a new message). On/off + a "test buzz" live in
+  Account Settings (`/profile`). iOS needs home-screen install + one "Allow" tap.
 - **Dashboard `/home`** has a **Business Setup** card — guided check-offs that capture
   business details (name, structure, EIN, bank, bookkeeping, W-9/contractor) into a profile.
 - **My Crew** (`/flipper/crew`) — roster + private rating / notes / would-rehire.
+  Now also holds **off-platform, name-only crew** (people you hired in person who have
+  no account), with a running jobs/cash tally and the same rating/notes/name editing.
 - **Payment Records** (`/flipper/records`) — per-worker per-year payouts, a year-correct
   1099 flag ($600 ≤2025, $2,000 2026+), and CSV export.
 - **Pipeline** (`/flipper/pipeline`) — pieces Sourced→Sold with photos, an itemized
-  expense ledger, and a profit / cash-tied-up HUD (the resource-game core).
+  expense ledger, and a profit / cash-tied-up HUD (the resource-game core). Posting a
+  job can **auto-create a piece**; paying the worker (or closing a job off-platform)
+  logs the pay as a **labor expense** on that piece, so profit reflects it.
 
-New tables: `crew_members`, `business_profiles`, `inventory_pieces`, `piece_expenses`
-(`operator_business` is an unused orphan — drop when convenient).
+New/changed tables: `crew_members` (now allows name-only off-platform members —
+nullable `worker_user_id` plus `worker_name`/`jobs_count`/`paid_total`), `business_profiles`,
+`inventory_pieces` (+`source_gig_id`, linking a piece to the job it came from),
+`piece_expenses` (the LIVE cost source — `category='labor'` rows hold worker pay; the
+old `inventory_pieces.labor_cost`/`materials_cost` columns are unused by the UI).
+`operator_business` is an unused orphan — drop when convenient.
 
 Monetization stays a pro/business subscription (never a cut of payments); validate by
 dogfooding + micro-influencer outreach before charging. Standing legal caution: the

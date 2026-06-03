@@ -5,7 +5,94 @@
 
 ---
 
-## Latest session — June 3, 2026 (Operator-Hub direction)
+## Latest session — June 3, 2026 (App polish · pay→pipeline · off-platform crew)
+
+A later June-3 session. All shipped to `main`; SQL to run is listed below. Cory
+deploys via local `git pull` / `git push` (~45-60s for Vercel).
+
+**Installable app (PWA).** FlipWork installs to the phone home screen.
+`app/manifest.ts`, `public/icon-192.png` + `icon-512.png`, and manifest/appleWebApp/
+themeColor metadata in `app/layout.tsx`. `components/notifications/AddToHomeScreenPrompt.tsx`
+shows an install guide (hides once installed or dismissed — localStorage `fw_a2hs_dismissed`).
+
+**Web Push notifications (working).** Fires on a new message from
+`app/api/messages/notify/route.ts`. Pieces: `lib/push.ts` (`sendPushToUser`,
+`web-push@3.6.7`, service-role client), `public/sw.js` (**notifications-only** service
+worker — NO offline caching, deliberate), `app/api/push/subscribe|unsubscribe|test/route.ts`,
+`components/notifications/EnableNotificationsButton.tsx` (auto re-subscribes on open when
+permission is granted; "Send a test buzz" diagnostic). **Controls live in Account
+Settings** (`/profile` → Notifications), not the dashboard. SQL run:
+`supabase/push_subscriptions_20260602.sql`. VAPID: public key is hardcoded as a fallback
+(also env-overridable); **private key is in Vercel as `VAPID_PRIVATE_KEY`**. iOS requires
+home-screen install + one "Allow" tap. **Gotcha that ate time:** the private key was
+pasted into Vercel's *Note* field instead of *Value* → push silently dead until fixed.
+
+**Stay logged in.** `app/api/auth/set-session/route.ts` cookie now lasts 1 year (was
+~1 hour, tied to the access-token expiry). NOTE: each user must sign in once after this
+deploy to pick up the long cookie.
+
+**Dashboard cleanup.** `app/home/page.tsx`: install prompt + notifications button +
+Business Setup card up top; the empty "needs attention" grid only renders when it has
+content; `components/home/UnreadMessagesCard.tsx` is a standalone live (realtime) unread
+count that matches the bell. `BusinessSetupCard` gained a `mode` prop — `dashboard`
+(hides when complete) vs `settings` (always shows; self-loads); it's also rendered on
+`/profile` with `mode="settings"`. Dashboard breadcrumb removed. Hamburger menu now
+scrolls so Logout is always reachable; removed a duplicate unread badge from it.
+
+**Jobs / Gigs wording split (visible copy only).** Operator/flipper screens say
+**"Jobs"** and **"crew"**; worker screens stay **"Gigs."** URLs (`/gigs`,
+`/flipper/post-gig`) and DB names were NOT touched. Mental model: hiring = Job, picking
+up work = Gig.
+
+**Job → Pipeline link.**
+- Posting a job can **auto-create** an `inventory_pieces` row (stage `sourced`).
+  `PostGigForm.tsx`: opt-out checkbox "Add this to my Pipeline" (default on, remembered
+  via localStorage `fw_add_to_pipeline`); optional "What you paid for the piece" →
+  piece `acquisition_cost` (NEVER stored on the gig — can't leak to workers). The piece
+  is stamped with **`source_gig_id`**.
+- SQL: `supabase/schema_inventory_pieces_source_gig_20260603.sql` (adds `source_gig_id`).
+- `components/shared/PayWorkerCard.tsx` now has an editable **"Amount paid"** field
+  (defaults to posted pay; "Cash (in person)" was already an option). On "Mark as paid"
+  it records the pay as a **`piece_expenses` row, `category='labor'`** on the linked
+  piece — so it lands in the profit HUD. Confirmation messages show the real amount paid.
+
+**Off-platform crew.** For people with no account (e.g. a friend with a busted phone).
+- SQL: `supabase/schema_crew_offplatform_20260603.sql` — makes `crew_members.worker_user_id`
+  nullable and adds `worker_name`, `jobs_count`, `paid_total`, + an identity CHECK
+  (a row must have a user_id OR a name).
+- On an **Open** job, the "⋮" menu has **"Mark done (off-platform)"** → modal asks
+  worker name + cash → marks the job `completed`, logs the cash as a `piece_expenses`
+  labor row on the linked piece, and saves the person to Crew **by name**
+  (find-or-create; case-insensitive but otherwise exact; bumps jobs/cash tally).
+  `app/flipper/dashboard/FlipperGigList.tsx` (`handleOffPlatform` + custom modal).
+- `app/flipper/crew/page.tsx` fetches off-platform members into an **"Off-platform
+  crew"** section rendered by `app/flipper/crew/OffPlatformCrewList.tsx` (editable cards:
+  name, rating, rehire, private notes — saved by `crew_members.id`, NOT `worker_user_id`,
+  because the existing `CrewList`/`CrewCard` upserts on `worker_user_id` and can't hold a
+  name-only person).
+
+**SQL to run (this session) — Cory runs in Supabase, raw URL → SQL Editor → Run:**
+- `supabase/push_subscriptions_20260602.sql`
+- `supabase/schema_inventory_pieces_source_gig_20260603.sql`
+- `supabase/schema_crew_offplatform_20260603.sql`
+
+**New gotchas:**
+- **Profit math reads `piece_expenses`, NOT `inventory_pieces.labor_cost`.** The Pipeline
+  HUD is `acquisition_cost + sum(piece_expenses)` (`costsOf` in `PipelineBoard.tsx`).
+  Worker pay is recorded as a `category='labor'` expense — this was FIXED this session
+  (it previously wrote the ignored `labor_cost` column and never showed in profit). If
+  you ever record a piece cost, write a `piece_expenses` row.
+- `public/sw.js` is **notifications-only** (no caching) on purpose — don't add caching
+  casually (stale-asset risk in a PWA).
+- VAPID private key goes in Vercel's **Value** field, never the Note field.
+- Off-platform crew has **no "remove" yet** (no hide/restore for name-only members) —
+  only rating/notes/rehire/name editing. Possible follow-up.
+- Off-platform name match is case-insensitive but otherwise exact ("Marcus" ≠ "Marc");
+  rename a card to merge two records.
+
+---
+
+## Previous session — June 3, 2026 (Operator-Hub buildout)
 
 **Strategic shift (drives everything below).** Stopped treating FlipWork as a
 two-sided "everything-flippable" marketplace and refocused on ONE customer: the
