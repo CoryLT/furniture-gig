@@ -541,7 +541,7 @@ export default async function HomePage() {
         <EnableNotificationsButton />
 
         {/* Business setup → business-at-a-glance */}
-        <BusinessSetupCard userId={user.id} initial={businessProfile as any} />
+        <BusinessSetupCard userId={user.id} initial={businessProfile as any} mode="dashboard" />
 
         {/* Brand-new user welcome */}
         {isBrandNew ? (

@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { PhotoUploadForm } from '@/components/ui/PhotoUploadForm';
 import { PhotoGallery, type GalleryPhoto } from '@/components/ui/PhotoGallery';
 import PayoutHandlesSection from '@/components/profile/PayoutHandlesSection';
+import BusinessSetupCard from '@/app/home/BusinessSetupCard';
 import { compressImageForUpload } from '@/lib/imageCompression';
 
 export default function ProfilePage() {
@@ -544,6 +545,13 @@ export default function ProfilePage() {
 
         {/* How you get paid — direct pay handles (Cash App/Venmo/etc.) */}
         <PayoutHandlesSection />
+
+        {/* Your business — appears here once setup is complete on the dashboard */}
+        {userId && (
+          <div className="mt-6">
+            <BusinessSetupCard userId={userId} mode="settings" />
+          </div>
+        )}
 
         {/* Work Samples Gallery — separate card so it has its own context */}
         <div className="bg-white rounded-lg shadow p-8 mt-6">

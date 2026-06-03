@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -136,10 +137,13 @@ const ITEMS: ItemDef[] = [
 export default function BusinessSetupCard({
   userId,
   initial,
+  mode = 'dashboard',
 }: {
   userId: string
-  initial: Profile | null
+  initial?: Profile | null
+  mode?: 'dashboard' | 'settings'
 }) {
+  const supabase = createClient()
   const blank: Profile = {
     business_name: null,
     structure: null,
@@ -151,6 +155,28 @@ export default function BusinessSetupCard({
   }
   const [saved, setSaved] = useState<Profile>({ ...blank, ...(initial ?? {}) })
   const [editingAll, setEditingAll] = useState(false)
+  // When no initial data is passed in (the settings page), load it ourselves.
+  const [loadingInitial, setLoadingInitial] = useState(initial === undefined)
+
+  useEffect(() => {
+    if (initial !== undefined) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('business_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (!cancelled) {
+        if (data) setSaved((prev) => ({ ...prev, ...(data as Profile) }))
+        setLoadingInitial(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const doneCount = ITEMS.filter((it) => it.isDone(saved)).length
   const allDone = doneCount === ITEMS.length
@@ -158,6 +184,25 @@ export default function BusinessSetupCard({
   function onSaved(patch: Partial<Profile>) {
     setSaved((prev) => ({ ...prev, ...patch }))
   }
+
+  // Still loading self-fetched data (settings page) — show nothing yet.
+  if (loadingInitial) return null
+
+  // Where this card lives depends on whether the business is set up:
+  //  - dashboard: prompts until set up, then steps aside (info moves to settings)
+  //  - settings:  appears only once set up, as the editable home for the info
+  if (mode === 'dashboard' && allDone && !editingAll) {
+    return (
+      <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+        <Check className="w-4 h-4 text-accent shrink-0" />
+        <span>Business set up.</span>
+        <Link href="/profile" className="text-accent hover:underline">
+          Manage it in Account Settings
+        </Link>
+      </div>
+    )
+  }
+  if (mode === 'settings' && !allDone && !editingAll) return null
 
   // Completed state: business at a glance (unless they chose to edit).
   if (allDone && !editingAll) {
