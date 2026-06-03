@@ -4,10 +4,18 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Plus, ArrowRight, Trash2, ImageIcon } from 'lucide-react'
+import { Plus, ArrowRight, Trash2, ImageIcon, X } from 'lucide-react'
 import { compressImageForUpload, isAcceptableImageFile } from '@/lib/imageCompression'
 
 type Stage = 'sourced' | 'in_progress' | 'listed' | 'sold'
+
+type Expense = {
+  id: string
+  amount: number | null
+  category: string | null
+  note: string
+  spent_on: string | null
+}
 
 type Piece = {
   id: string
@@ -15,8 +23,6 @@ type Piece = {
   stage: Stage
   source: string | null
   acquisition_cost: number | null
-  materials_cost: number | null
-  labor_cost: number | null
   target_price: number | null
   sale_price: number | null
   image_path: string | null
@@ -24,6 +30,7 @@ type Piece = {
   acquired_at: string | null
   listed_at: string | null
   sold_at: string | null
+  expenses: Expense[]
 }
 
 const STAGES: { key: Stage; label: string }[] = [
@@ -33,10 +40,11 @@ const STAGES: { key: Stage; label: string }[] = [
   { key: 'sold', label: 'Sold' },
 ]
 const ORDER: Stage[] = ['sourced', 'in_progress', 'listed', 'sold']
+const CATEGORIES = ['materials', 'labor', 'transport', 'fees', 'other']
 
 const n = (v: any) => Number(v ?? 0)
-const costsOf = (p: Piece) =>
-  n(p.acquisition_cost) + n(p.materials_cost) + n(p.labor_cost)
+const sumExpenses = (p: Piece) => (p.expenses ?? []).reduce((s, e) => s + n(e.amount), 0)
+const costsOf = (p: Piece) => n(p.acquisition_cost) + sumExpenses(p)
 const realized = (p: Piece) => n(p.sale_price) - costsOf(p)
 const expected = (p: Piece) => n(p.target_price) - costsOf(p)
 const money = (v: number) => `${v < 0 ? '-' : ''}$${Math.abs(v).toFixed(2)}`
@@ -83,7 +91,7 @@ export default function PipelineBoard({
     try {
       toSend = await compressImageForUpload(file)
     } catch {
-      // fall back to the original if compression fails
+      // fall back to original
     }
     const fd = new FormData()
     fd.append('file', toSend)
@@ -113,7 +121,7 @@ export default function PipelineBoard({
     return !!path
   }
 
-  // ---- mutations ----
+  // ---- piece mutations ----
   async function createPiece(fields: Partial<Piece>, file?: File | null) {
     setError('')
     const { data, error: err } = await (supabase.from('inventory_pieces') as any)
@@ -129,7 +137,7 @@ export default function PipelineBoard({
       setError('Could not add the piece. Try again.')
       return
     }
-    const piece = data as Piece
+    const piece = { ...(data as Piece), expenses: [] as Expense[] }
     if (file) {
       const path = await uploadImage(piece.id, file)
       if (path) piece.image_path = path
@@ -161,6 +169,54 @@ export default function PipelineBoard({
       return
     }
     setPieces((prev) => prev.filter((p) => p.id !== id))
+    router.refresh()
+  }
+
+  // ---- expense mutations ----
+  async function addExpense(
+    pieceId: string,
+    fields: { amount: number; note: string; category: string | null }
+  ) {
+    setError('')
+    const { data, error: err } = await (supabase.from('piece_expenses') as any)
+      .insert({
+        piece_id: pieceId,
+        owner_user_id: userId,
+        amount: fields.amount,
+        note: fields.note,
+        category: fields.category,
+      })
+      .select()
+      .single()
+    if (err || !data) {
+      setError('Could not add expense. Try again.')
+      return false
+    }
+    setPieces((prev) =>
+      prev.map((p) =>
+        p.id === pieceId ? { ...p, expenses: [...(p.expenses ?? []), data as Expense] } : p
+      )
+    )
+    router.refresh()
+    return true
+  }
+
+  async function deleteExpense(pieceId: string, expenseId: string) {
+    setError('')
+    const { error: err } = await (supabase.from('piece_expenses') as any)
+      .delete()
+      .eq('id', expenseId)
+    if (err) {
+      setError('Could not remove expense. Try again.')
+      return
+    }
+    setPieces((prev) =>
+      prev.map((p) =>
+        p.id === pieceId
+          ? { ...p, expenses: (p.expenses ?? []).filter((e) => e.id !== expenseId) }
+          : p
+      )
+    )
     router.refresh()
   }
 
@@ -235,6 +291,8 @@ export default function PipelineBoard({
                       onUpdate={updatePiece}
                       onDelete={deletePiece}
                       onPhoto={handlePhoto}
+                      onAddExpense={addExpense}
+                      onDeleteExpense={deleteExpense}
                     />
                   ))
                 )}
@@ -306,7 +364,6 @@ function AddPieceForm({
     <div className="card card-body space-y-3">
       <p className="font-semibold text-foreground text-sm">New piece</p>
 
-      {/* Photo */}
       <div className="flex items-center gap-3">
         <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
           {preview ? (
@@ -381,6 +438,8 @@ function PieceCard({
   onUpdate,
   onDelete,
   onPhoto,
+  onAddExpense,
+  onDeleteExpense,
 }: {
   piece: Piece
   imgUrl: string | null
@@ -388,15 +447,22 @@ function PieceCard({
   onUpdate: (id: string, patch: Partial<Piece>) => Promise<boolean>
   onDelete: (id: string) => void
   onPhoto: (id: string, file: File) => Promise<boolean>
+  onAddExpense: (
+    id: string,
+    fields: { amount: number; note: string; category: string | null }
+  ) => Promise<boolean>
+  onDeleteExpense: (pieceId: string, expenseId: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [acq, setAcq] = useState(String(piece.acquisition_cost ?? ''))
-  const [mat, setMat] = useState(String(piece.materials_cost ?? ''))
-  const [lab, setLab] = useState(String(piece.labor_cost ?? ''))
   const [target, setTarget] = useState(String(piece.target_price ?? ''))
   const [sale, setSale] = useState(String(piece.sale_price ?? ''))
+  const [newAmt, setNewAmt] = useState('')
+  const [newNote, setNewNote] = useState('')
+  const [newCat, setNewCat] = useState('')
+  const [addingExp, setAddingExp] = useState(false)
 
   const isSold = piece.stage === 'sold'
   const profit = isSold ? realized(piece) : expected(piece)
@@ -406,8 +472,6 @@ function PieceCard({
     setSaving(true)
     const patch: Partial<Piece> = {
       acquisition_cost: acq ? parseFloat(acq) || 0 : 0,
-      materials_cost: mat ? parseFloat(mat) || 0 : 0,
-      labor_cost: lab ? parseFloat(lab) || 0 : 0,
       target_price: target ? parseFloat(target) : null,
     }
     if (isSold) patch.sale_price = sale ? parseFloat(sale) : null
@@ -423,6 +487,23 @@ function PieceCard({
     setUploading(false)
   }
 
+  async function addExp() {
+    const amt = parseFloat(newAmt)
+    if (isNaN(amt)) return
+    setAddingExp(true)
+    const ok = await onAddExpense(piece.id, {
+      amount: amt,
+      note: newNote.trim(),
+      category: newCat || null,
+    })
+    setAddingExp(false)
+    if (ok) {
+      setNewAmt('')
+      setNewNote('')
+      setNewCat('')
+    }
+  }
+
   const nextLabel =
     piece.stage === 'sourced'
       ? 'Start work'
@@ -432,11 +513,11 @@ function PieceCard({
       ? 'Mark sold'
       : null
 
+  const expenses = piece.expenses ?? []
+
   return (
     <div className="card card-body space-y-2">
-      {imgUrl && (
-        <img src={imgUrl} alt={piece.title} className="w-full h-28 object-cover rounded-lg" />
-      )}
+      {imgUrl && <img src={imgUrl} alt={piece.title} className="w-full h-28 object-cover rounded-lg" />}
 
       <div className="min-w-0">
         <p className="font-medium text-foreground text-sm truncate">{piece.title || 'Untitled piece'}</p>
@@ -488,7 +569,8 @@ function PieceCard({
       </div>
 
       {open && (
-        <div className="space-y-2 pt-2 border-t border-border">
+        <div className="space-y-3 pt-2 border-t border-border">
+          {/* Photo */}
           <label className="text-sm text-accent hover:underline cursor-pointer inline-flex items-center gap-1.5">
             <ImageIcon className="w-3.5 h-3.5" />
             {uploading ? 'Uploading…' : imgUrl ? 'Change photo' : 'Add a photo'}
@@ -500,15 +582,81 @@ function PieceCard({
               onChange={(e) => choosePhoto(e.target.files?.[0] ?? null)}
             />
           </label>
-          <div className="grid grid-cols-3 gap-2">
-            <NumField label="Paid" value={acq} onChange={setAcq} />
-            <NumField label="Materials" value={mat} onChange={setMat} />
-            <NumField label="Labor" value={lab} onChange={setLab} />
+
+          {/* Expenses ledger */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-foreground">Expenses</p>
+            {expenses.length > 0 ? (
+              <div className="space-y-1">
+                {expenses.map((e) => (
+                  <div key={e.id} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="text-muted-foreground truncate">
+                      {e.note || e.category || 'Expense'}
+                      {e.note && e.category ? ` · ${e.category}` : ''}
+                    </span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className="text-foreground">{money(n(e.amount))}</span>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteExpense(piece.id, e.id)}
+                        className="text-muted-foreground hover:text-red-600"
+                        aria-label="Remove expense"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No expenses logged yet.</p>
+            )}
+
+            {/* Add expense */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  value={newAmt}
+                  onChange={(e) => setNewAmt(e.target.value)}
+                  placeholder="$"
+                  className="w-16 rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+                />
+                <input
+                  type="text"
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  placeholder="What for? e.g. paint"
+                  className="flex-1 min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={newCat}
+                  onChange={(e) => setNewCat(e.target.value)}
+                  className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+                >
+                  <option value="">Category (optional)</option>
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <Button variant="accent" onClick={addExp} disabled={addingExp || !newAmt}>
+                  {addingExp ? 'Adding…' : 'Add'}
+                </Button>
+              </div>
+            </div>
           </div>
-          <div className={`grid ${isSold ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
-            <NumField label="Target price" value={target} onChange={setTarget} />
+
+          {/* Prices */}
+          <div className={`grid ${isSold ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
+            <NumField label="Paid" value={acq} onChange={setAcq} />
+            <NumField label="Target" value={target} onChange={setTarget} />
             {isSold && <NumField label="Sold for" value={sale} onChange={setSale} />}
           </div>
+
           <div className="flex items-center gap-3">
             <Button variant="accent" onClick={save} disabled={saving}>
               {saving ? 'Saving…' : 'Save'}

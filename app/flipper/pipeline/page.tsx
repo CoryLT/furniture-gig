@@ -16,7 +16,22 @@ export default async function PipelinePage() {
     .eq('owner_user_id', me)
     .order('created_at', { ascending: false })
 
-  const pieces = (piecesRaw ?? []) as any[]
+  const { data: expRaw } = await supabase
+    .from('piece_expenses')
+    .select('id, piece_id, amount, category, note, spent_on')
+    .eq('owner_user_id', me)
+    .order('created_at', { ascending: true })
+
+  const expByPiece: Record<string, any[]> = {}
+  for (const e of (expRaw ?? []) as any[]) {
+    if (!expByPiece[e.piece_id]) expByPiece[e.piece_id] = []
+    expByPiece[e.piece_id].push(e)
+  }
+
+  const pieces = ((piecesRaw ?? []) as any[]).map((p) => ({
+    ...p,
+    expenses: expByPiece[p.id] ?? [],
+  }))
 
   return (
     <div className="space-y-8">
