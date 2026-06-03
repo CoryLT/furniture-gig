@@ -113,14 +113,25 @@ export default function PayWorkerCard({ gigId, workerId, workerName, amount, fli
       setSaving(false)
       return
     }
-    // Record what you actually paid as this piece's labor cost in the Pipeline.
-    // Best-effort: only matters if this job was added to the pipeline.
+    // Record what you actually paid as a LABOR expense on the linked pipeline
+    // piece, so it flows into the profit HUD (which sums piece_expenses, NOT
+    // the legacy labor_cost column). Best-effort: only if a piece is linked.
     try {
-      await db
+      const { data: piece } = await db
         .from('inventory_pieces')
-        .update({ labor_cost: payAmount, updated_at: new Date().toISOString() })
+        .select('id')
         .eq('source_gig_id', gigId)
         .eq('owner_user_id', flipperUserId)
+        .maybeSingle()
+      if (piece?.id) {
+        await db.from('piece_expenses').insert({
+          piece_id: piece.id,
+          owner_user_id: flipperUserId,
+          amount: payAmount,
+          category: 'labor',
+          note: `Paid ${workerName}`,
+        })
+      }
     } catch {}
     const { data: p } = await db.from('gig_payments').select('*').eq('gig_id', gigId).maybeSingle()
     setPayment(p ?? null)

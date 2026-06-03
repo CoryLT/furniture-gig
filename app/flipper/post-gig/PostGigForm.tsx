@@ -221,7 +221,6 @@ export default function PostGigForm({ existingDraft }: Props) {
             title: published.title || form.title || 'New piece',
             stage: 'sourced',
             acquisition_cost: parseFloat(pieceCost) || 0,
-            labor_cost: published.pay_amount ?? 0,
             notes: published.summary || '',
           })
         }
