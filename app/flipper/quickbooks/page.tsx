@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { qbIsConfigured } from '@/lib/quickbooks'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 
 // Always read the live connection state.
 export const dynamic = 'force-dynamic'
@@ -86,9 +86,12 @@ export default async function QuickbooksPage({
           <p className="text-sm text-muted-foreground">
             You haven&apos;t linked QuickBooks yet.
           </p>
-          <Button asChild variant="accent" className="w-fit">
-            <Link href="/api/quickbooks/connect">Connect QuickBooks</Link>
-          </Button>
+          <Link
+            href="/api/quickbooks/connect"
+            className={buttonVariants({ variant: 'accent', className: 'w-fit' })}
+          >
+            Connect QuickBooks
+          </Link>
         </div>
       )}
     </div>
