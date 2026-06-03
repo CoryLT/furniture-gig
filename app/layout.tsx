@@ -25,6 +25,13 @@ const dmMono = DM_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://myflipwork.com'),
+  applicationName: 'FlipWork',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: 'FlipWork',
+    statusBarStyle: 'default',
+  },
   title: {
     default: 'FlipWork — Profits, not paychecks',
     template: '%s · FlipWork',
@@ -61,6 +68,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
+  themeColor: '#f9f8f6',
 }
 
 export default function RootLayout({
