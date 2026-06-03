@@ -12,6 +12,7 @@ import {
   AlertCircle,
   MoreVertical,
   Edit,
+  UserCheck,
   Archive,
   Trash2,
   Image as ImageIcon,
@@ -70,6 +71,9 @@ export default function FlipperGigList({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<FlipperGig | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<FlipperGig | null>(null)
+  const [offTarget, setOffTarget] = useState<FlipperGig | null>(null)
+  const [offName, setOffName] = useState('')
+  const [offAmount, setOffAmount] = useState('')
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -128,6 +132,76 @@ export default function FlipperGigList({
     }
     setArchiveTarget(null)
     router.refresh()
+  }
+
+  // "Mark done — paid off-platform": close the job, save the worker into Crew
+  // by name (with a running tally), and log the cash to the pipeline piece.
+  async function handleOffPlatform() {
+    if (!offTarget) return
+    const name = offName.trim()
+    const amount = parseFloat(offAmount) || 0
+    if (!name) {
+      setActionError("Enter the worker's name.")
+      return
+    }
+    setBusy(true)
+    setActionError(null)
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not signed in.')
+
+      // 1) Find-or-create the off-platform crew member, bumping their tally.
+      const { data: existing } = await supabase
+        .from('crew_members')
+        .select('id, jobs_count, paid_total')
+        .eq('operator_user_id', user.id)
+        .is('worker_user_id', null)
+        .ilike('worker_name', name)
+        .maybeSingle()
+      if (existing) {
+        await supabase
+          .from('crew_members')
+          .update({
+            jobs_count: (existing.jobs_count ?? 0) + 1,
+            paid_total: Number(existing.paid_total ?? 0) + amount,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id)
+      } else {
+        await supabase.from('crew_members').insert({
+          operator_user_id: user.id,
+          worker_name: name,
+          jobs_count: 1,
+          paid_total: amount,
+        })
+      }
+
+      // 2) Close the job as completed.
+      const { error: gigErr } = await supabase
+        .from('gigs')
+        .update({ status: 'completed' })
+        .eq('id', offTarget.id)
+      if (gigErr) throw gigErr
+
+      // 3) Log the cash to the linked pipeline piece, if there is one.
+      await supabase
+        .from('inventory_pieces')
+        .update({ labor_cost: amount, updated_at: new Date().toISOString() })
+        .eq('source_gig_id', offTarget.id)
+        .eq('owner_user_id', user.id)
+
+      setBusy(false)
+      setOffTarget(null)
+      setOffName('')
+      setOffAmount('')
+      router.refresh()
+    } catch (e: any) {
+      console.error('[flipper-list] off-platform complete error:', e)
+      setActionError(e?.message || 'Could not complete the job.')
+      setBusy(false)
+    }
   }
 
   async function handleDelete() {
@@ -407,6 +481,24 @@ export default function FlipperGigList({
                               <Edit className="w-4 h-4 text-stone-600" />
                               Edit
                             </Link>
+                            {gig.status === 'open' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuId(null)
+                                  setActionError(null)
+                                  setOffName('')
+                                  setOffAmount(
+                                    gig.pay_amount ? String(gig.pay_amount) : ''
+                                  )
+                                  setOffTarget(gig)
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-secondary flex items-center gap-2"
+                              >
+                                <UserCheck className="w-4 h-4 text-stone-600" />
+                                Mark done (off-platform)
+                              </button>
+                            )}
                             {gig.status !== 'archived' && (
                               <button
                                 type="button"
@@ -482,6 +574,75 @@ export default function FlipperGigList({
         onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
       />
+
+      {offTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !busy && setOffTarget(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="font-semibold text-foreground">Mark done — paid off-platform</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Closes &ldquo;{offTarget.title}&rdquo; as completed, logs the cash to its
+                pipeline piece, and saves this person to your Crew.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Worker&apos;s name</label>
+              <input
+                value={offName}
+                onChange={(e) => setOffName(e.target.value)}
+                placeholder="e.g. Marcus"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Cash paid</label>
+              <div className="relative max-w-[170px]">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  $
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={offAmount}
+                  onChange={(e) => setOffAmount(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+              </div>
+            </div>
+
+            {actionError && <p className="text-sm text-destructive">{actionError}</p>}
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setOffTarget(null)}
+                disabled={busy}
+                className="px-3 py-2 text-sm rounded-lg hover:bg-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleOffPlatform}
+                disabled={busy}
+                className="px-3 py-2 text-sm rounded-lg bg-accent text-accent-foreground font-medium disabled:opacity-60"
+              >
+                {busy ? 'Working…' : 'Mark done'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
