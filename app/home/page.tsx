@@ -254,24 +254,8 @@ export default async function HomePage() {
   }
 
   // ============================================================
-  // ACTION SECTION: Unread messages count
-  // ============================================================
-  const { data: convs } = await supabase
-    .from('gig_conversations')
-    .select('id')
-    .or(`flipper_user_id.eq.${user.id},worker_user_id.eq.${user.id}`)
-
-  const convIds = (convs ?? []).map((c: any) => c.id)
-  let unreadCount = 0
-  if (convIds.length > 0) {
-    const { count } = await supabase
-      .from('gig_messages')
-      .select('id', { count: 'exact', head: true })
-      .in('conversation_id', convIds)
-      .neq('sender_user_id', user.id)
-      .is('read_at', null)
-    unreadCount = count ?? 0
-  }
+  // Unread messages are shown by the live <UnreadMessagesCard /> (client-side),
+  // so no server-side unread count is computed here anymore.
 
   // ============================================================
   // ACTION SECTION: Work in progress (as a worker)
@@ -517,7 +501,6 @@ export default async function HomePage() {
   const actionCardCount =
     (needsReview.length > 0 ? 1 : 0) +
     (pendingApplicants.length > 0 ? 1 : 0) +
-    (unreadCount > 0 ? 1 : 0) +
     (workInProgress.length > 0 ? 1 : 0)
 
   return (
@@ -579,7 +562,13 @@ export default async function HomePage() {
           </div>
         ) : (
           <>
-            {/* ACTION SECTIONS */}
+            {/* Live unread card — manages its own visibility (null when none) */}
+            <UnreadMessagesCard />
+
+            {/* ACTION SECTIONS — only render the grid when there's something in it */}
+            {(needsReview.length > 0 ||
+              pendingApplicants.length > 0 ||
+              workInProgress.length > 0) && (
             <div className={`grid gap-4 ${actionCardCount === 1 ? 'grid-cols-1' : 'sm:grid-cols-2'}`}>
               {needsReview.length > 0 && (
                 <ActionCard
@@ -637,9 +626,6 @@ export default async function HomePage() {
                 </ActionCard>
               )}
 
-              {/* Live card — re-counts and clears the moment a message is read */}
-              <UnreadMessagesCard />
-
               {workInProgress.length > 0 && (
                 <ActionCard
                   icon={<Wrench className="w-5 h-5 text-green-600" />}
@@ -669,6 +655,7 @@ export default async function HomePage() {
                 </ActionCard>
               )}
             </div>
+            )}
 
             {/* GO TO — navigation hub into each area of the app */}
             <div className="space-y-5">
