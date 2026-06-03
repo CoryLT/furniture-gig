@@ -29,6 +29,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 export default function EnableNotificationsButton() {
   const [status, setStatus] = useState<Status>('loading')
   const [error, setError] = useState<string | null>(null)
+  const [testMsg, setTestMsg] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -119,6 +120,29 @@ export default function EnableNotificationsButton() {
     }
   }
 
+  async function sendTest() {
+    setTestMsg('Sending…')
+    try {
+      const res = await fetch('/api/push/test', { method: 'POST' })
+      const j = await res.json()
+      if (!j.configured) {
+        setTestMsg(
+          "The server isn't set up to send yet — the VAPID key is missing in Vercel."
+        )
+      } else if (!j.subs) {
+        setTestMsg('No device is registered. Tap "Turn off", then "Turn on" again.')
+      } else if (j.sent > 0) {
+        setTestMsg('Sent! Watch for the buzz in a second.')
+      } else {
+        setTestMsg(
+          "Tried to send, but it didn't go through. Tap Turn off, then Turn on again to refresh this device."
+        )
+      }
+    } catch {
+      setTestMsg('Test failed to run. Try again.')
+    }
+  }
+
   async function disable() {
     setError(null)
     setStatus('working')
@@ -167,17 +191,28 @@ export default function EnableNotificationsButton() {
 
   if (status === 'on') {
     return (
-      <div className={`${card} justify-between`}>
-        <span className="flex items-center gap-2 text-foreground">
-          <BellRing className="w-5 h-5 text-accent shrink-0" />
-          Notifications are on.
-        </span>
-        <button
-          onClick={disable}
-          className="text-muted-foreground hover:text-foreground underline underline-offset-2"
-        >
-          Turn off
-        </button>
+      <div className="rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm">
+        <div className="flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2 text-foreground">
+            <BellRing className="w-5 h-5 text-accent shrink-0" />
+            Notifications are on.
+          </span>
+          <button
+            onClick={disable}
+            className="text-muted-foreground hover:text-foreground underline underline-offset-2 shrink-0"
+          >
+            Turn off
+          </button>
+        </div>
+        <div className="mt-2 flex items-center gap-3 flex-wrap">
+          <button
+            onClick={sendTest}
+            className="bg-accent text-accent-foreground px-3 py-1.5 rounded-lg font-medium shrink-0"
+          >
+            Send a test buzz
+          </button>
+          {testMsg && <span className="text-muted-foreground">{testMsg}</span>}
+        </div>
       </div>
     )
   }
