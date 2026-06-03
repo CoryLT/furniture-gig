@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import CrewList from './CrewList'
-import { formatCurrency } from '@/lib/utils'
+import OffPlatformCrewList from './OffPlatformCrewList'
 
 // Crew data changes whenever a worker is picked or paid — always fresh.
 export const dynamic = 'force-dynamic'
@@ -142,7 +142,7 @@ export default async function CrewPage() {
   // Off-platform crew: name-only people you hired in person (no app account).
   const { data: offRaw } = await supabase
     .from('crew_members')
-    .select('id, worker_name, jobs_count, paid_total')
+    .select('id, worker_name, jobs_count, paid_total, rating, notes, would_rehire')
     .eq('operator_user_id', me)
     .is('worker_user_id', null)
   const offCrew = ((offRaw ?? []) as any[]).map((m) => ({
@@ -150,6 +150,9 @@ export default async function CrewPage() {
     name: ((m.worker_name as string) || 'Unnamed').trim() || 'Unnamed',
     jobs: (m.jobs_count as number) ?? 0,
     paid: Number(m.paid_total ?? 0),
+    rating: (m.rating as number) ?? null,
+    notes: (m.notes as string) ?? '',
+    wouldRehire: (m.would_rehire as boolean) ?? null,
   }))
 
   return (
@@ -181,30 +184,7 @@ export default async function CrewPage() {
                   People you hired in person and paid in cash. Tracked here by name.
                 </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {offCrew.map((m) => (
-                  <div
-                    key={m.id}
-                    className="card card-body flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-sm font-semibold text-foreground shrink-0">
-                        {m.name.slice(0, 1).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground truncate">{m.name}</p>
-                        <p className="text-xs text-muted-foreground">Off-platform</p>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm text-foreground">
-                        {m.jobs} job{m.jobs === 1 ? '' : 's'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{formatCurrency(m.paid)} paid</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <OffPlatformCrewList crew={offCrew} />
             </div>
           )}
         </>
