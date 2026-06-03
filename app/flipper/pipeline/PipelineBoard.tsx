@@ -61,6 +61,7 @@ export default function PipelineBoard({
   const [pieces, setPieces] = useState<Piece[]>(initialPieces)
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState('')
+  const [openStat, setOpenStat] = useState<string | null>(null)
 
   function imageUrl(path?: string | null) {
     if (!path) return null
@@ -73,13 +74,12 @@ export default function PipelineBoard({
   const tiedUp = unsold.reduce((s, p) => s + costsOf(p), 0)
   const allTimeProfit = sold.reduce((s, p) => s + realized(p), 0)
   const now = new Date()
-  const monthProfit = sold
-    .filter((p) => {
-      if (!p.sold_at) return false
-      const d = new Date(p.sold_at)
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
-    })
-    .reduce((s, p) => s + realized(p), 0)
+  const soldThisMonth = sold.filter((p) => {
+    if (!p.sold_at) return false
+    const d = new Date(p.sold_at)
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  })
+  const monthProfit = soldThisMonth.reduce((s, p) => s + realized(p), 0)
 
   // ---- image upload (shared moderation flow) ----
   async function uploadImage(pieceId: string, file: File): Promise<string | null> {
@@ -246,11 +246,50 @@ export default function PipelineBoard({
   return (
     <div className="space-y-6">
       {/* HUD */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Stat label="Cash tied up" value={money(tiedUp)} hint={`${unsold.length} in progress`} />
-        <Stat label="In the pipeline" value={String(unsold.length)} hint="pieces not yet sold" />
-        <Stat label="Profit this month" value={money(monthProfit)} hint="from pieces sold" accent />
-        <Stat label="All-time profit" value={money(allTimeProfit)} hint={`${sold.length} flipped`} accent />
+      <div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Stat
+            label="Cash tied up"
+            value={money(tiedUp)}
+            hint={`${unsold.length} in progress`}
+            selected={openStat === 'tied_up'}
+            onClick={() => setOpenStat((k) => (k === 'tied_up' ? null : 'tied_up'))}
+          />
+          <Stat
+            label="In the pipeline"
+            value={String(unsold.length)}
+            hint="pieces not yet sold"
+            selected={openStat === 'count'}
+            onClick={() => setOpenStat((k) => (k === 'count' ? null : 'count'))}
+          />
+          <Stat
+            label="Profit this month"
+            value={money(monthProfit)}
+            hint="from pieces sold"
+            accent
+            selected={openStat === 'month'}
+            onClick={() => setOpenStat((k) => (k === 'month' ? null : 'month'))}
+          />
+          <Stat
+            label="All-time profit"
+            value={money(allTimeProfit)}
+            hint={`${sold.length} flipped`}
+            accent
+            selected={openStat === 'alltime'}
+            onClick={() => setOpenStat((k) => (k === 'alltime' ? null : 'alltime'))}
+          />
+        </div>
+        {openStat && (
+          <div className="mt-3">
+            <StatDetail
+              statKey={openStat}
+              onClose={() => setOpenStat(null)}
+              unsold={unsold}
+              soldThisMonth={soldThisMonth}
+              sold={sold}
+            />
+          </div>
+        )}
       </div>
 
       {/* Add */}
@@ -310,17 +349,151 @@ function Stat({
   value,
   hint,
   accent,
+  selected,
+  onClick,
 }: {
   label: string
   value: string
   hint?: string
   accent?: boolean
+  selected?: boolean
+  onClick?: () => void
 }) {
   return (
-    <div className="card card-body">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`card card-body text-left w-full transition-shadow hover:shadow-md cursor-pointer ${
+        selected ? 'ring-2 ring-accent/40' : ''
+      }`}
+    >
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className={`text-xl font-semibold ${accent ? 'text-accent' : 'text-foreground'}`}>{value}</p>
       {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
+      <p className="text-[11px] text-accent mt-1">{selected ? 'Hide details' : 'See details'}</p>
+    </button>
+  )
+}
+
+function StatDetail({
+  statKey,
+  onClose,
+  unsold,
+  soldThisMonth,
+  sold,
+}: {
+  statKey: string
+  onClose: () => void
+  unsold: Piece[]
+  soldThisMonth: Piece[]
+  sold: Piece[]
+}) {
+  const stageLabel = (s: Stage) => STAGES.find((x) => x.key === s)?.label ?? s
+  const dateOf = (d: string | null) => (d ? new Date(d).toLocaleDateString() : undefined)
+
+  type Row = { id: string; name: string; sub?: string; value: string; tone?: 'good' | 'bad' }
+
+  let title = ''
+  let subtitle = ''
+  let rows: Row[] = []
+  let empty = ''
+
+  if (statKey === 'tied_up') {
+    title = 'Cash tied up'
+    subtitle = "What you've put into pieces you haven't sold yet."
+    rows = [...unsold]
+      .sort((a, b) => costsOf(b) - costsOf(a))
+      .map((p) => ({
+        id: p.id,
+        name: p.title || 'Untitled piece',
+        sub: stageLabel(p.stage),
+        value: money(costsOf(p)),
+      }))
+    empty = 'No cash tied up — nothing in progress.'
+  } else if (statKey === 'count') {
+    title = 'In the pipeline'
+    subtitle = 'Pieces by stage (not yet sold).'
+    const stages: Stage[] = ['sourced', 'in_progress', 'listed']
+    rows =
+      unsold.length === 0
+        ? []
+        : stages.map((s) => ({
+            id: s,
+            name: stageLabel(s),
+            value: String(unsold.filter((p) => p.stage === s).length),
+          }))
+    empty = 'Nothing in the pipeline yet.'
+  } else if (statKey === 'month') {
+    title = 'Profit this month'
+    subtitle = 'Pieces you sold this month and what each one cleared.'
+    rows = [...soldThisMonth]
+      .sort((a, b) => realized(b) - realized(a))
+      .map((p) => ({
+        id: p.id,
+        name: p.title || 'Untitled piece',
+        sub: dateOf(p.sold_at),
+        value: money(realized(p)),
+        tone: realized(p) >= 0 ? 'good' : 'bad',
+      }))
+    empty = 'No pieces sold yet this month.'
+  } else {
+    title = 'All-time profit'
+    subtitle = "Every piece you've flipped."
+    rows = [...sold]
+      .sort((a, b) => (b.sold_at || '').localeCompare(a.sold_at || ''))
+      .map((p) => ({
+        id: p.id,
+        name: p.title || 'Untitled piece',
+        sub: dateOf(p.sold_at),
+        value: money(realized(p)),
+        tone: realized(p) >= 0 ? 'good' : 'bad',
+      }))
+    empty = 'No flips completed yet.'
+  }
+
+  return (
+    <div className="card card-body space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-foreground text-sm">{title}</p>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-muted-foreground hover:text-foreground shrink-0"
+          aria-label="Close details"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{empty}</p>
+      ) : (
+        <div className="divide-y divide-border max-h-80 overflow-auto">
+          {rows.map((r) => (
+            <div key={r.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+              <div className="min-w-0">
+                <p className="text-foreground truncate">{r.name}</p>
+                {r.sub && <p className="text-xs text-muted-foreground">{r.sub}</p>}
+              </div>
+              <span
+                className={`shrink-0 font-medium ${
+                  r.tone === 'bad'
+                    ? 'text-red-600'
+                    : r.tone === 'good'
+                    ? 'text-accent'
+                    : 'text-foreground'
+                }`}
+              >
+                {r.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
