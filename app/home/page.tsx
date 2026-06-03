@@ -9,6 +9,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import BusinessSetupCard from './BusinessSetupCard'
 import EnableNotificationsButton from '@/components/notifications/EnableNotificationsButton'
 import AddToHomeScreenPrompt from '@/components/notifications/AddToHomeScreenPrompt'
+import UnreadMessagesCard from '@/components/home/UnreadMessagesCard'
 import {
   DollarSign,
   Briefcase,
@@ -636,14 +637,8 @@ export default async function HomePage() {
                 </ActionCard>
               )}
 
-              {unreadCount > 0 && (
-                <ActionCard
-                  icon={<MessageSquare className="w-5 h-5 text-blue-600" />}
-                  title={`${unreadCount} unread message${unreadCount === 1 ? '' : 's'}`}
-                  subtitle="Catch up on your conversations"
-                  href="/messages"
-                />
-              )}
+              {/* Live card — re-counts and clears the moment a message is read */}
+              <UnreadMessagesCard />
 
               {workInProgress.length > 0 && (
                 <ActionCard
