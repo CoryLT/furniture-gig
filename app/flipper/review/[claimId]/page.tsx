@@ -118,7 +118,7 @@ export default async function FlipperReviewPage({ params }: Props) {
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
-        Back to gig
+        Back to job
       </Link>
 
       {/* Gig header */}

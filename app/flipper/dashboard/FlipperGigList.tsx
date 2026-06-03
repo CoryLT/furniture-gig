@@ -123,7 +123,7 @@ export default function FlipperGigList({
     setBusy(false)
     if (error) {
       console.error('[flipper-list] archive error:', error)
-      setActionError(error.message || 'Could not archive gig.')
+      setActionError(error.message || 'Could not archive job.')
       return
     }
     setArchiveTarget(null)
@@ -141,7 +141,7 @@ export default function FlipperGigList({
       const body = await res.json().catch(() => ({}))
       setBusy(false)
       if (!res.ok) {
-        setActionError(body?.error || 'Could not delete gig.')
+        setActionError(body?.error || 'Could not delete job.')
         return
       }
       setDeleteTarget(null)
@@ -149,7 +149,7 @@ export default function FlipperGigList({
     } catch (e) {
       console.error('[flipper-list] delete error:', e)
       setBusy(false)
-      setActionError('Could not delete gig. Try again.')
+      setActionError('Could not delete job. Try again.')
     }
   }
 
@@ -292,7 +292,7 @@ export default function FlipperGigList({
       {/* List */}
       {visibleGigs.length === 0 ? (
         <div className="card card-body text-center py-12">
-          <p className="text-muted-foreground">No gigs match this filter.</p>
+          <p className="text-muted-foreground">No jobs match this filter.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -374,7 +374,7 @@ export default function FlipperGigList({
                       <Link
                         href={`/flipper/gigs/${gig.id}`}
                         className="flex items-center gap-3 group"
-                        aria-label="Open gig"
+                        aria-label="Open job"
                       >
                         <span className="font-mono font-semibold text-foreground">
                           {formatCurrency(gig.pay_amount)}
@@ -454,7 +454,7 @@ export default function FlipperGigList({
 
       <ConfirmActionModal
         open={!!archiveTarget}
-        title="Archive this gig?"
+        title="Archive this job?"
         description={
           archiveTarget
             ? `"${archiveTarget.title}" will be hidden from workers and from your dashboard. Claims and history are kept.`
@@ -469,7 +469,7 @@ export default function FlipperGigList({
 
       <ConfirmActionModal
         open={!!deleteTarget}
-        title="Delete this gig permanently?"
+        title="Delete this job permanently?"
         description={
           deleteTarget
             ? `"${deleteTarget.title}" and every claim, photo, checklist item, message, and payout record attached to it will be removed.\n\nThis cannot be undone.`

@@ -126,7 +126,7 @@ export default function PostGigForm({ existingDraft }: Props) {
 
     if (insertError || !newGig) {
       console.error('[post-gig] error:', insertError)
-      setError(insertError?.message ?? 'Could not save the gig.')
+      setError(insertError?.message ?? 'Could not save the job.')
       setLoading(false)
       return
     }
@@ -176,7 +176,7 @@ export default function PostGigForm({ existingDraft }: Props) {
 
     if (publishError) {
       console.error('[post-gig] publish error:', publishError)
-      setError(publishError.message ?? 'Could not publish the gig.')
+      setError(publishError.message ?? 'Could not publish the job.')
       setPublishing(false)
       return
     }
@@ -191,7 +191,7 @@ export default function PostGigForm({ existingDraft }: Props) {
   async function handleDiscardDraft() {
     if (!savedGigId) return
     const ok = window.confirm(
-      'Delete this draft and start a new gig from scratch? This cannot be undone.',
+      'Delete this draft and start a new job from scratch? This cannot be undone.',
     )
     if (!ok) return
 
@@ -335,7 +335,7 @@ export default function PostGigForm({ existingDraft }: Props) {
                 <label htmlFor="description" className="field-label">Full Description</label>
                 <textarea id="description" name="description" value={form.description}
                   onChange={handleChange} className="field-input min-h-[120px] resize-none"
-                  placeholder="Describe the gig — what needs doing, the condition of anything involved, and any details that matter..."
+                  placeholder="Describe the job — what needs doing, the condition of anything involved, and any details that matter..."
                   required />
               </div>
 

@@ -25,7 +25,7 @@ export default function ExportButton({
   rows: Row[]
 }) {
   function download() {
-    const header = ['Worker', 'Username', 'Date Paid', 'Gig', 'Method', 'Amount']
+    const header = ['Worker', 'Username', 'Date Paid', 'Job', 'Method', 'Amount']
     const lines = [header.map(csvCell).join(',')]
     for (const r of rows) {
       lines.push(

@@ -151,7 +151,7 @@ export default async function CrewPage() {
         <div className="card card-body text-center py-16 space-y-3">
           <p className="text-lg text-muted-foreground">No crew yet.</p>
           <p className="text-sm text-muted-foreground">
-            Once you pick a worker for one of your gigs, they&apos;ll show up here so you
+            Once you pick a worker for one of your jobs, they&apos;ll show up here so you
             can track and rate them.
           </p>
         </div>

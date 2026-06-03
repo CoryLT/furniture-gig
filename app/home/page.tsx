@@ -538,7 +538,7 @@ export default async function HomePage() {
                 Welcome to FlipWork.
               </h2>
               <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                You're early — FlipWork just launched. Post a gig to get help
+                You're early — FlipWork just launched. Post a Job to get help
                 on a furniture project, or browse open gigs to pick up some
                 work. Your dashboard fills in as you go.
               </p>
@@ -549,7 +549,7 @@ export default async function HomePage() {
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent/90 transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                Post your first gig
+                Post your first Job
               </Link>
               <Link
                 href="/gigs"
@@ -664,8 +664,8 @@ export default async function HomePage() {
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Flipper</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <NavTile href="/flipper/post-gig" icon={<Plus className="w-5 h-5" />} title="Post a gig" subtitle="Get help on a project" />
-                  <NavTile href="/flipper/dashboard" icon={<ClipboardCheck className="w-5 h-5" />} title="My posted gigs" subtitle="Gigs you've posted" />
+                  <NavTile href="/flipper/post-gig" icon={<Plus className="w-5 h-5" />} title="Post a Job" subtitle="Get help on a project" />
+                  <NavTile href="/flipper/dashboard" icon={<ClipboardCheck className="w-5 h-5" />} title="My posted Jobs" subtitle="Jobs you've posted" />
                   <NavTile href="/flipper/payouts" icon={<DollarSign className="w-5 h-5" />} title="Payouts" subtitle="Money you've spent" />
                 </div>
               </div>
