@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Plus, ArrowRight, Trash2, ImageIcon, X } from 'lucide-react'
+import { Plus, ArrowRight, Trash2, ImageIcon, X, ChevronDown } from 'lucide-react'
 import { compressImageForUpload, isAcceptableImageFile } from '@/lib/imageCompression'
 
 type Stage = 'sourced' | 'in_progress' | 'listed' | 'sold'
@@ -517,56 +517,62 @@ function PieceCard({
 
   return (
     <div className="card card-body space-y-2">
-      {imgUrl && <img src={imgUrl} alt={piece.title} className="w-full h-28 object-cover rounded-lg" />}
+      {/* Tap anywhere on this top part to open or close the card's details */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full text-left space-y-2 cursor-pointer"
+      >
+        {imgUrl && <img src={imgUrl} alt={piece.title} className="w-full h-28 object-cover rounded-lg" />}
 
-      <div className="min-w-0">
-        <p className="font-medium text-foreground text-sm truncate">{piece.title || 'Untitled piece'}</p>
-        {piece.source && <p className="text-xs text-muted-foreground truncate">{piece.source}</p>}
-      </div>
-
-      <div className="text-xs text-muted-foreground space-y-0.5">
-        <div className="flex justify-between">
-          <span>In so far</span>
-          <span className="text-foreground">{money(costsOf(piece))}</span>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-medium text-foreground text-sm truncate">{piece.title || 'Untitled piece'}</p>
+            {piece.source && <p className="text-xs text-muted-foreground truncate">{piece.source}</p>}
+          </div>
+          <ChevronDown
+            className={`w-4 h-4 text-muted-foreground shrink-0 mt-0.5 transition-transform ${
+              open ? 'rotate-180' : ''
+            }`}
+          />
         </div>
-        {isSold ? (
-          <div className="flex justify-between">
-            <span>Sold for</span>
-            <span className="text-foreground">{money(n(piece.sale_price))}</span>
-          </div>
-        ) : (
-          piece.target_price != null && (
-            <div className="flex justify-between">
-              <span>Target</span>
-              <span className="text-foreground">{money(n(piece.target_price))}</span>
-            </div>
-          )
-        )}
-        {hasProfit && (
-          <div className="flex justify-between pt-1 border-t border-border">
-            <span>{isSold ? 'Profit' : 'Projected'}</span>
-            <span className={profit >= 0 ? 'text-accent font-semibold' : 'text-red-600 font-semibold'}>
-              {money(profit)}
-            </span>
-          </div>
-        )}
-      </div>
 
-      <div className="flex items-center gap-2 pt-1">
-        {nextLabel && (
-          <Button variant="accent" onClick={() => onAdvance(piece)}>
-            {nextLabel}
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Button>
-        )}
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="text-xs text-muted-foreground hover:text-foreground ml-auto"
-        >
-          {open ? 'Close' : 'Edit'}
-        </button>
-      </div>
+        <div className="text-xs text-muted-foreground space-y-0.5">
+          <div className="flex justify-between">
+            <span>In so far</span>
+            <span className="text-foreground">{money(costsOf(piece))}</span>
+          </div>
+          {isSold ? (
+            <div className="flex justify-between">
+              <span>Sold for</span>
+              <span className="text-foreground">{money(n(piece.sale_price))}</span>
+            </div>
+          ) : (
+            piece.target_price != null && (
+              <div className="flex justify-between">
+                <span>Target</span>
+                <span className="text-foreground">{money(n(piece.target_price))}</span>
+              </div>
+            )
+          )}
+          {hasProfit && (
+            <div className="flex justify-between pt-1 border-t border-border">
+              <span>{isSold ? 'Profit' : 'Projected'}</span>
+              <span className={profit >= 0 ? 'text-accent font-semibold' : 'text-red-600 font-semibold'}>
+                {money(profit)}
+              </span>
+            </div>
+          )}
+        </div>
+      </button>
+
+      {nextLabel && (
+        <Button variant="accent" onClick={() => onAdvance(piece)}>
+          {nextLabel}
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Button>
+      )}
 
       {open && (
         <div className="space-y-3 pt-2 border-t border-border">
