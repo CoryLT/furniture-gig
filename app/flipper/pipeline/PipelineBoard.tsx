@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Plus, ArrowRight, Trash2 } from 'lucide-react'
+import { Plus, ArrowRight, Trash2, ImageIcon } from 'lucide-react'
+import { compressImageForUpload, isAcceptableImageFile } from '@/lib/imageCompression'
 
 type Stage = 'sourced' | 'in_progress' | 'listed' | 'sold'
 
@@ -18,6 +19,7 @@ type Piece = {
   labor_cost: number | null
   target_price: number | null
   sale_price: number | null
+  image_path: string | null
   notes: string | null
   acquired_at: string | null
   listed_at: string | null
@@ -37,8 +39,7 @@ const costsOf = (p: Piece) =>
   n(p.acquisition_cost) + n(p.materials_cost) + n(p.labor_cost)
 const realized = (p: Piece) => n(p.sale_price) - costsOf(p)
 const expected = (p: Piece) => n(p.target_price) - costsOf(p)
-const money = (v: number) =>
-  `${v < 0 ? '-' : ''}$${Math.abs(v).toFixed(2)}`
+const money = (v: number) => `${v < 0 ? '-' : ''}$${Math.abs(v).toFixed(2)}`
 
 export default function PipelineBoard({
   userId,
@@ -53,7 +54,12 @@ export default function PipelineBoard({
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState('')
 
-  // ---- HUD numbers (recomputed from state) ----
+  function imageUrl(path?: string | null) {
+    if (!path) return null
+    return supabase.storage.from('marketplace-photos').getPublicUrl(path).data.publicUrl
+  }
+
+  // ---- HUD numbers ----
   const unsold = pieces.filter((p) => p.stage !== 'sold')
   const sold = pieces.filter((p) => p.stage === 'sold')
   const tiedUp = unsold.reduce((s, p) => s + costsOf(p), 0)
@@ -67,8 +73,48 @@ export default function PipelineBoard({
     })
     .reduce((s, p) => s + realized(p), 0)
 
+  // ---- image upload (shared moderation flow) ----
+  async function uploadImage(pieceId: string, file: File): Promise<string | null> {
+    if (!isAcceptableImageFile(file)) {
+      setError('That file type isn\u2019t supported. Try a JPG or PNG.')
+      return null
+    }
+    let toSend = file
+    try {
+      toSend = await compressImageForUpload(file)
+    } catch {
+      // fall back to the original if compression fails
+    }
+    const fd = new FormData()
+    fd.append('file', toSend)
+    fd.append('pieceId', pieceId)
+    try {
+      const res = await fetch('/api/upload-piece-image', { method: 'POST', body: fd })
+      const json = await res.json()
+      if (!res.ok || !json?.image?.file_path) {
+        setError(json?.error || 'Photo upload failed.')
+        return null
+      }
+      return json.image.file_path as string
+    } catch {
+      setError('Photo upload failed.')
+      return null
+    }
+  }
+
+  function setPieceImage(id: string, path: string) {
+    setPieces((prev) => prev.map((p) => (p.id === id ? { ...p, image_path: path } : p)))
+  }
+
+  async function handlePhoto(pieceId: string, file: File) {
+    setError('')
+    const path = await uploadImage(pieceId, file)
+    if (path) setPieceImage(pieceId, path)
+    return !!path
+  }
+
   // ---- mutations ----
-  async function createPiece(fields: Partial<Piece>) {
+  async function createPiece(fields: Partial<Piece>, file?: File | null) {
     setError('')
     const { data, error: err } = await (supabase.from('inventory_pieces') as any)
       .insert({
@@ -83,7 +129,12 @@ export default function PipelineBoard({
       setError('Could not add the piece. Try again.')
       return
     }
-    setPieces((prev) => [data as Piece, ...prev])
+    const piece = data as Piece
+    if (file) {
+      const path = await uploadImage(piece.id, file)
+      if (path) piece.image_path = path
+    }
+    setPieces((prev) => [piece, ...prev])
     setAdding(false)
     router.refresh()
   }
@@ -104,9 +155,7 @@ export default function PipelineBoard({
 
   async function deletePiece(id: string) {
     setError('')
-    const { error: err } = await (supabase.from('inventory_pieces') as any)
-      .delete()
-      .eq('id', id)
+    const { error: err } = await (supabase.from('inventory_pieces') as any).delete().eq('id', id)
     if (err) {
       setError('Could not delete. Try again.')
       return
@@ -120,9 +169,7 @@ export default function PipelineBoard({
     if (i >= ORDER.length - 1) return
     const next = ORDER[i + 1]
     const patch: Partial<Piece> = { stage: next }
-    if (next === 'listed' && !piece.listed_at) {
-      patch.listed_at = new Date().toISOString()
-    }
+    if (next === 'listed' && !piece.listed_at) patch.listed_at = new Date().toISOString()
     if (next === 'sold') {
       const input = window.prompt(
         'Sold! What did it sell for?',
@@ -183,9 +230,11 @@ export default function PipelineBoard({
                     <PieceCard
                       key={p.id}
                       piece={p}
+                      imgUrl={imageUrl(p.image_path)}
                       onAdvance={advance}
                       onUpdate={updatePiece}
                       onDelete={deletePiece}
+                      onPhoto={handlePhoto}
                     />
                   ))
                 )}
@@ -212,9 +261,7 @@ function Stat({
   return (
     <div className="card card-body">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`text-xl font-semibold ${accent ? 'text-accent' : 'text-foreground'}`}>
-        {value}
-      </p>
+      <p className={`text-xl font-semibold ${accent ? 'text-accent' : 'text-foreground'}`}>{value}</p>
       {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
     </div>
   )
@@ -225,29 +272,60 @@ function AddPieceForm({
   onCreate,
 }: {
   onCancel: () => void
-  onCreate: (fields: Partial<Piece>) => void
+  onCreate: (fields: Partial<Piece>, file?: File | null) => void
 }) {
   const [title, setTitle] = useState('')
   const [source, setSource] = useState('')
   const [acq, setAcq] = useState('')
   const [target, setTarget] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  function pickFile(f: File | null) {
+    setFile(f)
+    setPreview(f ? URL.createObjectURL(f) : null)
+  }
 
   async function submit() {
     if (!title.trim()) return
     setSaving(true)
-    await onCreate({
-      title: title.trim(),
-      source: source.trim() || null,
-      acquisition_cost: acq ? parseFloat(acq) || 0 : 0,
-      target_price: target ? parseFloat(target) : null,
-    })
+    await onCreate(
+      {
+        title: title.trim(),
+        source: source.trim() || null,
+        acquisition_cost: acq ? parseFloat(acq) || 0 : 0,
+        target_price: target ? parseFloat(target) : null,
+      },
+      file
+    )
     setSaving(false)
   }
 
   return (
     <div className="card card-body space-y-3">
       <p className="font-semibold text-foreground text-sm">New piece</p>
+
+      {/* Photo */}
+      <div className="flex items-center gap-3">
+        <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
+          {preview ? (
+            <img src={preview} alt="preview" className="w-full h-full object-cover" />
+          ) : (
+            <ImageIcon className="w-6 h-6 text-muted-foreground/50" />
+          )}
+        </div>
+        <label className="text-sm text-accent hover:underline cursor-pointer">
+          {preview ? 'Change photo' : 'Add a photo'}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+          />
+        </label>
+      </div>
+
       <input
         type="text"
         value={title}
@@ -288,11 +366,7 @@ function AddPieceForm({
         <Button variant="accent" onClick={submit} disabled={saving || !title.trim()}>
           {saving ? 'Adding…' : 'Add piece'}
         </Button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
+        <button type="button" onClick={onCancel} className="text-sm text-muted-foreground hover:text-foreground">
           Cancel
         </button>
       </div>
@@ -302,17 +376,22 @@ function AddPieceForm({
 
 function PieceCard({
   piece,
+  imgUrl,
   onAdvance,
   onUpdate,
   onDelete,
+  onPhoto,
 }: {
   piece: Piece
+  imgUrl: string | null
   onAdvance: (p: Piece) => void
   onUpdate: (id: string, patch: Partial<Piece>) => Promise<boolean>
   onDelete: (id: string) => void
+  onPhoto: (id: string, file: File) => Promise<boolean>
 }) {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [acq, setAcq] = useState(String(piece.acquisition_cost ?? ''))
   const [mat, setMat] = useState(String(piece.materials_cost ?? ''))
   const [lab, setLab] = useState(String(piece.labor_cost ?? ''))
@@ -337,6 +416,13 @@ function PieceCard({
     if (ok) setOpen(false)
   }
 
+  async function choosePhoto(f: File | null) {
+    if (!f) return
+    setUploading(true)
+    await onPhoto(piece.id, f)
+    setUploading(false)
+  }
+
   const nextLabel =
     piece.stage === 'sourced'
       ? 'Start work'
@@ -348,13 +434,13 @@ function PieceCard({
 
   return (
     <div className="card card-body space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-medium text-foreground text-sm truncate">{piece.title || 'Untitled piece'}</p>
-          {piece.source && (
-            <p className="text-xs text-muted-foreground truncate">{piece.source}</p>
-          )}
-        </div>
+      {imgUrl && (
+        <img src={imgUrl} alt={piece.title} className="w-full h-28 object-cover rounded-lg" />
+      )}
+
+      <div className="min-w-0">
+        <p className="font-medium text-foreground text-sm truncate">{piece.title || 'Untitled piece'}</p>
+        {piece.source && <p className="text-xs text-muted-foreground truncate">{piece.source}</p>}
       </div>
 
       <div className="text-xs text-muted-foreground space-y-0.5">
@@ -403,6 +489,17 @@ function PieceCard({
 
       {open && (
         <div className="space-y-2 pt-2 border-t border-border">
+          <label className="text-sm text-accent hover:underline cursor-pointer inline-flex items-center gap-1.5">
+            <ImageIcon className="w-3.5 h-3.5" />
+            {uploading ? 'Uploading…' : imgUrl ? 'Change photo' : 'Add a photo'}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={uploading}
+              onChange={(e) => choosePhoto(e.target.files?.[0] ?? null)}
+            />
+          </label>
           <div className="grid grid-cols-3 gap-2">
             <NumField label="Paid" value={acq} onChange={setAcq} />
             <NumField label="Materials" value={mat} onChange={setMat} />
@@ -419,7 +516,7 @@ function PieceCard({
             <button
               type="button"
               onClick={() => {
-                if (window.confirm(`Delete "${piece.title || 'this piece'}"? This can't be undone.`)) {
+                if (window.confirm(`Delete "${piece.title || 'this piece'}"? This can\u2019t be undone.`)) {
                   onDelete(piece.id)
                 }
               }}
