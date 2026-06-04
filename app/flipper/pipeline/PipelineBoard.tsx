@@ -52,9 +52,11 @@ const money = (v: number) => `${v < 0 ? '-' : ''}$${Math.abs(v).toFixed(2)}`
 export default function PipelineBoard({
   userId,
   initialPieces,
+  qbReady = false,
 }: {
   userId: string
   initialPieces: Piece[]
+  qbReady?: boolean
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -332,6 +334,7 @@ export default function PipelineBoard({
                       onPhoto={handlePhoto}
                       onAddExpense={addExpense}
                       onDeleteExpense={deleteExpense}
+                      qbReady={qbReady}
                     />
                   ))
                 )}
@@ -613,6 +616,7 @@ function PieceCard({
   onPhoto,
   onAddExpense,
   onDeleteExpense,
+  qbReady,
 }: {
   piece: Piece
   imgUrl: string | null
@@ -625,10 +629,13 @@ function PieceCard({
     fields: { amount: number; note: string; category: string | null }
   ) => Promise<boolean>
   onDeleteExpense: (pieceId: string, expenseId: string) => void
+  qbReady?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [qbSending, setQbSending] = useState(false)
+  const [qbMsg, setQbMsg] = useState('')
   const [acq, setAcq] = useState(String(piece.acquisition_cost ?? ''))
   const [target, setTarget] = useState(String(piece.target_price ?? ''))
   const [sale, setSale] = useState(String(piece.sale_price ?? ''))
@@ -651,6 +658,37 @@ function PieceCard({
     const ok = await onUpdate(piece.id, patch)
     setSaving(false)
     if (ok) setOpen(false)
+  }
+
+  async function sendToQuickbooks() {
+    setQbSending(true)
+    setQbMsg('')
+    try {
+      const res = await fetch('/api/quickbooks/sync-piece', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pieceId: piece.id }),
+      })
+      const json = await res.json()
+      if (!json.ok) {
+        setQbMsg(
+          json.error === 'no_mapping'
+            ? 'Set up your QuickBooks cost mapping first.'
+            : json.error === 'not_connected'
+            ? 'Connect QuickBooks first.'
+            : 'Could not send to QuickBooks.'
+        )
+      } else if (json.alreadyDone || json.created === 0) {
+        setQbMsg('Already in QuickBooks \u2014 nothing new to send.')
+      } else {
+        setQbMsg(
+          `Sent ${json.created} cost${json.created === 1 ? '' : 's'} to QuickBooks.`
+        )
+      }
+    } catch {
+      setQbMsg('Could not send to QuickBooks.')
+    }
+    setQbSending(false)
   }
 
   async function choosePhoto(f: File | null) {
@@ -835,6 +873,20 @@ function PieceCard({
             <NumField label="Target" value={target} onChange={setTarget} />
             {isSold && <NumField label="Sold for" value={sale} onChange={setSale} />}
           </div>
+
+          {qbReady && (
+            <div className="space-y-1.5 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={sendToQuickbooks}
+                disabled={qbSending}
+                className="text-sm text-accent hover:underline disabled:opacity-50"
+              >
+                {qbSending ? 'Sending\u2026' : 'Send costs to QuickBooks'}
+              </button>
+              {qbMsg && <p className="text-xs text-muted-foreground">{qbMsg}</p>}
+            </div>
+          )}
 
           <div className="flex items-center gap-3">
             <Button variant="accent" onClick={save} disabled={saving}>

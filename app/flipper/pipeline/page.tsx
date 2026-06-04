@@ -33,6 +33,24 @@ export default async function PipelinePage() {
     expenses: expByPiece[p.id] ?? [],
   }))
 
+  // Is QuickBooks connected AND a cost mapping saved? Controls the
+  // "Send costs to QuickBooks" button on each piece.
+  const { data: qbConn } = await supabase
+    .from('quickbooks_connections')
+    .select('owner_user_id')
+    .eq('owner_user_id', me)
+    .maybeSingle()
+  const { data: qbSettings } = await supabase
+    .from('quickbooks_settings')
+    .select('paid_from_account_id, category_map')
+    .eq('owner_user_id', me)
+    .maybeSingle()
+  const qbReady =
+    !!qbConn &&
+    !!qbSettings?.paid_from_account_id &&
+    !!qbSettings?.category_map &&
+    Object.keys(qbSettings.category_map as Record<string, unknown>).length > 0
+
   return (
     <div className="space-y-8">
       <div>
@@ -42,7 +60,7 @@ export default async function PipelinePage() {
           they progress and watch the profit land.
         </p>
       </div>
-      <PipelineBoard userId={me} initialPieces={pieces} />
+      <PipelineBoard userId={me} initialPieces={pieces} qbReady={qbReady} />
     </div>
   )
 }
