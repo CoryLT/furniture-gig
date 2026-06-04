@@ -26,6 +26,8 @@ const userLinks: NavItem[] = [
   { href: '/flipper/pipeline', label: 'Pipeline' },
   { href: '/flipper/crew', label: 'My Crew' },
   { href: '/flipper/records', label: 'Payment Records' },
+  { href: '/flipper/receipts', label: 'Snap a Receipt' },
+  { href: '/flipper/quickbooks', label: 'QuickBooks' },
   { divider: true },
   { href: '/gigs', label: 'Browse Gigs' },
   { href: '/my-gigs', label: 'My Gigs' },
