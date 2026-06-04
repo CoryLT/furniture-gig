@@ -1,12 +1,31 @@
 'use client'
 
 import { useState } from 'react'
-import { ImageIcon, CheckCircle2 } from 'lucide-react'
+import { ImageIcon, CheckCircle2, Plus, X } from 'lucide-react'
 import { compressImageForUpload, isAcceptableImageFile } from '@/lib/imageCompression'
 
-type Account = { id: string; name: string; paymentType?: string }
+type Piece = { id: string; title: string }
 
-export default function ReceiptScanner() {
+type Line = {
+  key: string
+  description: string
+  amount: string
+  category: string
+  pieceId: string
+}
+
+const CATS: { key: string; label: string }[] = [
+  { key: 'purchase', label: 'Purchase' },
+  { key: 'materials', label: 'Materials' },
+  { key: 'labor', label: 'Labor' },
+  { key: 'transport', label: 'Transport' },
+  { key: 'fees', label: 'Fees' },
+  { key: 'other', label: 'Other' },
+]
+
+const newKey = () => Math.random().toString(36).slice(2)
+
+export default function ReceiptScanner({ pieces }: { pieces: Piece[] }) {
   const [phase, setPhase] = useState<
     'idle' | 'reading' | 'review' | 'saving' | 'saved' | 'error'
   >('idle')
@@ -15,15 +34,11 @@ export default function ReceiptScanner() {
   const [fileToSave, setFileToSave] = useState<File | null>(null)
 
   const [vendor, setVendor] = useState('')
-  const [amount, setAmount] = useState('')
   const [date, setDate] = useState('')
-
-  const [paidFrom, setPaidFrom] = useState<Account[]>([])
-  const [categories, setCategories] = useState<Account[]>([])
-  const [paidFromId, setPaidFromId] = useState('')
-  const [categoryId, setCategoryId] = useState('')
-
-  const [result, setResult] = useState<{ attached: boolean } | null>(null)
+  const [lines, setLines] = useState<Line[]>([])
+  const [result, setResult] = useState<{ lines: number; tagged: number; attached: boolean } | null>(
+    null
+  )
 
   function reset() {
     setPhase('idle')
@@ -31,28 +46,13 @@ export default function ReceiptScanner() {
     setPreview(null)
     setFileToSave(null)
     setVendor('')
-    setAmount('')
     setDate('')
+    setLines([])
     setResult(null)
   }
 
-  async function loadAccounts() {
-    try {
-      const res = await fetch('/api/quickbooks/accounts')
-      const json = await res.json()
-      if (!json.ok) return
-      setPaidFrom(json.paidFrom || [])
-      setCategories(json.categories || [])
-      if (json.paidFrom?.[0]) setPaidFromId(json.paidFrom[0].id)
-      if (json.categories?.length) {
-        const supplies = json.categories.find((c: Account) =>
-          /suppl/i.test(c.name)
-        )
-        setCategoryId((supplies || json.categories[0]).id)
-      }
-    } catch {
-      // dropdowns just stay empty; user sees the message
-    }
+  function blankLine(): Line {
+    return { key: newKey(), description: '', amount: '', category: 'materials', pieceId: '' }
   }
 
   async function onPick(file: File | null) {
@@ -80,27 +80,52 @@ export default function ReceiptScanner() {
       const json = await res.json()
       if (json.ok) {
         setVendor(json.vendor || '')
-        setAmount(json.amount != null ? String(json.amount) : '')
         setDate(json.date || '')
+        const fromItems: Line[] = (json.items || [])
+          .filter((it: any) => Number.isFinite(it.amount) && it.amount > 0)
+          .map((it: any) => ({
+            key: newKey(),
+            description: it.description || '',
+            amount: String(it.amount),
+            category: 'materials',
+            pieceId: '',
+          }))
+        setLines(fromItems.length ? fromItems : [blankLine()])
       } else {
-        setError('Couldn\u2019t read that one — type the details in by hand.')
+        setLines([blankLine()])
+        setError('Couldn\u2019t read that one — add the lines by hand.')
       }
     } catch {
-      setError('Couldn\u2019t read that one — type the details in by hand.')
+      setLines([blankLine()])
+      setError('Couldn\u2019t read that one — add the lines by hand.')
     }
     setPhase('review')
-    loadAccounts()
   }
+
+  function updateLine(key: string, patch: Partial<Line>) {
+    setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)))
+  }
+  function addLine() {
+    setLines((prev) => [...prev, blankLine()])
+  }
+  function removeLine(key: string) {
+    setLines((prev) => prev.filter((l) => l.key !== key))
+  }
+
+  const total = lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0)
 
   async function save() {
     setError('')
-    const amt = parseFloat(amount)
-    if (!Number.isFinite(amt) || amt <= 0) {
-      setError('Enter an amount.')
-      return
-    }
-    if (!categoryId || !paidFromId) {
-      setError('Pick a category and a paid-from account.')
+    const payload = lines
+      .map((l) => ({
+        description: l.description.trim(),
+        amount: parseFloat(l.amount),
+        category: l.category,
+        pieceId: l.pieceId || null,
+      }))
+      .filter((l) => Number.isFinite(l.amount) && l.amount > 0)
+    if (payload.length === 0) {
+      setError('Add at least one line with an amount.')
       return
     }
     if (!fileToSave) {
@@ -108,25 +133,24 @@ export default function ReceiptScanner() {
       return
     }
     setPhase('saving')
-    const paymentType =
-      paidFrom.find((a) => a.id === paidFromId)?.paymentType || 'Cash'
     try {
       const fd = new FormData()
       fd.append('file', fileToSave)
       fd.append('vendor', vendor)
-      fd.append('amount', String(amt))
       fd.append('date', date)
-      fd.append('categoryId', categoryId)
-      fd.append('paidFromId', paidFromId)
-      fd.append('paymentType', paymentType)
+      fd.append('lines', JSON.stringify(payload))
       const res = await fetch('/api/receipts/save', { method: 'POST', body: fd })
       const json = await res.json()
       if (!json.ok) {
         setPhase('review')
-        setError('Couldn\u2019t save to QuickBooks. Please try again.')
+        setError(
+          json.error === 'no_mapping'
+            ? 'Set up your cost mapping first.'
+            : 'Couldn\u2019t save to QuickBooks. Please try again.'
+        )
         return
       }
-      setResult({ attached: !!json.attached })
+      setResult({ lines: json.lines || 0, tagged: json.tagged || 0, attached: !!json.attached })
       setPhase('saved')
     } catch {
       setPhase('review')
@@ -135,7 +159,7 @@ export default function ReceiptScanner() {
   }
 
   const inputCls =
-    'mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30'
+    'rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30'
 
   if (phase === 'saved') {
     return (
@@ -145,10 +169,11 @@ export default function ReceiptScanner() {
           <p className="font-medium">Saved to QuickBooks</p>
         </div>
         <p className="text-sm text-muted-foreground">
-          The expense was added to your books
+          {result?.lines} line{result?.lines === 1 ? '' : 's'} saved
+          {result?.tagged ? `, ${result.tagged} tagged to a piece` : ''}
           {result?.attached
-            ? ' with the receipt photo attached.'
-            : '. (The photo couldn\u2019t be attached this time, but the expense is saved.)'}
+            ? ', with the receipt photo attached.'
+            : '. (The photo couldn\u2019t attach this time, but the expense is saved.)'}
         </p>
         <button
           type="button"
@@ -186,28 +211,15 @@ export default function ReceiptScanner() {
 
       {(phase === 'review' || phase === 'saving') && (
         <div className="card card-body space-y-3">
-          <p className="text-sm font-medium text-foreground">Check and save</p>
-
-          <label className="text-xs text-muted-foreground block">
-            Vendor
-            <input
-              type="text"
-              value={vendor}
-              onChange={(e) => setVendor(e.target.value)}
-              placeholder="Store name"
-              className={inputCls}
-            />
-          </label>
-
           <div className="grid grid-cols-2 gap-3">
             <label className="text-xs text-muted-foreground block">
-              Amount
+              Vendor
               <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                className={inputCls}
+                type="text"
+                value={vendor}
+                onChange={(e) => setVendor(e.target.value)}
+                placeholder="Store name"
+                className={`mt-1 w-full ${inputCls}`}
               />
             </label>
             <label className="text-xs text-muted-foreground block">
@@ -216,42 +228,82 @@ export default function ReceiptScanner() {
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className={inputCls}
+                className={`mt-1 w-full ${inputCls}`}
               />
             </label>
           </div>
 
-          <label className="text-xs text-muted-foreground block">
-            Category (what kind of expense)
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className={inputCls}
-            >
-              <option value="">Choose a category</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="space-y-3 border-t border-border pt-3">
+            <p className="text-xs font-medium text-foreground">
+              Lines — tag each to a piece, or leave general
+            </p>
+            {lines.map((l) => (
+              <div key={l.key} className="space-y-1.5 rounded-lg border border-border p-2">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={l.description}
+                    onChange={(e) => updateLine(l.key, { description: e.target.value })}
+                    placeholder="What is it?"
+                    className={`flex-1 min-w-0 ${inputCls}`}
+                  />
+                  <input
+                    type="number"
+                    value={l.amount}
+                    onChange={(e) => updateLine(l.key, { amount: e.target.value })}
+                    placeholder="$"
+                    className={`w-20 ${inputCls}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeLine(l.key)}
+                    className="text-muted-foreground hover:text-red-600 shrink-0"
+                    aria-label="Remove line"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={l.category}
+                    onChange={(e) => updateLine(l.key, { category: e.target.value })}
+                    className={`flex-1 ${inputCls}`}
+                  >
+                    {CATS.map((c) => (
+                      <option key={c.key} value={c.key}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={l.pieceId}
+                    onChange={(e) => updateLine(l.key, { pieceId: e.target.value })}
+                    className={`flex-1 ${inputCls}`}
+                  >
+                    <option value="">General (no piece)</option>
+                    {pieces.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ))}
 
-          <label className="text-xs text-muted-foreground block">
-            Paid from
-            <select
-              value={paidFromId}
-              onChange={(e) => setPaidFromId(e.target.value)}
-              className={inputCls}
+            <button
+              type="button"
+              onClick={addLine}
+              className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline"
             >
-              <option value="">Choose an account</option>
-              {paidFrom.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </label>
+              <Plus className="w-3.5 h-3.5" />
+              Add a line
+            </button>
+
+            <p className="text-xs text-muted-foreground">
+              Lines total: <span className="text-foreground">${total.toFixed(2)}</span>
+            </p>
+          </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -265,8 +317,6 @@ export default function ReceiptScanner() {
           </button>
         </div>
       )}
-
-      {phase === 'idle' && error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   )
 }

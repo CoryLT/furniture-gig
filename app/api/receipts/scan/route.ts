@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   try {
     const resp = await anthropic.messages.create({
       model: SUPPORT_MODEL,
-      max_tokens: 300,
+      max_tokens: 700,
       messages: [
         {
           role: 'user',
@@ -49,10 +49,12 @@ export async function POST(req: Request) {
             {
               type: 'text',
               text:
-                'Read this store receipt. Reply with ONLY a JSON object and nothing ' +
-                'else: {"vendor": string|null, "amount": number|null, "date": ' +
-                '"YYYY-MM-DD"|null}. "amount" is the final grand total actually paid. ' +
-                'Use null for anything you cannot read.',
+                'Read this store receipt. Reply with ONLY a JSON object, nothing ' +
+                'else: {"vendor": string|null, "date": "YYYY-MM-DD"|null, "total": ' +
+                'number|null, "items": [{"description": string, "amount": number}]}. ' +
+                '"total" is the grand total paid. "items" are the individual line ' +
+                'items with their prices (skip tax, subtotal, and total lines). Use ' +
+                'null or [] for anything you cannot read.',
             },
           ],
         },
@@ -70,21 +72,36 @@ export async function POST(req: Request) {
     try {
       parsed = JSON.parse(clean)
     } catch {
-      // leave parsed empty -> all nulls, user fills manually
+      // leave parsed empty -> user fills manually
     }
 
-    const amount =
-      typeof parsed.amount === 'number'
-        ? parsed.amount
-        : parsed.amount
-        ? Number(parsed.amount)
+    const total =
+      typeof parsed.total === 'number'
+        ? parsed.total
+        : parsed.total
+        ? Number(parsed.total)
         : null
+
+    const items = Array.isArray(parsed.items)
+      ? parsed.items
+          .map((it: any) => ({
+            description: typeof it?.description === 'string' ? it.description : '',
+            amount:
+              typeof it?.amount === 'number'
+                ? it.amount
+                : it?.amount
+                ? Number(it.amount)
+                : null,
+          }))
+          .filter((it: any) => Number.isFinite(it.amount))
+      : []
 
     return NextResponse.json({
       ok: true,
       vendor: parsed.vendor ?? null,
-      amount: Number.isFinite(amount) ? amount : null,
       date: parsed.date ?? null,
+      total: Number.isFinite(total) ? total : null,
+      items,
     })
   } catch (e: any) {
     console.error('[receipt scan] error:', e)
