@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { qbIsConfigured } from '@/lib/quickbooks'
 import { buttonVariants } from '@/components/ui/button'
 import TestConnectionButton from './TestConnectionButton'
+import CostMapping from './CostMapping'
 
 // Always read the live connection state.
 export const dynamic = 'force-dynamic'
@@ -63,26 +64,29 @@ export default async function QuickbooksPage({
           added in Vercel, this page will show a Connect button.
         </div>
       ) : connected ? (
-        <div className="card card-body space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-accent" />
-            <p className="font-medium text-foreground">Connected</p>
+        <>
+          <div className="card card-body space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-accent" />
+              <p className="font-medium text-foreground">Connected</p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Company ID: <span className="text-foreground">{conn!.realm_id}</span>
+              <br />
+              Mode: <span className="text-foreground">{conn!.environment}</span>
+            </p>
+            <TestConnectionButton />
+            <form action="/api/quickbooks/disconnect" method="post">
+              <button
+                type="submit"
+                className="text-sm text-muted-foreground hover:text-red-600"
+              >
+                Disconnect
+              </button>
+            </form>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Company ID: <span className="text-foreground">{conn!.realm_id}</span>
-            <br />
-            Mode: <span className="text-foreground">{conn!.environment}</span>
-          </p>
-          <TestConnectionButton />
-          <form action="/api/quickbooks/disconnect" method="post">
-            <button
-              type="submit"
-              className="text-sm text-muted-foreground hover:text-red-600"
-            >
-              Disconnect
-            </button>
-          </form>
-        </div>
+          <CostMapping />
+        </>
       ) : (
         <div className="card card-body space-y-3">
           <p className="text-sm text-muted-foreground">
