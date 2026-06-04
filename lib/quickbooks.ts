@@ -32,7 +32,7 @@ export function qbIsConfigured(): boolean {
   return Boolean(c.clientId && c.clientSecret && c.redirectUri)
 }
 
-function basicAuthHeader(): string {
+export function qbBasicAuth(): string {
   const { clientId, clientSecret } = qbConfig()
   return 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
 }
@@ -68,7 +68,7 @@ export async function exchangeCodeForTokens(code: string): Promise<QBTokens> {
   const res = await fetch(QBO_TOKEN_URL, {
     method: 'POST',
     headers: {
-      Authorization: basicAuthHeader(),
+      Authorization: qbBasicAuth(),
       'Content-Type': 'application/x-www-form-urlencoded',
       Accept: 'application/json',
     },
@@ -88,7 +88,7 @@ export async function revokeToken(token: string): Promise<void> {
     await fetch(QBO_REVOKE_URL, {
       method: 'POST',
       headers: {
-        Authorization: basicAuthHeader(),
+        Authorization: qbBasicAuth(),
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },

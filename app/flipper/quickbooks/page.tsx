@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { qbIsConfigured } from '@/lib/quickbooks'
 import { buttonVariants } from '@/components/ui/button'
+import TestConnectionButton from './TestConnectionButton'
 
 // Always read the live connection state.
 export const dynamic = 'force-dynamic'
@@ -72,6 +73,7 @@ export default async function QuickbooksPage({
             <br />
             Mode: <span className="text-foreground">{conn!.environment}</span>
           </p>
+          <TestConnectionButton />
           <form action="/api/quickbooks/disconnect" method="post">
             <button
               type="submit"
