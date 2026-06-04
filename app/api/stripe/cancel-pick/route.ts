@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { cancelPickAuthorization } from '@/lib/stripe-pick'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -9,14 +8,14 @@ export const revalidate = 0
 /**
  * POST /api/stripe/cancel-pick
  *
- * No-show handling. The gig poster (or admin) cancels the worker they
- * picked. In order:
- *   1. Verify caller is the gig poster (or admin).
+ * No-show handling. The gig poster (or admin) un-picks the worker they
+ * chose and reopens the gig so someone else can apply.
+ *
+ * Payments are direct & off-platform now (Stripe removed, May 2026), so
+ * there is no money hold to release here. Un-picking is purely:
+ *   1. Verify the caller is the gig poster (or admin).
  *   2. Verify the claim is 'active' (a currently picked worker).
- *   3. Refuse if the payment was already captured (worker was paid) —
- *      that needs a refund, not a cancel.
- *   4. Release the Stripe hold so the flipper is charged nothing.
- *   5. Void the payout record, cancel the claim, reopen the gig.
+ *   3. Cancel the claim and reopen the gig.
  *
  * Body: { claimId: string }
  */
@@ -60,7 +59,7 @@ export async function POST(req: Request) {
     )
   }
 
-  // Load the gig + verify caller is the poster or an admin.
+  // Load the gig + verify the caller is the poster or an admin.
   const { data: gig, error: gigErr } = await supabase
     .from('gigs')
     .select('id, poster_user_id, created_by, status')
@@ -88,61 +87,6 @@ export async function POST(req: Request) {
 
   // Auth checks passed — use the admin client for the writes (bypasses RLS).
   const admin = createAdminClient()
-
-  // Find the most recent payout record holding this gig+worker payment.
-  const { data: payout } = await admin
-    .from('payout_records')
-    .select('id, stripe_payment_intent_id, payment_status')
-    .eq('gig_id', claim.gig_id)
-    .eq('worker_user_id', claim.worker_user_id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const paymentStatus = (payout as any)?.payment_status as string | undefined
-
-  // Safety: never silently reverse money that already moved.
-  if (paymentStatus === 'captured' || paymentStatus === 'transferred') {
-    return NextResponse.json(
-      {
-        error:
-          'This payment was already captured (the worker was paid). Cancel is only for no-shows before payment — handle this as a refund instead.',
-      },
-      { status: 409 }
-    )
-  }
-
-  // Release the Stripe authorization hold if one is still live.
-  const paymentIntentId = (payout as any)?.stripe_payment_intent_id as
-    | string
-    | undefined
-  if (paymentIntentId && paymentStatus === 'authorized') {
-    try {
-      await cancelPickAuthorization(paymentIntentId)
-    } catch (err: any) {
-      const msg = err?.message || ''
-      // If Stripe says it's already canceled/expired, treat as success.
-      const benign = /already|cancel|no longer|expired|succeeded/i.test(msg)
-      if (!benign) {
-        return NextResponse.json(
-          { error: `Could not release the payment hold: ${msg}` },
-          { status: 502 }
-        )
-      }
-    }
-  }
-
-  // Void the payout record (payout_status stays a legal value: 'unpaid').
-  if ((payout as any)?.id) {
-    await admin
-      .from('payout_records')
-      .update({
-        payment_status: 'canceled',
-        payout_status: 'unpaid',
-        notes: 'No-show — gig cancelled and payment hold released.',
-      })
-      .eq('id', (payout as any).id)
-  }
 
   // Cancel the claim.
   const { error: claimUpdErr } = await admin
