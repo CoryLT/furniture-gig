@@ -5,7 +5,97 @@
 
 ---
 
-## Latest session — June 3, 2026 (App polish · pay→pipeline · off-platform crew)
+## Latest session — June 3, 2026 (QuickBooks integration · SANDBOX, not yet live)
+
+Built a full QuickBooks Online bookkeeping pipeline. **It all works against a
+practice (sandbox) company — it is NOT yet pointed at real books.** Going live is
+the next session's job (checklist below). All shipped to `main`; SQL + env below.
+
+**OAuth connect.** `app/api/quickbooks/connect|callback|disconnect/route.ts` +
+`lib/quickbooks.ts` (authorize URL, code/token exchange, refresh-token revoke,
+`qbBasicAuth`, `qbConfig`, `qbIsConfigured`). Connection saved in
+`quickbooks_connections` (one row/user: realm_id, access/refresh tokens, expiries,
+environment). Settings page `app/flipper/quickbooks/page.tsx` (Connect / Disconnect /
+status) + `TestConnectionButton.tsx` (reads CompanyInfo to prove the link).
+
+**API layer** `lib/quickbooks-api.ts`: `getFreshConnection(userId)` reads the row
+(admin client) and refreshes the access token if within 5 min of expiry, saving the
+new pair; `qboFetch(conn, path, init)` makes authenticated calls (base URL sandbox vs
+production by `environment`).
+
+**Receipts** (`/flipper/receipts`, `ReceiptScanner.tsx`). Snap →
+`app/api/receipts/scan/route.ts` (Anthropic Haiku 4.5 vision via `lib/anthropic.ts`
+`SUPPORT_MODEL`; returns vendor/date/total/**items[]**). The user splits the receipt
+into lines, tags each line to a **piece** or leaves it **General**, picks a category.
+Save → `app/api/receipts/save/route.ts`: creates **ONE** QBO Purchase with a line per
+receipt line (each line's account from the category map), attaches the photo **once**,
+and for piece-tagged lines ALSO writes a `piece_expenses` row + a `quickbooks_synced`
+marker so the piece sync won't repost it.
+
+**Cost mapping** `CostMapping.tsx` + `app/api/quickbooks/settings/route.ts` →
+`quickbooks_settings` (paid_from_account_id, `category_map` jsonb {flipwork category →
+QBO account}, income_account_id, deposit_to_account_id). `app/api/quickbooks/accounts/
+route.ts` returns paidFrom / categories(expense) / income(Revenue) / bank lists.
+
+**Per-piece sync** `app/api/quickbooks/sync-piece/route.ts` (POST {pieceId}). Sends
+acquisition_cost (as `purchase`) + each piece_expense as QBO **Purchases**, and a sold
+piece's sale_price as a QBO **Deposit** (DepositLineDetail.AccountRef = income account,
+DepositToAccountRef = bank). Idempotent via `quickbooks_synced` (unique
+owner+source_type+source_id; source_type ∈ piece_acquisition | piece_expense |
+piece_sale). Button "Send to QuickBooks" in `PipelineBoard.tsx` PieceCard, shown only
+when `qbReady` (connected + mapping set), threaded from the pipeline page. Also: clickable
+pipeline cards + clickable HUD stat breakdowns + an off-platform "Mark complete" button +
+a `purchase` expense category were added earlier this session.
+
+**SQL run (Supabase):** `schema_quickbooks_connections_20260603.sql`,
+`schema_quickbooks_settings_20260603.sql`, `schema_quickbooks_settings_income_20260603.sql`,
+`schema_quickbooks_synced_20260603.sql`, `schema_piece_expenses_add_purchase_category_20260603.sql`.
+
+**Env vars (Vercel, Production):** `QUICKBOOKS_CLIENT_ID`, `QUICKBOOKS_CLIENT_SECRET`
+(currently **development/sandbox** keys), `QUICKBOOKS_REDIRECT_URI` =
+`https://myflipwork.com/api/quickbooks/callback`, `QUICKBOOKS_ENVIRONMENT` = `sandbox`.
+Also added **`NEXT_PUBLIC_SITE_URL` = `https://myflipwork.com`** (fixed the OAuth redirect
+landing on the *.vercel.app deploy domain).
+
+**Intuit setup:** app "FlipWork" at developer.intuit.com; redirect URI registered on the
+**Development** side. Had to **create a sandbox company** manually (developer portal →
+Sandbox companies → Create, QBO Plus / US) — connect failed "no sandbox companies found"
+until then.
+
+**GO-LIVE checklist (next session — point at REAL books):**
+1. developer.intuit.com → complete the **Production app assessment** (App details +
+   Compliance) → get production keys.
+2. Vercel → swap CLIENT_ID/SECRET to the **production** values; set
+   `QUICKBOOKS_ENVIRONMENT=production`; redeploy.
+3. Reconnect at `/flipper/quickbooks` (now picks the real company); redo the cost mapping
+   against real accounts.
+4. **Sanity-check the mapping with Cory's accountant before relying on it** (books accuracy).
+
+**Gotchas that cost real time:**
+- `components/ui/button.tsx` Button always renders a hidden loading slot, so
+  `<Button asChild>` hands Radix Slot two children → `React.Children.only` throws → page
+  crash. Don't use Button asChild; style a `<Link>` with `buttonVariants(...)`.
+- `getSiteUrl()` falls back to `VERCEL_URL` (per-deploy *.vercel.app host) when
+  `NEXT_PUBLIC_SITE_URL` is unset → OAuth callback redirected to the wrong domain and
+  bounced to login. Fixed by setting `NEXT_PUBLIC_SITE_URL`.
+- Sales use a QBO **Deposit**, NOT SalesReceipt, to avoid needing Item/Customer records.
+- Attachment upload = multipart parts `file_metadata_01` + `file_content_01`; best-effort
+  (expense still saved if the photo attach fails).
+
+**Double-count cautions (by design — tell Cory):**
+- Both doors into QBO share `quickbooks_synced` ONLY for piece-tagged items. A receipt line
+  tagged to a piece → piece_expense + synced marker → piece sync skips it. General receipt
+  lines are standalone QBO expenses.
+- The piece "Paid" box (acquisition_cost) is already sent as a `purchase` expense by the
+  piece sync — do NOT also log the buy price as a separate purchase line, or it doubles.
+
+**Open follow-ups:** editing/deleting a FlipWork cost after sync does NOT update/remove the
+QBO entry (no back-sync); income mapping must be set for sales to sync; pre-existing Stripe
+dead-code cleanup still pending (live landmine: admin `ReviewActions.tsx` capture call).
+
+---
+
+## Previous session — June 3, 2026 (App polish · pay→pipeline · off-platform crew)
 
 A later June-3 session. All shipped to `main`; SQL to run is listed below. Cory
 deploys via local `git pull` / `git push` (~45-60s for Vercel).
@@ -148,7 +238,7 @@ defeat the rules.
 
 - **App:** FlipWork — a two-sided platform for the flipping economy. People post gigs, claim gigs, sell items on a marketplace, and (new) advertise services they offer. Furniture was the origin; it's now "anything that can legally be flipped."
 - **Repo:** `github.com/CoryLT/furniture-gig` (code name stayed `furniture-gig`; brand is FlipWork).
-- **Stack:** Next.js 14.1 (App Router) · Supabase (Postgres + Auth + Storage) · Tailwind 3.3 · Resend (email) · Sightengine (image moderation) · Anthropic (AI support). Deployed on Vercel.
+- **Stack:** Next.js 14.1 (App Router) · Supabase (Postgres + Auth + Storage) · Tailwind 3.3 · Resend (email) · Sightengine (image moderation) · Anthropic (AI support + receipt reading) · QuickBooks Online API (bookkeeping sync — sandbox for now). Deployed on Vercel.
 - **Domain:** myflipwork.com (live). **Payments are now direct & off-platform — Stripe removed. See Payments below.**
 - **Operating entity:** Groovy Greens, LLC (NC) d/b/a FlipWork. NC governing law, binding arbitration + class waiver in TOS.
 
