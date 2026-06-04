@@ -38,11 +38,15 @@ export async function POST(req: Request) {
   // Mapping
   const { data: settings } = await supabase
     .from('quickbooks_settings')
-    .select('paid_from_account_id, category_map')
+    .select(
+      'paid_from_account_id, category_map, income_account_id, deposit_to_account_id'
+    )
     .eq('owner_user_id', user.id)
     .maybeSingle()
   const paidFromId = settings?.paid_from_account_id || ''
   const categoryMap: Record<string, string> = (settings?.category_map as any) || {}
+  const incomeAccountId = settings?.income_account_id || ''
+  const depositToAccountId = settings?.deposit_to_account_id || ''
   if (!paidFromId || Object.keys(categoryMap).length === 0) {
     return NextResponse.json({ ok: false, error: 'no_mapping' }, { status: 400 })
   }
@@ -50,7 +54,7 @@ export async function POST(req: Request) {
   // Piece + expenses (owner-scoped)
   const { data: piece } = await supabase
     .from('inventory_pieces')
-    .select('id, title, acquisition_cost, acquired_at')
+    .select('id, title, acquisition_cost, acquired_at, sale_price, sold_at, stage')
     .eq('id', pieceId)
     .eq('owner_user_id', user.id)
     .maybeSingle()
@@ -105,7 +109,13 @@ export async function POST(req: Request) {
     }
   }
 
-  if (items.length === 0) {
+  const salePrice = Number((piece as any).sale_price || 0)
+  const wantSale =
+    (piece as any).stage === 'sold' &&
+    salePrice > 0 &&
+    !done.has(`piece_sale:${piece.id}`)
+
+  if (items.length === 0 && !wantSale) {
     return NextResponse.json({ ok: true, created: 0, alreadyDone: true })
   }
 
@@ -162,6 +172,49 @@ export async function POST(req: Request) {
     } catch (e: any) {
       console.error('[sync-piece] item error:', e)
       errors.push(String(e?.message || e).slice(0, 120))
+    }
+  }
+
+  // Send the sale as income (a deposit booked to the income account).
+  if (wantSale) {
+    if (!incomeAccountId || !depositToAccountId) {
+      errors.push('Set the income mapping to send the sale.')
+    } else {
+      const soldDate = (piece as any).sold_at
+        ? String((piece as any).sold_at).slice(0, 10)
+        : null
+      const deposit: any = {
+        DepositToAccountRef: { value: depositToAccountId },
+        Line: [
+          {
+            Amount: salePrice,
+            DetailType: 'DepositLineDetail',
+            DepositLineDetail: { AccountRef: { value: incomeAccountId } },
+            Description: `${(piece as any).title || 'Piece'} sale`,
+          },
+        ],
+      }
+      if (soldDate) deposit.TxnDate = soldDate
+      try {
+        const createdDep = await qboFetch(conn, 'deposit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(deposit),
+        })
+        const depId = createdDep?.Deposit?.Id ?? null
+        await supabase.from('quickbooks_synced').insert({
+          owner_user_id: user.id,
+          source_type: 'piece_sale',
+          source_id: piece.id,
+          qbo_type: 'Deposit',
+          qbo_id: depId,
+          amount: salePrice,
+        })
+        created++
+      } catch (e: any) {
+        console.error('[sync-piece] sale error:', e)
+        errors.push(String(e?.message || e).slice(0, 120))
+      }
     }
   }
 

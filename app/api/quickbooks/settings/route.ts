@@ -15,13 +15,15 @@ export async function GET() {
   const admin = createAdminClient()
   const { data } = await admin
     .from('quickbooks_settings')
-    .select('paid_from_account_id, category_map')
+    .select('paid_from_account_id, category_map, income_account_id, deposit_to_account_id')
     .eq('owner_user_id', user.id)
     .maybeSingle()
   return NextResponse.json({
     ok: true,
     paidFromAccountId: data?.paid_from_account_id ?? '',
     categoryMap: data?.category_map ?? {},
+    incomeAccountId: data?.income_account_id ?? '',
+    depositToAccountId: data?.deposit_to_account_id ?? '',
   })
 }
 
@@ -45,6 +47,10 @@ export async function POST(req: Request) {
     typeof body.paidFromAccountId === 'string' ? body.paidFromAccountId : null
   const categoryMap =
     body.categoryMap && typeof body.categoryMap === 'object' ? body.categoryMap : {}
+  const incomeAccountId =
+    typeof body.incomeAccountId === 'string' ? body.incomeAccountId : null
+  const depositToAccountId =
+    typeof body.depositToAccountId === 'string' ? body.depositToAccountId : null
 
   const admin = createAdminClient()
   const { error } = await admin.from('quickbooks_settings').upsert(
@@ -52,6 +58,8 @@ export async function POST(req: Request) {
       owner_user_id: user.id,
       paid_from_account_id: paidFromAccountId,
       category_map: categoryMap,
+      income_account_id: incomeAccountId,
+      deposit_to_account_id: depositToAccountId,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'owner_user_id' }

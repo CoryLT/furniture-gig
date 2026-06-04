@@ -39,7 +39,15 @@ export async function GET() {
       .filter((a) => a.Classification === 'Expense')
       .map((a) => ({ id: a.Id, name: a.Name }))
 
-    return NextResponse.json({ ok: true, paidFrom, categories })
+    const income = accounts
+      .filter((a) => a.Classification === 'Revenue')
+      .map((a) => ({ id: a.Id, name: a.Name }))
+
+    const bank = accounts
+      .filter((a) => ['Bank', 'Other Current Asset'].includes(a.AccountType))
+      .map((a) => ({ id: a.Id, name: a.Name }))
+
+    return NextResponse.json({ ok: true, paidFrom, categories, income, bank })
   } catch (e: any) {
     console.error('[quickbooks] accounts error:', e)
     return NextResponse.json(

@@ -17,8 +17,12 @@ export default function CostMapping() {
   const [loading, setLoading] = useState(true)
   const [expenseAccounts, setExpenseAccounts] = useState<Account[]>([])
   const [paidFromAccounts, setPaidFromAccounts] = useState<Account[]>([])
+  const [incomeAccounts, setIncomeAccounts] = useState<Account[]>([])
+  const [bankAccounts, setBankAccounts] = useState<Account[]>([])
   const [map, setMap] = useState<Record<string, string>>({})
   const [paidFromId, setPaidFromId] = useState('')
+  const [incomeId, setIncomeId] = useState('')
+  const [depositToId, setDepositToId] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -37,10 +41,14 @@ export default function CostMapping() {
         if (acc.ok) {
           setExpenseAccounts(acc.categories || [])
           setPaidFromAccounts(acc.paidFrom || [])
+          setIncomeAccounts(acc.income || [])
+          setBankAccounts(acc.bank || [])
         }
         if (set.ok) {
           setMap(set.categoryMap || {})
           setPaidFromId(set.paidFromAccountId || '')
+          setIncomeId(set.incomeAccountId || '')
+          setDepositToId(set.depositToAccountId || '')
         }
       } catch {
         if (active) setError('Could not load your QuickBooks accounts.')
@@ -61,7 +69,12 @@ export default function CostMapping() {
       const res = await fetch('/api/quickbooks/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paidFromAccountId: paidFromId, categoryMap: map }),
+        body: JSON.stringify({
+          paidFromAccountId: paidFromId,
+          categoryMap: map,
+          incomeAccountId: incomeId,
+          depositToAccountId: depositToId,
+        }),
       })
       const json = await res.json()
       if (!json.ok) {
@@ -136,6 +149,46 @@ export default function CostMapping() {
                 </select>
               </label>
             ))}
+          </div>
+
+          <div className="border-t border-border pt-3 space-y-3">
+            <p className="text-xs font-medium text-foreground">When a piece sells</p>
+            <label className="text-xs text-muted-foreground block">
+              Sales income goes to
+              <select
+                value={incomeId}
+                onChange={(e) => {
+                  setIncomeId(e.target.value)
+                  setSaved(false)
+                }}
+                className={selectCls}
+              >
+                <option value="">Choose an income account</option>
+                {incomeAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs text-muted-foreground block">
+              Deposited into
+              <select
+                value={depositToId}
+                onChange={(e) => {
+                  setDepositToId(e.target.value)
+                  setSaved(false)
+                }}
+                className={selectCls}
+              >
+                <option value="">Choose a bank account</option>
+                {bankAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

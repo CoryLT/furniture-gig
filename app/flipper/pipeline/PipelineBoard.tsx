@@ -678,12 +678,15 @@ function PieceCard({
             ? 'Connect QuickBooks first.'
             : 'Could not send to QuickBooks.'
         )
-      } else if (json.alreadyDone || json.created === 0) {
-        setQbMsg('Already in QuickBooks \u2014 nothing new to send.')
-      } else {
+      } else if (json.created > 0) {
         setQbMsg(
-          `Sent ${json.created} cost${json.created === 1 ? '' : 's'} to QuickBooks.`
+          `Sent ${json.created} item${json.created === 1 ? '' : 's'} to QuickBooks.` +
+            (json.errors && json.errors.length ? ' Some items had an issue.' : '')
         )
+      } else if (json.errors && json.errors.length) {
+        setQbMsg(json.errors[0])
+      } else {
+        setQbMsg('Already in QuickBooks \u2014 nothing new to send.')
       }
     } catch {
       setQbMsg('Could not send to QuickBooks.')
@@ -882,7 +885,7 @@ function PieceCard({
                 disabled={qbSending}
                 className="text-sm text-accent hover:underline disabled:opacity-50"
               >
-                {qbSending ? 'Sending\u2026' : 'Send costs to QuickBooks'}
+                {qbSending ? 'Sending\u2026' : 'Send to QuickBooks'}
               </button>
               {qbMsg && <p className="text-xs text-muted-foreground">{qbMsg}</p>}
             </div>
