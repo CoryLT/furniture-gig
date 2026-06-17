@@ -6,6 +6,10 @@ import CountUp from '@/components/play/CountUp'
 import GameBar from '@/components/play/GameBar'
 import RankEmblem from '@/components/play/RankEmblem'
 import RankTrail from '@/components/play/RankTrail'
+import EnableNotificationsButton from '@/components/notifications/EnableNotificationsButton'
+import AddToHomeScreenPrompt from '@/components/notifications/AddToHomeScreenPrompt'
+import UnreadMessagesCard from '@/components/home/UnreadMessagesCard'
+import BusinessSetupCard from '../home/BusinessSetupCard'
 import type { ReactNode } from 'react'
 import { ImageIcon, ArrowRight, TrendingUp, TrendingDown, Coins, Lock, Target, Check } from 'lucide-react'
 
@@ -103,6 +107,15 @@ export default async function PlayPage() {
     (flipperProfile as any)?.business_name ||
     user.email ||
     ''
+
+  // Business profile for the Business Setup card (carried over from the old dashboard).
+  const { data: businessProfile } = await supabase
+    .from('business_profiles')
+    .select(
+      'business_name, structure, business_state, ein, bank_name, bookkeeping_tool, contractor_paperwork_ready'
+    )
+    .eq('user_id', me)
+    .maybeSingle()
 
   // Pieces + their tagged expenses.
   const { data: piecesRaw } = await supabase
@@ -461,6 +474,12 @@ export default async function PlayPage() {
             Open the full Pipeline <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
+
+        {/* Carried over from the old dashboard */}
+        <UnreadMessagesCard />
+        <BusinessSetupCard userId={me} initial={businessProfile as any} mode="dashboard" />
+        <EnableNotificationsButton />
+        <AddToHomeScreenPrompt />
       </main>
     </div>
   )

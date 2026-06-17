@@ -32,8 +32,6 @@ const userLinks: NavItem[] = [
   //     Un-comment these two lines to bring the links back (e.g. as a future paid feature). ---
   // { href: '/flipper/receipts', label: 'Snap a Receipt' },
   // { href: '/flipper/quickbooks', label: 'QuickBooks' },
-  { divider: true },
-  { href: '/home', label: 'Dashboard' },
   // ---------------------------------------------------------------------------
   // Shelved June 17, 2026 for the operator-hub focus (the worker side, selling,
   // and the social feature). These pages still work by direct URL — un-comment
