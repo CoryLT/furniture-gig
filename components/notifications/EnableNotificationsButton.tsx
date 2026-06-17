@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Bell, BellOff, BellRing } from 'lucide-react'
+import { Bell, BellOff, BellRing, X } from 'lucide-react'
 
 // Public VAPID key (safe to ship). Matches lib/push.ts / env override.
 const VAPID_PUBLIC =
@@ -34,6 +34,21 @@ export default function EnableNotificationsButton({
   const [status, setStatus] = useState<Status>('loading')
   const [error, setError] = useState<string | null>(null)
   const [testMsg, setTestMsg] = useState<string | null>(null)
+  const [dismissed, setDismissed] = useState(false)
+
+  // Remember if the dashboard nudge was closed (settings always shows it).
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('fw_buzz_dismissed') === '1') setDismissed(true)
+    } catch {}
+  }, [])
+
+  function dismiss() {
+    try {
+      localStorage.setItem('fw_buzz_dismissed', '1')
+    } catch {}
+    setDismissed(true)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -191,6 +206,8 @@ export default function EnableNotificationsButton({
 
   // ---- Render ----
   if (status === 'loading') return null
+  // On the dashboard, respect a closed nudge (settings still shows everything).
+  if (dismissed && placement === 'dashboard') return null
 
   const card =
     'rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm flex items-center gap-3'
@@ -252,13 +269,24 @@ export default function EnableNotificationsButton({
         <Bell className="w-5 h-5 text-accent shrink-0" />
         {error || 'Get a buzz when you have a new message.'}
       </span>
-      <button
-        onClick={enable}
-        disabled={status === 'working'}
-        className="bg-accent text-accent-foreground px-3 py-1.5 rounded-lg font-medium disabled:opacity-60 shrink-0"
-      >
-        {status === 'working' ? 'Working…' : 'Turn on'}
-      </button>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={enable}
+          disabled={status === 'working'}
+          className="bg-accent text-accent-foreground px-3 py-1.5 rounded-lg font-medium disabled:opacity-60"
+        >
+          {status === 'working' ? 'Working…' : 'Turn on'}
+        </button>
+        {placement === 'dashboard' && (
+          <button
+            onClick={dismiss}
+            aria-label="Dismiss"
+            className="text-muted-foreground hover:text-foreground p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
     </div>
   )
 }

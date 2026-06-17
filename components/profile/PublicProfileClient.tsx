@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase/client'
 import {
   MapPin,
   Globe,
-  ArrowLeft,
   Armchair,
   CheckCircle2,
   User,
@@ -158,15 +157,6 @@ export function PublicProfileClient({
       )}
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-        {/* Back link */}
-        <Link
-          href={isLoggedIn ? '/home' : '/'}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          {isLoggedIn ? 'Back to dashboard' : 'Back'}
-        </Link>
-
         {/* Hero card */}
         <div className="card">
           <div className="card-body">
@@ -523,106 +513,6 @@ export function PublicProfileClient({
                   Add your first one.
                 </Link>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Listings for sale — what this person has up on the marketplace.
-            Same hide-from-strangers behavior as Available gigs: only shown
-            to non-owners when there are listings; owner sees an empty
-            state nudging them to create one. */}
-        {(listings.length > 0 || isOwnProfile) && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <h2 className="text-2xl font-serif text-foreground flex items-center gap-2">
-                <ShoppingBag className="w-5 h-5 text-accent" strokeWidth={1.5} />
-                Listings for sale
-                {listings.length > 0 && (
-                  <span className="text-base font-sans text-muted-foreground font-normal">
-                    ({listings.length})
-                  </span>
-                )}
-              </h2>
-              {isOwnProfile && (
-                <Link
-                  href="/marketplace/new"
-                  className="text-sm text-accent hover:underline"
-                >
-                  + New listing
-                </Link>
-              )}
-            </div>
-
-            {listings.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {listings.map((listing: any) => {
-                  const thumb = listingThumbnails[listing.id]
-                  const listingLoc =
-                    listing.location_city && listing.location_state
-                      ? `${listing.location_city}, ${listing.location_state}`
-                      : listing.location_city || listing.location_state || ''
-                  return (
-                    <Link
-                      key={listing.id}
-                      href={`/marketplace/${listing.slug}`}
-                      className="card hover:shadow-md transition-shadow group block overflow-hidden"
-                    >
-                      {/* Image */}
-                      <div className="aspect-square w-full bg-muted border-b border-border flex items-center justify-center overflow-hidden">
-                        {thumb ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={thumb}
-                            alt=""
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <Tag className="w-7 h-7 text-muted-foreground" />
-                        )}
-                      </div>
-
-                      {/* Text */}
-                      <div className="p-2.5 space-y-1">
-                        <div className="font-mono font-semibold text-sm text-foreground">
-                          {formatPriceFromCents(listing.price_cents, listing.price_mode)}
-                        </div>
-                        <h3 className="text-xs font-medium text-foreground line-clamp-2 group-hover:text-accent transition-colors min-h-[2rem]">
-                          {listing.title}
-                        </h3>
-                        {listingLoc && (
-                          <p className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
-                            <MapPin className="w-3 h-3 shrink-0" />
-                            <span className="truncate">{listingLoc}</span>
-                          </p>
-                        )}
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            ) : (
-              /* Owner-only empty state */
-              <div className="card">
-                <div className="card-body text-center py-10">
-                  <ShoppingBag className="w-10 h-10 mx-auto text-slate-300 mb-3" strokeWidth={1.5} />
-                  <p className="text-sm text-muted-foreground mb-4">
-                    You don&apos;t have any active listings right now.
-                  </p>
-                  <Link
-                    href="/marketplace/new"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-accent-foreground font-medium hover:bg-accent/90 transition-colors text-sm"
-                  >
-                    Create a listing
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            {listings.length >= 12 && (
-              <p className="text-xs text-muted-foreground text-center">
-                Showing the 12 most recent active listings.
-              </p>
             )}
           </div>
         )}
