@@ -24,7 +24,7 @@ export default function AddableSelect({
 }) {
   const [val, setVal] = useState('')
   const fieldCls =
-    'w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-amber-400'
+    'w-full rounded-lg border border-border px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-accent'
 
   return (
     <div className="space-y-2">

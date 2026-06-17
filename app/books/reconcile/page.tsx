@@ -190,8 +190,8 @@ export default async function ReconcilePage({
     return (
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-neutral-900">Reconcile</h1>
-          <Link href="/books" className="text-sm text-neutral-500 hover:text-neutral-800">← Back to Books</Link>
+          <h1 className="text-2xl font-semibold text-foreground">Reconcile</h1>
+          <Link href="/books" className="text-sm text-muted-foreground hover:text-foreground">← Back to Books</Link>
         </div>
         <div className="mt-8 rounded-xl border border-green-200 bg-green-50 p-6 text-center">
           <div className="text-3xl">🎉</div>
@@ -201,7 +201,7 @@ export default async function ReconcilePage({
           </p>
           <Link
             href="/books"
-            className="mt-5 inline-block rounded-lg bg-amber-500 px-5 py-2.5 font-medium text-white hover:bg-amber-600"
+            className="mt-5 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-accent-foreground hover:bg-accent/90"
           >
             Back to Books
           </Link>
@@ -241,18 +241,18 @@ export default async function ReconcilePage({
     .order('name', { ascending: true })
   const contacts = (contactsRaw ?? []) as { id: string; name: string }[]
 
-  const labelCls = 'block text-sm font-medium text-neutral-700 mb-1'
+  const labelCls = 'block text-sm font-medium text-foreground mb-1'
   const fieldCls =
-    'w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-amber-400'
+    'w-full rounded-lg border border-border px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-accent'
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-neutral-900">Reconcile</h1>
-        <Link href="/books" className="text-sm text-neutral-500 hover:text-neutral-800">← Back to Books</Link>
+        <h1 className="text-2xl font-semibold text-foreground">Reconcile</h1>
+        <Link href="/books" className="text-sm text-muted-foreground hover:text-foreground">← Back to Books</Link>
       </div>
-      <p className="mt-1 text-sm text-neutral-500">
-        Sort each bank line into your books. <span className="font-medium text-neutral-700">{leftCount ?? 0} left.</span>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Sort each bank line into your books. <span className="font-medium text-foreground">{leftCount ?? 0} left.</span>
       </p>
 
       {searchParams?.error && (
@@ -262,19 +262,19 @@ export default async function ReconcilePage({
       )}
 
       {/* The bank line being sorted */}
-      <div className="mt-6 rounded-xl border border-neutral-200 p-5">
+      <div className="mt-6 rounded-xl border border-border p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-neutral-400">
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {isMoneyIn ? 'Money in' : 'Money out'}
             </div>
-            <div className="mt-1 text-xs text-neutral-400">{line.posted_date}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{line.posted_date}</div>
           </div>
           <div className={'text-2xl font-semibold ' + (isMoneyIn ? 'text-green-700' : 'text-red-600')}>
             {isMoneyIn ? '+' : '−'}{'$' + Math.abs(Number(line.amount)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         </div>
-        <p className="mt-3 break-words text-sm text-neutral-600">{cleanDesc(line.raw_description)}</p>
+        <p className="mt-3 break-words text-sm text-muted-foreground">{cleanDesc(line.raw_description)}</p>
       </div>
 
       <form action={reconcileLine} className="mt-6 space-y-5">
@@ -367,7 +367,7 @@ export default async function ReconcilePage({
             type="submit"
             name="action"
             value="save"
-            className="rounded-lg bg-amber-500 px-5 py-2.5 font-medium text-white hover:bg-amber-600"
+            className="rounded-lg bg-accent px-5 py-2.5 font-medium text-accent-foreground hover:bg-accent/90"
           >
             Save &amp; next
           </button>
@@ -375,7 +375,7 @@ export default async function ReconcilePage({
             type="submit"
             name="action"
             value="skip"
-            className="rounded-lg border border-neutral-300 px-5 py-2.5 font-medium text-neutral-700 hover:bg-neutral-50"
+            className="rounded-lg border border-border px-5 py-2.5 font-medium text-foreground hover:bg-muted"
           >
             Skip for now
           </button>
@@ -383,12 +383,12 @@ export default async function ReconcilePage({
             type="submit"
             name="action"
             value="dismiss"
-            className="rounded-lg px-3 py-2.5 text-sm font-medium text-neutral-400 hover:text-neutral-600"
+            className="rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-muted-foreground"
           >
             Not business
           </button>
         </div>
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs text-muted-foreground">
           <span className="font-medium">Skip for now</span> sends it to the back to revisit later.{' '}
           <span className="font-medium">Not business</span> removes it for good.
         </p>

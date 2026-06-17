@@ -79,12 +79,12 @@ export default async function BooksPage() {
   if (list.length === 0) {
     return (
       <main className="max-w-2xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-semibold text-neutral-900">Books</h1>
-        <p className="mt-1 text-sm text-neutral-500">
+        <h1 className="text-2xl font-semibold text-foreground">Books</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Your double-entry bookkeeping, built right into FlipWork.
         </p>
-        <div className="mt-8 rounded-xl border border-neutral-200 p-6 text-center">
-          <p className="text-neutral-700">
+        <div className="mt-8 rounded-xl border border-border p-6 text-center">
+          <p className="text-foreground">
             Let&apos;s set up your books. This creates your starter money
             buckets — cash, sales, materials, and the rest. You can rename or
             add to them later.
@@ -92,7 +92,7 @@ export default async function BooksPage() {
           <form action={setupBooks} className="mt-5">
             <button
               type="submit"
-              className="rounded-lg bg-amber-500 px-5 py-2.5 font-medium text-white hover:bg-amber-600"
+              className="rounded-lg bg-accent px-5 py-2.5 font-medium text-accent-foreground hover:bg-accent/90"
             >
               Set up my books
             </button>
@@ -147,8 +147,8 @@ export default async function BooksPage() {
     <main className="max-w-2xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Books</h1>
-          <p className="mt-1 text-sm text-neutral-500">
+          <h1 className="text-2xl font-semibold text-foreground">Books</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Your double-entry bookkeeping, built right into FlipWork.
           </p>
         </div>
@@ -161,22 +161,22 @@ export default async function BooksPage() {
           </Link>
           <Link
             href="/books/expense/new"
-            className="rounded-lg bg-amber-500 px-4 py-2 font-medium text-white hover:bg-amber-600 whitespace-nowrap"
+            className="rounded-lg bg-accent px-4 py-2 font-medium text-accent-foreground hover:bg-accent/90 whitespace-nowrap"
           >
             Log an expense
           </Link>
           <Link
             href="/flipper/receipts"
-            className="rounded-lg border border-amber-400 px-4 py-2 font-medium text-amber-700 hover:bg-amber-50 whitespace-nowrap"
+            className="rounded-lg border border-accent/40 px-4 py-2 font-medium text-accent hover:bg-accent/10 whitespace-nowrap"
           >
             Snap a receipt
           </Link>
         </div>
       </div>
 
-      <div className="mt-6 rounded-xl border border-neutral-200 p-5">
-        <div className="text-xs font-medium uppercase tracking-wide text-neutral-400">Money on hand</div>
-        <div className={'mt-1 text-3xl font-semibold ' + (onHand < 0 ? 'text-red-600' : 'text-neutral-900')}>
+      <div className="mt-6 rounded-xl border border-border p-5">
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Money on hand</div>
+        <div className={'mt-1 text-3xl font-semibold ' + (onHand < 0 ? 'text-red-600' : 'text-foreground')}>
           {money(onHand)}
         </div>
         <Link href="/books/cash/new" className="mt-2 inline-block text-sm font-medium text-green-700 hover:text-green-800">
@@ -187,30 +187,30 @@ export default async function BooksPage() {
       {(toSort ?? 0) > 0 && (
         <Link
           href="/books/reconcile"
-          className="mt-4 flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 hover:bg-amber-100"
+          className="mt-4 flex items-center justify-between rounded-xl border border-accent/40 bg-accent/10 px-5 py-4 hover:bg-accent/20"
         >
           <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Catch up your books</div>
-            <div className="mt-0.5 text-lg font-semibold text-neutral-900">{toSort} bank lines to sort</div>
+            <div className="text-xs font-medium uppercase tracking-wide text-accent">Catch up your books</div>
+            <div className="mt-0.5 text-lg font-semibold text-foreground">{toSort} bank lines to sort</div>
           </div>
-          <span className="whitespace-nowrap rounded-lg bg-amber-500 px-4 py-2 font-medium text-white">Reconcile →</span>
+          <span className="whitespace-nowrap rounded-lg bg-accent px-4 py-2 font-medium text-accent-foreground">Reconcile →</span>
         </Link>
       )}
 
       <section className="mt-8">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-400">Recent activity</h2>
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Recent activity</h2>
         {txns.length === 0 ? (
-          <p className="mt-2 text-sm text-neutral-500">Nothing logged yet.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Nothing logged yet.</p>
         ) : (
-          <ul className="mt-2 divide-y divide-neutral-100 rounded-xl border border-neutral-200">
+          <ul className="mt-2 divide-y divide-border rounded-xl border border-border">
             {txns.map((t) => (
               <li key={t.id}>
-                <Link href={'/books/transaction/' + t.id} className="flex items-center justify-between px-4 py-3 hover:bg-neutral-50">
+                <Link href={'/books/transaction/' + t.id} className="flex items-center justify-between px-4 py-3 hover:bg-muted">
                   <div>
-                    <div className="text-neutral-800">{t.description}</div>
-                    <div className="text-xs text-neutral-400">{t.date}</div>
+                    <div className="text-foreground">{t.description}</div>
+                    <div className="text-xs text-muted-foreground">{t.date}</div>
                   </div>
-                  <div className={t.dir === 'in' ? 'font-medium text-green-700' : t.dir === 'out' ? 'font-medium text-red-600' : 'font-medium text-neutral-700'}>
+                  <div className={t.dir === 'in' ? 'font-medium text-green-700' : t.dir === 'out' ? 'font-medium text-red-600' : 'font-medium text-foreground'}>
                     {t.dir === 'in' ? '+' : t.dir === 'out' ? '−' : ''}{'$' + Math.abs(t.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </Link>
@@ -221,14 +221,14 @@ export default async function BooksPage() {
       </section>
 
       <section className="mt-8">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-400">Your money buckets</h2>
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Your money buckets</h2>
         <div className="mt-2 space-y-5">
           {TYPE_ORDER.filter((ty) => list.some((a) => a.type === ty)).map((ty) => (
             <div key={ty}>
-              <div className="text-xs text-neutral-400">{TYPE_LABELS[ty] ?? ty}</div>
-              <ul className="mt-1 divide-y divide-neutral-100 rounded-xl border border-neutral-200">
+              <div className="text-xs text-muted-foreground">{TYPE_LABELS[ty] ?? ty}</div>
+              <ul className="mt-1 divide-y divide-border rounded-xl border border-border">
                 {list.filter((a) => a.type === ty).map((a) => (
-                  <li key={a.id} className="px-4 py-2.5 text-neutral-800">{a.name}</li>
+                  <li key={a.id} className="px-4 py-2.5 text-foreground">{a.name}</li>
                 ))}
               </ul>
             </div>

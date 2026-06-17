@@ -127,10 +127,10 @@ export default async function TransactionPage({
     receiptUrl = signed?.signedUrl ?? null
   }
 
-  const labelCls = 'block text-sm font-medium text-neutral-700 mb-1'
-  const helpCls = 'mt-1 text-xs text-neutral-400'
+  const labelCls = 'block text-sm font-medium text-foreground mb-1'
+  const helpCls = 'mt-1 text-xs text-muted-foreground'
   const fieldCls =
-    'w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-amber-400'
+    'w-full rounded-lg border border-border px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-accent'
 
   const accountOptions = TYPE_ORDER.filter((ty) => accounts.some((a) => a.type === ty)).map((ty) => (
     <optgroup key={ty} label={TYPE_LABELS[ty] ?? ty}>
@@ -143,8 +143,8 @@ export default async function TransactionPage({
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-neutral-900">Edit entry</h1>
-        <Link href="/books" className="text-sm text-neutral-500 hover:text-neutral-800">
+        <h1 className="text-2xl font-semibold text-foreground">Edit entry</h1>
+        <Link href="/books" className="text-sm text-muted-foreground hover:text-foreground">
           ← Back to Books
         </Link>
       </div>
@@ -167,7 +167,7 @@ export default async function TransactionPage({
             <img
               src={receiptUrl}
               alt="Receipt"
-              className="max-h-72 w-auto rounded-lg border border-neutral-300"
+              className="max-h-72 w-auto rounded-lg border border-border"
             />
           </a>
           <p className={helpCls}>Tap the photo to view it full size.</p>
@@ -235,13 +235,13 @@ export default async function TransactionPage({
 
         <button
           type="submit"
-          className="rounded-lg bg-amber-500 px-5 py-2.5 font-medium text-white hover:bg-amber-600"
+          className="rounded-lg bg-accent px-5 py-2.5 font-medium text-accent-foreground hover:bg-accent/90"
         >
           Save changes
         </button>
       </form>
 
-      <form action={deleteTxn} className="mt-8 border-t border-neutral-200 pt-6">
+      <form action={deleteTxn} className="mt-8 border-t border-border pt-6">
         <input type="hidden" name="id" value={t.id} />
         <button
           type="submit"
