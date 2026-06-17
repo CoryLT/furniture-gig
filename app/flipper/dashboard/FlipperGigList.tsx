@@ -494,7 +494,7 @@ export default function FlipperGigList({
                               onClick={() => setOpenMenuId(null)}
                               className="w-full text-left px-3 py-2 hover:bg-secondary flex items-center gap-2"
                             >
-                              <Edit className="w-4 h-4 text-stone-600" />
+                              <Edit className="w-4 h-4 text-muted-foreground" />
                               Edit
                             </Link>
                             {gig.status !== 'archived' && (
@@ -507,7 +507,7 @@ export default function FlipperGigList({
                                 }}
                                 className="w-full text-left px-3 py-2 hover:bg-secondary flex items-center gap-2"
                               >
-                                <Archive className="w-4 h-4 text-stone-600" />
+                                <Archive className="w-4 h-4 text-muted-foreground" />
                                 Archive
                               </button>
                             )}
@@ -606,7 +606,7 @@ export default function FlipperGigList({
           onClick={() => !busy && setOffTarget(null)}
         >
           <div
-            className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5 space-y-4"
+            className="bg-card rounded-lg shadow-xl w-full max-w-sm p-5 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div>
