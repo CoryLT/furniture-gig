@@ -5,6 +5,7 @@ import Nav from '@/components/shared/Nav'
 import CountUp from '@/components/play/CountUp'
 import GameBar from '@/components/play/GameBar'
 import RankEmblem from '@/components/play/RankEmblem'
+import RankTrail from '@/components/play/RankTrail'
 import type { ReactNode } from 'react'
 import { ImageIcon, ArrowRight, TrendingUp, TrendingDown, Coins, Lock, Target, Check } from 'lucide-react'
 
@@ -299,40 +300,19 @@ export default async function PlayPage() {
             </div>
           </div>
 
-          {/* Rank trail — the whole climb as medallions; locked ones grayed */}
-          <div className="mt-6 flex items-start justify-center gap-2 overflow-x-auto pb-1">
-            {TIERS.map((t, i) => {
-              const state = i === tierIdx ? 'current' : i < tierIdx ? 'achieved' : 'locked'
-              return (
-                <div
-                  key={t.title}
-                  className="flex shrink-0 flex-col items-center gap-1"
-                  style={{ width: 54 }}
-                >
-                  <RankEmblem
-                    index={i}
-                    size={i === tierIdx ? 42 : 34}
-                    state={state}
-                    idSuffix={`trail-${i}`}
-                  />
-                  <span
-                    className="text-center font-sans text-[9px] uppercase leading-tight tracking-wide"
-                    style={{
-                      color:
-                        state === 'current'
-                          ? C.gold
-                          : state === 'achieved'
-                            ? 'rgba(245,205,130,0.55)'
-                            : 'rgba(169,158,140,0.4)',
-                      fontWeight: state === 'current' ? 700 : 500,
-                    }}
-                  >
-                    {t.title}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
+          {/* Rank trail — medallions; tap or hover one to see what it takes */}
+          <RankTrail
+            tiers={TIERS}
+            tierIdx={tierIdx}
+            total={total}
+            colors={{
+              gold: C.gold,
+              muted: C.muted,
+              cream: C.cream,
+              green: C.green,
+              panelBorder: C.panelBorder,
+            }}
+          />
 
           <div
             className="mt-5 flex items-center justify-center gap-5 font-mono text-sm"
