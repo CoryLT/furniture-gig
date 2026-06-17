@@ -69,13 +69,9 @@ export default function RankTrail({
               <span
                 className="text-center font-sans text-[9px] uppercase leading-tight tracking-wide"
                 style={{
-                  color:
-                    state === 'current'
-                      ? colors.gold
-                      : state === 'achieved'
-                        ? 'rgba(245,205,130,0.55)'
-                        : 'rgba(169,158,140,0.4)',
-                  fontWeight: state === 'current' ? 700 : 500,
+                  color: state === 'current' ? colors.gold : colors.muted,
+                  fontWeight: state === 'current' ? 700 : state === 'achieved' ? 600 : 500,
+                  opacity: state === 'locked' ? 0.85 : 1,
                 }}
               >
                 {t.title}
@@ -88,8 +84,8 @@ export default function RankTrail({
                 className="absolute bottom-full left-1/2 z-20 mb-2 w-40 -translate-x-1/2 rounded-xl px-3 py-2 text-center"
                 style={{
                   background: 'var(--play-tooltip-bg)',
-                  border: `1px solid ${colors.panelBorder}`,
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                  border: '1px solid var(--play-tooltip-border)',
+                  boxShadow: 'var(--play-tooltip-shadow)',
                 }}
               >
                 <div

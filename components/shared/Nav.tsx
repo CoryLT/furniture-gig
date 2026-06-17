@@ -19,7 +19,7 @@ interface NavProps {
 type NavItem = { href: string; label: string } | { divider: true }
 
 const userLinks: NavItem[] = [
-  { href: '/play', label: 'Play' },
+  { href: '/play', label: 'Dashboard' },
   { href: '/flipper/pipeline', label: 'Pipeline' },
   { href: '/books', label: 'Books' },
   { href: '/messages', label: 'Messages' },
