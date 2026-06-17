@@ -113,6 +113,13 @@ export default async function BooksPage() {
     onHand += Number(l.debit) - Number(l.credit)
   }
 
+  // How many imported bank lines still need sorting (for the Reconcile prompt).
+  const { count: toSort } = await supabase
+    .from('books_bank_feed')
+    .select('id', { count: 'exact', head: true })
+    .eq('owner_user_id', me)
+    .eq('handled', false)
+
   // Recent activity: the latest money events, newest first.
   const { data: txnsRaw } = await supabase
     .from('transactions')
@@ -170,6 +177,19 @@ export default async function BooksPage() {
           + Add cash
         </Link>
       </div>
+
+      {(toSort ?? 0) > 0 && (
+        <Link
+          href="/books/reconcile"
+          className="mt-4 flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 hover:bg-amber-100"
+        >
+          <div>
+            <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Catch up your books</div>
+            <div className="mt-0.5 text-lg font-semibold text-neutral-900">{toSort} bank lines to sort</div>
+          </div>
+          <span className="whitespace-nowrap rounded-lg bg-amber-500 px-4 py-2 font-medium text-white">Reconcile →</span>
+        </Link>
+      )}
 
       <section className="mt-8">
         <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-400">Recent activity</h2>
