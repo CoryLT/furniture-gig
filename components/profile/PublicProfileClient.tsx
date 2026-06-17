@@ -56,7 +56,8 @@ interface PublicProfileClientProps {
   listings: any[]
   listingThumbnails: Record<string, string>
   services: ProfileService[]
-  completedCount: number
+  confirmedPaidCount: number
+  memberSince: string | null
   workerPhotos: any[]
   flipperPhotos: any[]
   viewerUserId: string | null
@@ -71,7 +72,8 @@ export function PublicProfileClient({
   listings,
   listingThumbnails,
   services,
-  completedCount,
+  confirmedPaidCount,
+  memberSince,
   workerPhotos: initialWorkerPhotos,
   flipperPhotos: initialFlipperPhotos,
   viewerUserId,
@@ -122,6 +124,9 @@ export function PublicProfileClient({
   const locationText = [profile.city, profile.state].filter(Boolean).join(', ')
 
   const allPhotos = [...workerPhotos, ...flipperPhotos]
+  const memberSinceLabel = memberSince
+    ? new Date(memberSince).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    : null
 
   return (
     <div className="min-h-screen bg-background">
@@ -257,7 +262,7 @@ export function PublicProfileClient({
           </div>
         </div>
 
-        {/* Stats row */}
+        {/* Stats row — trust signals that are hard to fake */}
         <div className="grid grid-cols-2 gap-4">
           <div className="card">
             <div className="card-body flex items-center gap-3">
@@ -265,19 +270,21 @@ export function PublicProfileClient({
                 <CheckCircle2 className="w-5 h-5 text-emerald-700" />
               </div>
               <div className="min-w-0">
-                <p className="text-2xl font-semibold text-foreground leading-none">{completedCount}</p>
-                <p className="text-sm text-muted-foreground mt-1">Completed gigs</p>
+                <p className="text-2xl font-semibold text-foreground leading-none">{confirmedPaidCount}</p>
+                <p className="text-sm text-muted-foreground mt-1">Jobs paid &amp; confirmed</p>
               </div>
             </div>
           </div>
           <div className="card">
             <div className="card-body flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-accent/15 flex items-center justify-center flex-shrink-0">
-                <ImageIcon className="w-5 h-5 text-accent" />
+                <Calendar className="w-5 h-5 text-accent" />
               </div>
               <div className="min-w-0">
-                <p className="text-2xl font-semibold text-foreground leading-none">{allPhotos.length}</p>
-                <p className="text-sm text-muted-foreground mt-1">Photos</p>
+                <p className="text-2xl font-semibold text-foreground leading-none">
+                  {memberSinceLabel ?? '—'}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">Member since</p>
               </div>
             </div>
           </div>

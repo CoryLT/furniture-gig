@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound } from 'next/navigation'
 import { PublicProfileClient } from '@/components/profile/PublicProfileClient'
 
@@ -87,6 +88,29 @@ export default async function PublicProfilePage({
 
   const openGigs = openGigsResult.data || []
   const completedCount = (completedCountResult as any).count || 0
+
+  // Trust metrics that are hard to fake. Counted with the admin client because
+  // a visitor can't read someone else's payment rows (RLS), and these are just
+  // public counts/dates — no sensitive detail leaves the server.
+  let confirmedPaidCount = 0
+  let memberSince: string | null = null
+  if (userId) {
+    const admin = createAdminClient()
+    const { count: paidCount } = await admin
+      .from('gig_payments')
+      .select('gig_id', { count: 'exact', head: true })
+      .eq('worker_user_id', userId)
+      .not('marked_paid_at', 'is', null)
+      .not('worker_confirmed_at', 'is', null)
+    confirmedPaidCount = paidCount || 0
+
+    const { data: acct } = await admin
+      .from('users')
+      .select('created_at')
+      .eq('id', userId)
+      .maybeSingle()
+    memberSince = (acct as any)?.created_at ?? null
+  }
 
   // Grab one thumbnail per open gig so the cards on the profile look
   // alive instead of being text-only. Single batched query, lowest
@@ -227,7 +251,8 @@ export default async function PublicProfilePage({
       listings={listings}
       listingThumbnails={listingThumbnails}
       services={services}
-      completedCount={completedCount}
+      confirmedPaidCount={confirmedPaidCount}
+      memberSince={memberSince}
       workerPhotos={workerPhotosResult.data || []}
       flipperPhotos={flipperPhotosResult.data || []}
       viewerUserId={viewer?.id || null}
