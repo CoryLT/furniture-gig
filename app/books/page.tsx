@@ -166,6 +166,9 @@ export default async function BooksPage() {
         <div className={'mt-1 text-3xl font-semibold ' + (onHand < 0 ? 'text-red-600' : 'text-neutral-900')}>
           {money(onHand)}
         </div>
+        <Link href="/books/cash/new" className="mt-2 inline-block text-sm font-medium text-green-700 hover:text-green-800">
+          + Add cash
+        </Link>
       </div>
 
       <section className="mt-8">
