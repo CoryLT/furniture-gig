@@ -137,7 +137,12 @@ function CrewCard({ operatorId, row }: { operatorId: string; row: CrewRow }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-semibold text-foreground">{row.name}</p>
+            <Link
+              href={`/flipper/crew/${row.workerId}`}
+              className="font-semibold text-foreground hover:text-accent hover:underline"
+            >
+              {row.name}
+            </Link>
             {row.username && (
               <Link
                 href={`/u/${row.username}`}

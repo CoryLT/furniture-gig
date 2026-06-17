@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -98,9 +99,13 @@ function OffCard({ row }: { row: OffRow }) {
     <div className="card card-body space-y-4">
       {/* Identity + track record */}
       <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-full bg-accent/10 text-accent flex items-center justify-center font-semibold shrink-0">
+        <Link
+          href={`/flipper/crew/${row.id}`}
+          className="w-12 h-12 rounded-full bg-accent/10 text-accent flex items-center justify-center font-semibold shrink-0 hover:bg-accent/20"
+          aria-label={`View ${row.name}`}
+        >
           {initials(name || row.name)}
-        </div>
+        </Link>
         <div className="flex-1 min-w-0">
           <input
             value={name}
@@ -110,6 +115,10 @@ function OffCard({ row }: { row: OffRow }) {
           />
           <p className="text-sm text-muted-foreground mt-0.5">
             Off-platform · {row.jobs} job{row.jobs === 1 ? '' : 's'} · {formatCurrency(row.paid)} paid
+            {' · '}
+            <Link href={`/flipper/crew/${row.id}`} className="text-accent hover:underline">
+              View page
+            </Link>
           </p>
         </div>
       </div>
