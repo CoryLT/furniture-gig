@@ -23,11 +23,10 @@ const STAGES: { key: Stage; label: string }[] = [
 // Ranks by total profit — turns the lifetime number into a level you climb.
 // Easy to rename or re-space these later.
 const TIERS: { min: number; title: string }[] = [
-  { min: 0, title: 'Picker' },
+  { min: 0, title: 'Rookie' },
   { min: 250, title: 'Flipper' },
-  { min: 1000, title: 'Dealer' },
-  { min: 2500, title: 'Operator' },
-  { min: 5000, title: 'Closer' },
+  { min: 1000, title: 'Heavy Hitter' },
+  { min: 2500, title: 'Expert' },
   { min: 10000, title: 'Mogul' },
   { min: 25000, title: 'Tycoon' },
 ]
