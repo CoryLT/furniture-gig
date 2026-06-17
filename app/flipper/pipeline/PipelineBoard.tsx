@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Plus, ArrowRight, Trash2, ImageIcon, X, ChevronDown } from 'lucide-react'
+import { Plus, ArrowRight, Trash2, ImageIcon, X, ChevronDown, Users } from 'lucide-react'
 import { compressImageForUpload, isAcceptableImageFile } from '@/lib/imageCompression'
+import FindHelpCard, { type HelpAd } from '@/components/pipeline/FindHelpCard'
 
 type Stage = 'sourced' | 'in_progress' | 'listed' | 'sold'
 
@@ -30,6 +31,7 @@ type Piece = {
   acquired_at: string | null
   listed_at: string | null
   sold_at: string | null
+  help_ad: HelpAd | null
   expenses: Expense[]
 }
 
@@ -643,6 +645,7 @@ function PieceCard({
   const [newNote, setNewNote] = useState('')
   const [newCat, setNewCat] = useState('')
   const [addingExp, setAddingExp] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
 
   const isSold = piece.stage === 'sold'
   const profit = isSold ? realized(piece) : expected(piece)
@@ -802,6 +805,26 @@ function PieceCard({
               onChange={(e) => choosePhoto(e.target.files?.[0] ?? null)}
             />
           </label>
+
+          {/* Find help — make an ad to hire for this piece */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setShowHelp((v) => !v)}
+              className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline"
+              aria-expanded={showHelp}
+            >
+              <Users className="w-3.5 h-3.5" />
+              {showHelp ? 'Hide find help' : piece.help_ad ? 'Find help (ad saved)' : 'Find help'}
+            </button>
+            {showHelp && (
+              <FindHelpCard
+                pieceTitle={piece.title}
+                initial={piece.help_ad ?? null}
+                onSave={(ad) => onUpdate(piece.id, { help_ad: ad })}
+              />
+            )}
+          </div>
 
           {/* Expenses ledger */}
           <div className="space-y-2">
