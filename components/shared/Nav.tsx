@@ -20,6 +20,7 @@ type NavItem = { href: string; label: string } | { divider: true }
 const userLinks: NavItem[] = [
   { href: '/messages', label: 'Messages' },
   { href: '/home', label: 'Dashboard' },
+  { href: '/play', label: 'Play' },
   { divider: true },
   { href: '/flipper/post-gig', label: 'Post a Job' },
   { href: '/flipper/dashboard', label: 'My Jobs' },
@@ -31,17 +32,22 @@ const userLinks: NavItem[] = [
   //     Un-comment these two lines to bring the links back (e.g. as a future paid feature). ---
   // { href: '/flipper/receipts', label: 'Snap a Receipt' },
   // { href: '/flipper/quickbooks', label: 'QuickBooks' },
-  { divider: true },
-  { href: '/gigs', label: 'Browse Gigs' },
-  { href: '/my-gigs', label: 'My Gigs' },
-  { href: '/my-gigs/payouts', label: 'Payouts' },
-  { divider: true },
-  { href: '/marketplace', label: 'Marketplace' },
-  { href: '/marketplace/new', label: 'List an Item' },
-  { href: '/marketplace/mine', label: 'My Listings' },
-  { divider: true },
-  { href: '/connections', label: 'My Connections' },
-  { href: '/profile/worker/services', label: 'Services I Offer' },
+  // ---------------------------------------------------------------------------
+  // Shelved June 17, 2026 for the operator-hub focus (the worker side, selling,
+  // and the social feature). These pages still work by direct URL — un-comment
+  // any line below to bring it back into the menu.
+  // ---------------------------------------------------------------------------
+  // { divider: true },
+  // { href: '/gigs', label: 'Browse Gigs' },
+  // { href: '/my-gigs', label: 'My Gigs' },
+  // { href: '/my-gigs/payouts', label: 'Payouts' },
+  // { divider: true },
+  // { href: '/marketplace', label: 'Marketplace' },
+  // { href: '/marketplace/new', label: 'List an Item' },
+  // { href: '/marketplace/mine', label: 'My Listings' },
+  // { divider: true },
+  // { href: '/connections', label: 'My Connections' },
+  // { href: '/profile/worker/services', label: 'Services I Offer' },
 ]
 
 const adminLinks: NavItem[] = [
