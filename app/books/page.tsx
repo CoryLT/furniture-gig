@@ -165,6 +165,12 @@ export default async function BooksPage() {
           >
             Log an expense
           </Link>
+          <Link
+            href="/flipper/receipts"
+            className="rounded-lg border border-amber-400 px-4 py-2 font-medium text-amber-700 hover:bg-amber-50 whitespace-nowrap"
+          >
+            Snap a receipt
+          </Link>
         </div>
       </div>
 

@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getFreshConnection, qboFetch } from '@/lib/quickbooks-api'
 
 // POST /api/receipts/save
-// FormData: file, vendor, date (YYYY-MM-DD), lines (JSON array of
-//   { description, amount, category, pieceId|null })
+// FormData: file, vendor, date (YYYY-MM-DD), paidFromAccountId, lines (JSON array
+//   of { description, amount, expenseAccountId, pieceId|null })
 //
-// Creates ONE QuickBooks expense with a line per receipt line, attaches the
-// photo once, and for lines tagged to a piece also records a piece cost (so it
-// shows in profit) plus an "already-sent" marker so the piece sync won't repost.
+// Logs each line as a real expense in the owner's books (the double-entry
+// ledger, via the record_expense function), tags it to a piece when chosen,
+// records the vendor as a contact, and attaches the receipt photo to every
+// entry it creates. No QuickBooks involved.
 export async function POST(req: Request) {
   const supabase = createClient()
   const {
@@ -28,11 +28,14 @@ export async function POST(req: Request) {
   const file = fd.get('file') as File | null
   const vendor = String(fd.get('vendor') || '').trim()
   const date = String(fd.get('date') || '').trim()
+  const paidFromAccountId = String(fd.get('paidFromAccountId') || '').trim()
+  const today = new Date().toISOString().slice(0, 10)
+  const useDate = date || today
 
   let lines: Array<{
     description: string
     amount: number
-    category: string
+    expenseAccountId: string
     pieceId: string | null
   }> = []
   try {
@@ -41,7 +44,7 @@ export async function POST(req: Request) {
       .map((l: any) => ({
         description: String(l?.description || '').trim(),
         amount: Number(l?.amount),
-        category: String(l?.category || 'other'),
+        expenseAccountId: String(l?.expenseAccountId || '').trim(),
         pieceId: l?.pieceId ? String(l.pieceId) : null,
       }))
       .filter((l) => Number.isFinite(l.amount) && l.amount > 0)
@@ -51,161 +54,116 @@ export async function POST(req: Request) {
   if (lines.length === 0) {
     return NextResponse.json({ ok: false, error: 'no_lines' }, { status: 400 })
   }
-
-  let conn
-  try {
-    conn = await getFreshConnection(user.id)
-  } catch {
-    conn = null
-  }
-  if (!conn) {
-    return NextResponse.json({ ok: false, error: 'not_connected' }, { status: 400 })
+  if (!paidFromAccountId) {
+    return NextResponse.json({ ok: false, error: 'no_paid_from' }, { status: 400 })
   }
 
-  // Mapping
-  const { data: settings } = await supabase
-    .from('quickbooks_settings')
-    .select('paid_from_account_id, category_map')
+  // Load the owner's own accounts + pieces so a line can't point somewhere else.
+  const { data: accountsRaw } = await supabase
+    .from('accounts')
+    .select('id, type')
     .eq('owner_user_id', user.id)
-    .maybeSingle()
-  const paidFromId = settings?.paid_from_account_id || ''
-  const categoryMap: Record<string, string> = (settings?.category_map as any) || {}
-  if (!paidFromId || Object.keys(categoryMap).length === 0) {
-    return NextResponse.json({ ok: false, error: 'no_mapping' }, { status: 400 })
+  const expenseIds = new Set(
+    (accountsRaw || []).filter((a: any) => a.type === 'expense').map((a: any) => a.id)
+  )
+  const assetIds = new Set(
+    (accountsRaw || []).filter((a: any) => a.type === 'asset').map((a: any) => a.id)
+  )
+  if (!assetIds.has(paidFromAccountId)) {
+    return NextResponse.json({ ok: false, error: 'bad_paid_from' }, { status: 400 })
   }
 
-  // Which pieces actually belong to this user (so a tag can't point elsewhere).
   const { data: ownPieces } = await supabase
     .from('inventory_pieces')
     .select('id')
     .eq('owner_user_id', user.id)
   const ownPieceIds = new Set((ownPieces || []).map((p: any) => p.id))
 
-  // Payment type from the paid-from account.
-  let paymentType = 'Cash'
-  try {
-    const q = encodeURIComponent('SELECT * FROM Account WHERE Active = true')
-    const accData = await qboFetch(conn, `query?query=${q}`)
-    const accs: any[] = accData?.QueryResponse?.Account ?? []
-    const pf = accs.find((a) => a.Id === paidFromId)
-    if (pf?.AccountType === 'Credit Card') paymentType = 'CreditCard'
-  } catch {
-    // default Cash
+  // Keep only lines whose category is one of the owner's expense accounts.
+  const goodLines = lines.filter((l) => expenseIds.has(l.expenseAccountId))
+  if (goodLines.length === 0) {
+    return NextResponse.json({ ok: false, error: 'no_category' }, { status: 400 })
   }
 
-  // Build one Purchase with a line per receipt line.
-  const qboLines: any[] = []
-  const lineMeta: Array<{ pieceId: string | null; amount: number; category: string; note: string }> = []
-  for (const l of lines) {
-    const acct = categoryMap[l.category] || categoryMap['other']
-    if (!acct) continue
-    const note = l.description || vendor || 'Receipt item'
-    qboLines.push({
-      Amount: l.amount,
-      DetailType: 'AccountBasedExpenseLineDetail',
-      AccountBasedExpenseLineDetail: { AccountRef: { value: acct } },
-      Description: note,
-    })
-    lineMeta.push({
-      pieceId: l.pieceId && ownPieceIds.has(l.pieceId) ? l.pieceId : null,
-      amount: l.amount,
-      category: l.category,
-      note,
-    })
-  }
-  if (qboLines.length === 0) {
-    return NextResponse.json({ ok: false, error: 'no_mapped_lines' }, { status: 400 })
-  }
-
-  const purchase: any = {
-    PaymentType: paymentType,
-    AccountRef: { value: paidFromId },
-    PrivateNote: `${vendor || 'Receipt'} — FlipWork`,
-    Line: qboLines,
-  }
-  if (date) purchase.TxnDate = date
-
-  let purchaseId: string | null = null
-  try {
-    const created = await qboFetch(conn, 'purchase', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(purchase),
-    })
-    purchaseId = created?.Purchase?.Id ?? null
-  } catch (e: any) {
-    console.error('[receipt save] purchase error:', e)
-    return NextResponse.json(
-      { ok: false, error: 'create_failed', detail: String(e?.message || e) },
-      { status: 500 }
-    )
+  // Vendor -> contact (find existing by name, else create one of type 'vendor').
+  let contactId: string | null = null
+  if (vendor) {
+    try {
+      const { data: existing } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('owner_user_id', user.id)
+        .ilike('name', vendor)
+        .limit(1)
+        .maybeSingle()
+      if (existing?.id) {
+        contactId = existing.id
+      } else {
+        const { data: created } = await supabase
+          .from('contacts')
+          .insert({ owner_user_id: user.id, name: vendor, type: 'vendor' })
+          .select('id')
+          .single()
+        contactId = created?.id ?? null
+      }
+    } catch {
+      contactId = null
+    }
   }
 
-  // Attach the photo once.
-  let attached = false
-  if (purchaseId && file) {
+  // Upload the receipt photo once to the private gig-photos bucket.
+  let receiptPath: string | null = null
+  if (file) {
     try {
       const buf = Buffer.from(await file.arrayBuffer())
-      const contentType = file.type || 'image/jpeg'
-      const fileName = file.name || 'receipt.jpg'
-      const meta = {
-        AttachableRef: [{ EntityRef: { type: 'Purchase', value: purchaseId } }],
-        FileName: fileName,
-        ContentType: contentType,
-      }
-      const form = new FormData()
-      form.append(
-        'file_metadata_01',
-        new Blob([JSON.stringify(meta)], { type: 'application/json' }),
-        'metadata.json'
-      )
-      form.append('file_content_01', new Blob([buf], { type: contentType }), fileName)
-      await qboFetch(conn, 'upload', { method: 'POST', body: form })
-      attached = true
-    } catch (e) {
-      console.error('[receipt save] attach error:', e)
+      const ext = (file.type && file.type.split('/')[1]) || 'jpg'
+      const path = `${user.id}/receipts/${crypto.randomUUID()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('gig-photos')
+        .upload(path, buf, { contentType: file.type || 'image/jpeg', upsert: false })
+      if (!upErr) receiptPath = path
+    } catch {
+      receiptPath = null
     }
   }
 
-  // For lines tagged to a piece: record the cost on the piece (for profit) and
-  // mark it already-sent so the piece sync won't post it again.
+  // Log each line as its own balanced expense entry, all sharing the photo.
+  let saved = 0
   let tagged = 0
-  for (const m of lineMeta) {
-    if (!m.pieceId) continue
+  let attached = false
+  for (const l of goodLines) {
+    const pieceId = l.pieceId && ownPieceIds.has(l.pieceId) ? l.pieceId : null
+    const description = l.description || vendor || 'Receipt item'
     try {
-      const { data: pe } = await supabase
-        .from('piece_expenses')
-        .insert({
-          piece_id: m.pieceId,
-          owner_user_id: user.id,
-          amount: m.amount,
-          category: m.category,
-          note: m.note,
-          ...(date ? { spent_on: date } : {}),
-        })
-        .select('id')
-        .single()
-      if (pe?.id) {
-        await supabase.from('quickbooks_synced').insert({
-          owner_user_id: user.id,
-          source_type: 'piece_expense',
-          source_id: pe.id,
-          qbo_type: 'Purchase',
-          qbo_id: purchaseId,
-          amount: m.amount,
-        })
-        tagged++
+      const { data: txnId, error: rpcErr } = await supabase.rpc('record_expense', {
+        p_date: useDate,
+        p_amount: l.amount,
+        p_expense_account_id: l.expenseAccountId,
+        p_paid_from_account_id: paidFromAccountId,
+        p_description: description,
+        p_memo: vendor || null,
+        p_piece_id: pieceId,
+        p_contact_id: contactId,
+      })
+      if (rpcErr || !txnId) continue
+      saved++
+      if (pieceId) tagged++
+      if (receiptPath) {
+        const { error: updErr } = await supabase
+          .from('transactions')
+          .update({ receipt_path: receiptPath })
+          .eq('id', txnId as string)
+          .eq('owner_user_id', user.id)
+        if (!updErr) attached = true
       }
     } catch (e) {
-      console.error('[receipt save] piece link error:', e)
+      console.error('[receipt save] record_expense error:', e)
     }
   }
 
-  return NextResponse.json({
-    ok: true,
-    purchaseId,
-    attached,
-    lines: qboLines.length,
-    tagged,
-  })
+  if (saved === 0) {
+    return NextResponse.json({ ok: false, error: 'save_failed' }, { status: 500 })
+  }
+
+  return NextResponse.json({ ok: true, lines: saved, tagged, attached })
 }

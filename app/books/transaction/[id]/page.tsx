@@ -83,7 +83,7 @@ export default async function TransactionPage({
 
   const { data: txn } = await supabase
     .from('transactions')
-    .select('id, date, description, memo, piece_id, contact_id, entry_lines(debit, credit, account_id)')
+    .select('id, date, description, memo, piece_id, contact_id, receipt_path, entry_lines(debit, credit, account_id)')
     .eq('id', params.id)
     .eq('owner_user_id', me)
     .single()
@@ -118,6 +118,15 @@ export default async function TransactionPage({
     .order('name', { ascending: true })
   const contacts = (contactsRaw ?? []) as { id: string; name: string }[]
 
+  // Receipt photo lives in the private gig-photos bucket; sign a short-lived URL.
+  let receiptUrl: string | null = null
+  if (t.receipt_path) {
+    const { data: signed } = await supabase.storage
+      .from('gig-photos')
+      .createSignedUrl(t.receipt_path, 60 * 60)
+    receiptUrl = signed?.signedUrl ?? null
+  }
+
   const labelCls = 'block text-sm font-medium text-neutral-700 mb-1'
   const helpCls = 'mt-1 text-xs text-neutral-400'
   const fieldCls =
@@ -148,6 +157,20 @@ export default async function TransactionPage({
       {searchParams?.error && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800">
           {searchParams.error}
+        </div>
+      )}
+
+      {receiptUrl && (
+        <div className="mt-6">
+          <p className={labelCls}>Attached receipt</p>
+          <a href={receiptUrl} target="_blank" rel="noopener noreferrer">
+            <img
+              src={receiptUrl}
+              alt="Receipt"
+              className="max-h-72 w-auto rounded-lg border border-neutral-300"
+            />
+          </a>
+          <p className={helpCls}>Tap the photo to view it full size.</p>
         </div>
       )}
 
