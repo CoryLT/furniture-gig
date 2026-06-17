@@ -175,14 +175,16 @@ export default async function BooksPage() {
         ) : (
           <ul className="mt-2 divide-y divide-neutral-100 rounded-xl border border-neutral-200">
             {txns.map((t) => (
-              <li key={t.id} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <div className="text-neutral-800">{t.description}</div>
-                  <div className="text-xs text-neutral-400">{t.date}</div>
-                </div>
-                <div className={t.dir === 'in' ? 'font-medium text-green-700' : t.dir === 'out' ? 'font-medium text-red-600' : 'font-medium text-neutral-700'}>
-                  {t.dir === 'in' ? '+' : t.dir === 'out' ? '−' : ''}{'$' + Math.abs(t.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
+              <li key={t.id}>
+                <Link href={'/books/transaction/' + t.id} className="flex items-center justify-between px-4 py-3 hover:bg-neutral-50">
+                  <div>
+                    <div className="text-neutral-800">{t.description}</div>
+                    <div className="text-xs text-neutral-400">{t.date}</div>
+                  </div>
+                  <div className={t.dir === 'in' ? 'font-medium text-green-700' : t.dir === 'out' ? 'font-medium text-red-600' : 'font-medium text-neutral-700'}>
+                    {t.dir === 'in' ? '+' : t.dir === 'out' ? '−' : ''}{'$' + Math.abs(t.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </Link>
               </li>
             ))}
           </ul>
