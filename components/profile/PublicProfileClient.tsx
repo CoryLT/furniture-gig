@@ -262,33 +262,9 @@ export function PublicProfileClient({
           </div>
         </div>
 
-        {/* Stats row — trust signals that are hard to fake */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="card">
-            <div className="card-body flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                <CheckCircle2 className="w-5 h-5 text-emerald-700" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-semibold text-foreground leading-none">{confirmedPaidCount}</p>
-                <p className="text-sm text-muted-foreground mt-1">Jobs paid &amp; confirmed</p>
-              </div>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-body flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-accent/15 flex items-center justify-center flex-shrink-0">
-                <Calendar className="w-5 h-5 text-accent" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-semibold text-foreground leading-none">
-                  {memberSinceLabel ?? '—'}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">Member since</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Profile stat cards shelved 2026-06-17 — TBD what to feature here.
+            confirmedPaidCount + memberSince are still passed in and ready to
+            drop back in once we decide. */}
 
         {/* About */}
         <div className="card">
