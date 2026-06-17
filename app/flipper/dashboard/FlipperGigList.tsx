@@ -536,6 +536,7 @@ export default function FlipperGigList({
                           url={`${siteUrl}/gigs/${gig.slug}`}
                           title={gig.title}
                           kind="gig"
+                          align="left"
                           className="text-accent border-accent/30"
                         />
                       )}

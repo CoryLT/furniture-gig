@@ -36,6 +36,12 @@ interface ShareButtonProps {
   className?: string
   /** If true, just shows the icon — no "Share" label. Defaults to false. */
   iconOnly?: boolean
+  /**
+   * Which side the popover menu lines up with. Use 'left' when the button
+   * sits near the LEFT edge of the screen, otherwise the menu can run off
+   * the left side. Defaults to 'right'.
+   */
+  align?: 'left' | 'right'
 }
 
 export default function ShareButton({
@@ -44,6 +50,7 @@ export default function ShareButton({
   kind,
   className,
   iconOnly = false,
+  align = 'right',
 }: ShareButtonProps) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -171,7 +178,10 @@ export default function ShareButton({
         <div
           ref={popoverRef}
           role="menu"
-          className="absolute right-0 mt-2 w-56 z-50 rounded-md border border-border bg-card shadow-lg overflow-hidden"
+          className={cn(
+            'absolute mt-2 w-56 max-w-[calc(100vw-1.5rem)] z-50 rounded-md border border-border bg-card shadow-lg overflow-hidden',
+            align === 'left' ? 'left-0' : 'right-0',
+          )}
         >
           {canNativeShare && (
             <button
