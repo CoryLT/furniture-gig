@@ -18,20 +18,21 @@ interface NavProps {
 type NavItem = { href: string; label: string } | { divider: true }
 
 const userLinks: NavItem[] = [
-  { href: '/messages', label: 'Messages' },
-  { href: '/home', label: 'Dashboard' },
   { href: '/play', label: 'Play' },
+  { href: '/flipper/pipeline', label: 'Pipeline' },
+  { href: '/books', label: 'Books' },
+  { href: '/messages', label: 'Messages' },
   { divider: true },
+  { href: '/flipper/crew', label: 'My Crew' },
   { href: '/flipper/post-gig', label: 'Post a Job' },
   { href: '/flipper/dashboard', label: 'My Jobs' },
-  { href: '/flipper/pipeline', label: 'Pipeline' },
-  { href: '/flipper/crew', label: 'My Crew' },
   { href: '/flipper/records', label: 'Payment Records' },
-  { href: '/books', label: 'Books' },
   // --- QuickBooks expansion shelved June 4, 2026 (pending Intuit production approval).
   //     Un-comment these two lines to bring the links back (e.g. as a future paid feature). ---
   // { href: '/flipper/receipts', label: 'Snap a Receipt' },
   // { href: '/flipper/quickbooks', label: 'QuickBooks' },
+  { divider: true },
+  { href: '/home', label: 'Dashboard' },
   // ---------------------------------------------------------------------------
   // Shelved June 17, 2026 for the operator-hub focus (the worker side, selling,
   // and the social feature). These pages still work by direct URL — un-comment
@@ -325,15 +326,6 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
 
             {dropdownOpen && (
               <div className="absolute right-0 mt-2 w-56 max-h-[calc(100vh-5rem)] overflow-y-auto overscroll-contain bg-white border border-stone-200 rounded-lg shadow-lg py-1 z-50">
-                {getPublicProfileUrl() && (
-                  <Link
-                    href={getPublicProfileUrl()!}
-                    onClick={() => setDropdownOpen(false)}
-                    className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
-                  >
-                    My Profile
-                  </Link>
-                )}
                 {/* Primary nav (now collapsed into here on every viewport) */}
                 {links.map((link, i) =>
                   'divider' in link ? (
@@ -359,6 +351,15 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
                   )
                 )}
                 <hr className="my-1" />
+                {getPublicProfileUrl() && (
+                  <Link
+                    href={getPublicProfileUrl()!}
+                    onClick={() => setDropdownOpen(false)}
+                    className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
+                  >
+                    My Profile
+                  </Link>
+                )}
                 <Link
                   href="/profile"
                   className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"

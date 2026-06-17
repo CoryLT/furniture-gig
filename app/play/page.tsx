@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '@/components/shared/Nav'
 import CountUp from '@/components/play/CountUp'
-import { ImageIcon, ArrowRight } from 'lucide-react'
+import { ImageIcon, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react'
 
 // Live data — always fresh.
 export const dynamic = 'force-dynamic'
@@ -16,6 +16,18 @@ const STAGES: { key: Stage; label: string }[] = [
   { key: 'in_progress', label: 'In Progress' },
   { key: 'listed', label: 'Listed' },
   { key: 'sold', label: 'Sold' },
+]
+
+// Ranks by total profit — turns the lifetime number into a level you climb.
+// Easy to rename or re-space these later.
+const TIERS: { min: number; title: string }[] = [
+  { min: 0, title: 'Picker' },
+  { min: 250, title: 'Flipper' },
+  { min: 1000, title: 'Dealer' },
+  { min: 2500, title: 'Operator' },
+  { min: 5000, title: 'Closer' },
+  { min: 10000, title: 'Mogul' },
+  { min: 25000, title: 'Tycoon' },
 ]
 
 const n = (v: any) => Number(v ?? 0)
@@ -60,11 +72,6 @@ export default async function PlayPage() {
       .eq('user_id', me)
       .maybeSingle()
   ).data
-  const firstName =
-    (workerProfile as any)?.first_name ||
-    (flipperProfile as any)?.business_name?.split(' ')[0] ||
-    user.email?.split('@')[0] ||
-    'there'
   const navUsername =
     (workerProfile as any)?.username || (flipperProfile as any)?.username || undefined
   const navName =
@@ -118,6 +125,17 @@ export default async function PlayPage() {
     })
     .reduce((s, p) => s + p.realized, 0)
 
+  // Rank / progress from total profit — the game-score framing.
+  const total = allTimeProfit
+  let tierIdx = 0
+  for (let i = 0; i < TIERS.length; i++) if (total >= TIERS[i].min) tierIdx = i
+  const tier = TIERS[tierIdx]
+  const next = TIERS[tierIdx + 1] ?? null
+  const toNext = next ? Math.max(0, next.min - total) : 0
+  const pct = next
+    ? Math.min(100, Math.max(0, ((total - tier.min) / (next.min - tier.min)) * 100))
+    : 100
+
   // Cash free = money on hand across asset buckets (same math as Books).
   const { data: assetLines } = await supabase
     .from('entry_lines')
@@ -134,16 +152,47 @@ export default async function PlayPage() {
     <div className="min-h-screen bg-background">
       <Nav role="flipper" userName={navName} userUsername={navUsername} />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-        {/* Hero: the number going up */}
-        <section className="text-center pt-2 pb-1">
-          <div className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            {firstName}&apos;s all-time profit
+        {/* Hero: your rank, your climbing score, your next goal */}
+        <section className="rounded-2xl border border-border bg-gradient-to-b from-accent/10 to-card px-6 py-7 text-center">
+          <div className="inline-flex items-center rounded-full bg-accent/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-accent">
+            {tier.title}
           </div>
-          <div className="mt-2 font-serif text-5xl sm:text-6xl tracking-tight text-accent">
-            <CountUp value={allTimeProfit} />
+          <div className="mt-3 font-serif text-5xl sm:text-6xl tracking-tight text-accent">
+            <CountUp value={total} />
           </div>
-          <div className="mt-2 text-sm text-muted-foreground">
-            {monthProfit !== 0 ? <>{money(monthProfit)} this month &middot; </> : null}
+          <div className="mt-1 text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+            profit so far
+          </div>
+
+          {monthProfit > 0 ? (
+            <div className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-green-600">
+              <TrendingUp className="w-4 h-4" /> {money(monthProfit)} this month
+            </div>
+          ) : monthProfit < 0 ? (
+            <div className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-red-600">
+              <TrendingDown className="w-4 h-4" /> {money(monthProfit)} this month
+            </div>
+          ) : (
+            <div className="mt-3 text-sm text-muted-foreground">Sell a piece to start the climb</div>
+          )}
+
+          {/* progress to the next rank */}
+          <div className="mt-4 max-w-xs mx-auto">
+            <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+              <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+            </div>
+            <div className="mt-1.5 text-xs text-muted-foreground">
+              {next ? (
+                <>
+                  {money(toNext)} to <span className="font-medium text-foreground">{next.title}</span>
+                </>
+              ) : (
+                'Top rank reached'
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 text-xs text-muted-foreground">
             {sold.length} flipped &middot; {unsold.length} in play
           </div>
         </section>
