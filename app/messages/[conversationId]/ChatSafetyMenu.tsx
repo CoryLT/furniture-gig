@@ -93,7 +93,7 @@ export default function ChatSafetyMenu({
           setOpen((o) => !o)
           setReporting(false)
         }}
-        className="p-2 rounded-lg text-stone-500 hover:bg-stone-100 transition-colors"
+        className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
         aria-label="Safety options"
       >
         <MoreVertical className="w-5 h-5" />
@@ -102,14 +102,14 @@ export default function ChatSafetyMenu({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 z-20 w-60 bg-white border border-stone-200 rounded-lg shadow-lg overflow-hidden">
+          <div className="absolute right-0 top-full mt-1 z-20 w-60 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
             {!reporting ? (
               <div className="py-1">
                 <button
                   type="button"
                   onClick={toggleBlock}
                   disabled={busy}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-stone-50 text-left disabled:opacity-50"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted text-left disabled:opacity-50"
                 >
                   {busy ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -137,7 +137,7 @@ export default function ChatSafetyMenu({
                   onChange={(e) => setReportReason(e.target.value.slice(0, 1000))}
                   rows={3}
                   placeholder="Tell us what's wrong (optional)"
-                  className="w-full px-2 py-1.5 text-sm border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-2 py-1.5 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
                 />
                 <div className="flex items-center gap-2">
                   <button
@@ -152,7 +152,7 @@ export default function ChatSafetyMenu({
                   <button
                     type="button"
                     onClick={() => setReporting(false)}
-                    className="px-3 py-1.5 rounded-md text-sm text-stone-600 hover:bg-stone-100"
+                    className="px-3 py-1.5 rounded-md text-sm text-muted-foreground hover:bg-muted"
                   >
                     Cancel
                   </button>
@@ -164,7 +164,7 @@ export default function ChatSafetyMenu({
       )}
 
       {note && (
-        <p className="absolute right-0 top-full mt-1 text-xs text-muted-foreground whitespace-nowrap bg-white px-2 py-1 rounded shadow-sm border border-stone-100">
+        <p className="absolute right-0 top-full mt-1 text-xs text-muted-foreground whitespace-nowrap bg-card px-2 py-1 rounded shadow-sm border border-border">
           {note}
         </p>
       )}

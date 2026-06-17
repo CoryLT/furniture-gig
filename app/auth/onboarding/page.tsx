@@ -117,13 +117,13 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50 flex items-center justify-center py-12 px-4">
+    <div className="min-h-screen bg-muted flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow p-8">
-          <h1 className="text-2xl font-serif font-bold text-slate-900 mb-2">
+        <div className="bg-card rounded-lg shadow p-8">
+          <h1 className="text-2xl font-serif font-bold text-foreground mb-2">
             Complete Your Profile
           </h1>
-          <p className="text-slate-600 mb-6">
+          <p className="text-muted-foreground mb-6">
             Let us know a bit about yourself before you start taking gigs.
           </p>
 
@@ -136,7 +136,7 @@ export default function OnboardingPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Full Name */}
             <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-slate-700 mb-1">
+              <label htmlFor="fullName" className="block text-sm font-medium text-foreground mb-1">
                 Full Name
               </label>
               <input
@@ -146,14 +146,14 @@ export default function OnboardingPage() {
                 value={formData.fullName}
                 onChange={handleChange}
                 disabled={loading}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
+                className="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-accent focus:border-accent disabled:bg-muted"
                 placeholder="John Doe"
               />
             </div>
 
             {/* Username */}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-slate-700 mb-1">
+              <label htmlFor="username" className="block text-sm font-medium text-foreground mb-1">
                 Username
               </label>
               <input
@@ -163,20 +163,20 @@ export default function OnboardingPage() {
                 value={formData.username}
                 onChange={handleChange}
                 disabled={loading}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
+                className="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-accent focus:border-accent disabled:bg-muted"
                 placeholder="johndoe"
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
               />
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Letters, numbers, hyphens, and underscores only. This becomes your public profile link.
               </p>
             </div>
 
             {/* Phone */}
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-1">
+              <label htmlFor="phone" className="block text-sm font-medium text-foreground mb-1">
                 Phone
               </label>
               <input
@@ -186,7 +186,7 @@ export default function OnboardingPage() {
                 value={formData.phone}
                 onChange={handleChange}
                 disabled={loading}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
+                className="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-accent focus:border-accent disabled:bg-muted"
                 placeholder="(555) 123-4567"
               />
             </div>

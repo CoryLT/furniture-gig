@@ -42,8 +42,8 @@ export function PhotoGallery({
 
   if (photos.length === 0) {
     return (
-      <div className="rounded-lg border border-stone-200 bg-stone-50 p-8 text-center">
-        <p className="text-sm text-stone-600">
+      <div className="rounded-lg border border-border bg-muted p-8 text-center">
+        <p className="text-sm text-muted-foreground">
           {isEditable
             ? "No photos yet. Upload your work to showcase what you do."
             : "No photos yet."}
@@ -57,9 +57,9 @@ export function PhotoGallery({
       {photos.map((photo) => (
         <div
           key={photo.id}
-          className="overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm transition hover:shadow-md"
+          className="overflow-hidden rounded-lg border border-border bg-card shadow-sm transition hover:shadow-md"
         >
-          <div className="relative h-48 w-full bg-stone-100">
+          <div className="relative h-48 w-full bg-muted">
             <Image
               src={photo.publicUrl}
               alt={photo.caption || "Work sample"}
@@ -70,7 +70,7 @@ export function PhotoGallery({
           </div>
           <div className="p-4">
             {photo.caption && (
-              <p className="mb-3 text-sm text-stone-700">{photo.caption}</p>
+              <p className="mb-3 text-sm text-foreground">{photo.caption}</p>
             )}
             {isEditable && (
               <Button

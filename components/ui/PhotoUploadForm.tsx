@@ -131,15 +131,15 @@ export function PhotoUploadForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 rounded-lg border border-stone-200 bg-stone-50 p-6"
+      className="space-y-4 rounded-lg border border-border bg-muted p-6"
     >
-      <h3 className="text-sm font-semibold text-stone-900">Upload Photo</h3>
+      <h3 className="text-sm font-semibold text-foreground">Upload Photo</h3>
 
       {/* File Input */}
       <div className="space-y-2">
         <label
           htmlFor="photo-upload"
-          className="block text-sm font-medium text-stone-700"
+          className="block text-sm font-medium text-foreground"
         >
           Photo
         </label>
@@ -149,14 +149,14 @@ export function PhotoUploadForm({
           accept="image/*,.heic,.heif"
           onChange={handleFileChange}
           disabled={isUploading}
-          className="block w-full text-sm text-stone-500 file:mr-4 file:rounded file:border-0 file:bg-amber-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-amber-700"
+          className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-semibold file:text-accent-foreground hover:file:bg-accent/90"
         />
-        <p className="text-xs text-stone-500">PNG, JPG, HEIC, or WebP. Max 10MB.</p>
+        <p className="text-xs text-muted-foreground">PNG, JPG, HEIC, or WebP. Max 10MB.</p>
       </div>
 
       {/* Preview */}
       {preview && (
-        <div className="overflow-hidden rounded-lg bg-white">
+        <div className="overflow-hidden rounded-lg bg-card">
           <img
             src={preview}
             alt="Preview"
@@ -167,7 +167,7 @@ export function PhotoUploadForm({
 
       {/* HEIC notice when no preview is shown */}
       {file && !preview && looksLikeHeic(file) && (
-        <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+        <div className="rounded-lg border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
           HEIC photo selected — your browser can&apos;t show a preview, but
           it will be converted to JPG when you upload.
         </div>
@@ -177,7 +177,7 @@ export function PhotoUploadForm({
       <div className="space-y-2">
         <label
           htmlFor="caption"
-          className="block text-sm font-medium text-stone-700"
+          className="block text-sm font-medium text-foreground"
         >
           Caption (Optional)
         </label>
@@ -188,7 +188,7 @@ export function PhotoUploadForm({
           placeholder="Describe what's in this photo..."
           disabled={isUploading}
           rows={2}
-          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+          className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         />
       </div>
 

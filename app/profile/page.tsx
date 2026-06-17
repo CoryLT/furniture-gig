@@ -302,29 +302,29 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-        <p className="text-slate-600">Loading profile...</p>
+      <div className="min-h-screen bg-muted flex items-center justify-center">
+        <p className="text-muted-foreground">Loading profile...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 py-12 px-4">
+    <div className="min-h-screen bg-muted py-12 px-4">
       <div className="max-w-2xl mx-auto">
         {/* Back link */}
         <Link
           href="/gigs"
-          className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 mb-6"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to gigs
         </Link>
 
-        <div className="bg-white rounded-lg shadow p-8">
-          <h1 className="text-3xl font-serif font-bold text-slate-900 mb-2">
+        <div className="bg-card rounded-lg shadow p-8">
+          <h1 className="text-3xl font-serif font-bold text-foreground mb-2">
             My Profile
           </h1>
-          <p className="text-slate-600 mb-6">
+          <p className="text-muted-foreground mb-6">
             One profile for everything — claiming gigs and posting gigs.
           </p>
 
@@ -342,10 +342,10 @@ export default function ProfilePage() {
 
           {/* Profile Picture */}
           <div className="mb-8">
-            <h2 className="text-lg font-semibold text-slate-900 mb-3">Profile Picture</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-3">Profile Picture</h2>
             <div className="flex items-end gap-4">
               {formData.avatarUrl ? (
-                <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-stone-200">
+                <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-muted">
                   <Image
                     src={formData.avatarUrl}
                     alt="Profile picture"
@@ -354,8 +354,8 @@ export default function ProfilePage() {
                   />
                 </div>
               ) : (
-                <div className="w-24 h-24 rounded-lg bg-stone-200 flex items-center justify-center">
-                  <span className="text-xs text-slate-500">No photo</span>
+                <div className="w-24 h-24 rounded-lg bg-muted flex items-center justify-center">
+                  <span className="text-xs text-muted-foreground">No photo</span>
                 </div>
               )}
               <div>
@@ -380,7 +380,7 @@ export default function ProfilePage() {
                     Upload photo
                   </Button>
                 </label>
-                <p className="text-xs text-slate-500 mt-2">Max 5MB</p>
+                <p className="text-xs text-muted-foreground mt-2">Max 5MB</p>
               </div>
             </div>
           </div>
@@ -388,10 +388,10 @@ export default function ProfilePage() {
           <form onSubmit={handleSubmit} className="space-y-8">
             {/* Personal Info */}
             <section className="space-y-4">
-              <h2 className="text-lg font-semibold text-slate-900">Personal Info</h2>
+              <h2 className="text-lg font-semibold text-foreground">Personal Info</h2>
 
               <div>
-                <label htmlFor="fullName" className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="fullName" className="block text-sm font-medium text-foreground mb-1">
                   Full Name
                 </label>
                 <input
@@ -401,13 +401,13 @@ export default function ProfilePage() {
                   value={formData.fullName}
                   onChange={handleChange}
                   disabled={saving}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
+                  className="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-accent focus:border-accent disabled:bg-muted"
                   placeholder="John Doe"
                 />
               </div>
 
               <div>
-                <label htmlFor="username" className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="username" className="block text-sm font-medium text-foreground mb-1">
                   Username
                 </label>
                 <input
@@ -417,19 +417,19 @@ export default function ProfilePage() {
                   value={formData.username}
                   onChange={handleChange}
                   disabled={saving}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
+                  className="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-accent focus:border-accent disabled:bg-muted"
                   placeholder="johndoe"
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
                 />
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Letters, numbers, hyphens, and underscores only. Appears in your public profile URL.
                 </p>
               </div>
 
               <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="phone" className="block text-sm font-medium text-foreground mb-1">
                   Phone
                 </label>
                 <input
@@ -439,7 +439,7 @@ export default function ProfilePage() {
                   value={formData.phone}
                   onChange={handleChange}
                   disabled={saving}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
+                  className="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-accent focus:border-accent disabled:bg-muted"
                   placeholder="(555) 123-4567"
                 />
               </div>
@@ -454,17 +454,17 @@ export default function ProfilePage() {
             </section>
 
             {/* About You (for when you post gigs) */}
-            <section className="space-y-4 pt-4 border-t border-slate-200">
+            <section className="space-y-4 pt-4 border-t border-border">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">About You</h2>
-                <p className="text-sm text-slate-600">
+                <h2 className="text-lg font-semibold text-foreground">About You</h2>
+                <p className="text-sm text-muted-foreground">
                   Shown on your public profile when you post gigs. Optional, but helps workers trust you.
                 </p>
               </div>
 
               <div>
-                <label htmlFor="businessName" className="block text-sm font-medium text-slate-700 mb-1">
-                  Business Name <span className="text-slate-500 font-normal">(optional)</span>
+                <label htmlFor="businessName" className="block text-sm font-medium text-foreground mb-1">
+                  Business Name <span className="text-muted-foreground font-normal">(optional)</span>
                 </label>
                 <input
                   id="businessName"
@@ -473,14 +473,14 @@ export default function ProfilePage() {
                   value={formData.businessName}
                   onChange={handleChange}
                   disabled={saving}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
+                  className="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-accent focus:border-accent disabled:bg-muted"
                   placeholder="Your business name"
                 />
               </div>
 
               <div>
-                <label htmlFor="website" className="block text-sm font-medium text-slate-700 mb-1">
-                  Website <span className="text-slate-500 font-normal">(optional)</span>
+                <label htmlFor="website" className="block text-sm font-medium text-foreground mb-1">
+                  Website <span className="text-muted-foreground font-normal">(optional)</span>
                 </label>
                 <input
                   id="website"
@@ -489,14 +489,14 @@ export default function ProfilePage() {
                   value={formData.website}
                   onChange={handleChange}
                   disabled={saving}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100"
+                  className="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-accent focus:border-accent disabled:bg-muted"
                   placeholder="https://yourwebsite.com"
                 />
               </div>
 
               <div>
-                <label htmlFor="bio" className="block text-sm font-medium text-slate-700 mb-1">
-                  Bio <span className="text-slate-500 font-normal">(optional)</span>
+                <label htmlFor="bio" className="block text-sm font-medium text-foreground mb-1">
+                  Bio <span className="text-muted-foreground font-normal">(optional)</span>
                 </label>
                 <textarea
                   id="bio"
@@ -505,12 +505,12 @@ export default function ProfilePage() {
                   onChange={handleChange}
                   disabled={saving}
                   rows={4}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 disabled:bg-slate-100 resize-none"
+                  className="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-accent focus:border-accent disabled:bg-muted resize-none"
                   placeholder="Tell people about yourself and your work..."
                 />
               </div>
 
-              <div className="flex items-start gap-3 p-3 bg-stone-50 rounded-md">
+              <div className="flex items-start gap-3 p-3 bg-muted rounded-md">
                 <input
                   id="profilePublic"
                   type="checkbox"
@@ -518,13 +518,13 @@ export default function ProfilePage() {
                   checked={formData.profilePublic}
                   onChange={handleChange}
                   disabled={saving}
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                  className="mt-1 h-4 w-4 rounded border-border text-accent focus:ring-accent"
                 />
                 <div>
-                  <label htmlFor="profilePublic" className="text-sm font-medium text-slate-700 cursor-pointer">
+                  <label htmlFor="profilePublic" className="text-sm font-medium text-foreground cursor-pointer">
                     Make my profile public
                   </label>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     When checked, your profile appears at flipwork.com/u/{formData.username || 'your-username'}
                   </p>
                 </div>
@@ -555,22 +555,22 @@ export default function ProfilePage() {
         )}
 
         {/* Notifications — manage the phone buzz (and send a test) here */}
-        <div className="bg-white rounded-lg shadow p-8 mt-6">
-          <h2 className="text-2xl font-serif font-bold text-slate-900 mb-4">
+        <div className="bg-card rounded-lg shadow p-8 mt-6">
+          <h2 className="text-2xl font-serif font-bold text-foreground mb-4">
             Notifications
           </h2>
           <EnableNotificationsButton placement="settings" />
         </div>
 
         {/* Work Samples Gallery — separate card so it has its own context */}
-        <div className="bg-white rounded-lg shadow p-8 mt-6">
+        <div className="bg-card rounded-lg shadow p-8 mt-6">
           <div className="flex items-center gap-2 mb-2">
-            <Camera className="w-5 h-5 text-slate-700" />
-            <h2 className="text-2xl font-serif font-bold text-slate-900">
+            <Camera className="w-5 h-5 text-foreground" />
+            <h2 className="text-2xl font-serif font-bold text-foreground">
               Work Samples
             </h2>
           </div>
-          <p className="text-sm text-slate-600 mb-6">
+          <p className="text-sm text-muted-foreground mb-6">
             Photos of your work. These show up on your public profile in an Instagram-style grid.
           </p>
 
@@ -578,7 +578,7 @@ export default function ProfilePage() {
             <PhotoUploadForm onPhotoUploaded={reloadPhotos} userType="flipper" />
 
             <div>
-              <h3 className="text-sm font-semibold text-slate-900 mb-3">
+              <h3 className="text-sm font-semibold text-foreground mb-3">
                 Your Photos {photos.length > 0 && `(${photos.length})`}
               </h3>
               <PhotoGallery

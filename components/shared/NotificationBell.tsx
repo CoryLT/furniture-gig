@@ -267,13 +267,13 @@ export function NotificationBell() {
           if (!n.read_at) markOneRead(n.id)
           setOpen(false)
         }}
-        className={`flex items-start gap-3 px-4 py-3 transition-colors hover:bg-stone-50 ${
-          !n.read_at ? 'bg-amber-50/40' : ''
+        className={`flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted ${
+          !n.read_at ? 'bg-accent/10/40' : ''
         }`}
       >
         <div className="flex-shrink-0 mt-0.5">
           {actor?.avatarUrl ? (
-            <div className="relative w-9 h-9 rounded-full overflow-hidden bg-stone-200">
+            <div className="relative w-9 h-9 rounded-full overflow-hidden bg-muted">
               <Image
                 src={actor.avatarUrl}
                 alt={actor.displayName}
@@ -283,7 +283,7 @@ export function NotificationBell() {
               />
             </div>
           ) : (
-            <div className="w-9 h-9 rounded-full bg-stone-200 text-stone-600 flex items-center justify-center font-medium text-xs">
+            <div className="w-9 h-9 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-medium text-xs">
               {initials || <User className="w-4 h-4" />}
             </div>
           )}
@@ -335,7 +335,7 @@ export function NotificationBell() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative p-2 hover:bg-stone-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-amber-600"
+        className="relative p-2 hover:bg-muted rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
         aria-label="Notifications"
       >
         <Bell className="w-5 h-5 text-foreground" />
@@ -347,8 +347,8 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-stone-200 rounded-lg shadow-lg z-50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-stone-200">
+        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-card border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
             <h3 className="text-sm font-semibold text-foreground">
               Notifications
             </h3>
@@ -369,14 +369,14 @@ export function NotificationBell() {
             </button>
           </div>
 
-          <div className="max-h-[420px] overflow-y-auto divide-y divide-stone-100">
+          <div className="max-h-[420px] overflow-y-auto divide-y divide-border">
             {loading ? (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                 Loading…
               </div>
             ) : notifications.length === 0 ? (
               <div className="px-4 py-8 text-center space-y-2">
-                <Bell className="w-8 h-8 mx-auto text-stone-300" strokeWidth={1.5} />
+                <Bell className="w-8 h-8 mx-auto text-muted-foreground" strokeWidth={1.5} />
                 <p className="text-sm text-muted-foreground">
                   You're all caught up.
                 </p>

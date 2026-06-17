@@ -298,9 +298,9 @@ export default function ChatClient({
   }
 
   return (
-    <div className="bg-white border border-stone-200 rounded-lg overflow-hidden flex flex-col h-[calc(100vh-180px)] min-h-[500px]">
+    <div className="bg-card border border-border rounded-lg overflow-hidden flex flex-col h-[calc(100vh-180px)] min-h-[500px]">
       {/* Header */}
-      <div className="border-b border-stone-200 p-4 flex items-center gap-3">
+      <div className="border-b border-border p-4 flex items-center gap-3">
         {otherUsername ? (
           <Link href={`/u/${otherUsername}`} className="flex-shrink-0">
             <AvatarBubble name={otherName} avatarUrl={otherAvatarUrl} />
@@ -336,7 +336,7 @@ export default function ChatClient({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-stone-50">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-muted">
         {messages.length === 0 && (
           <div className="text-center text-sm text-muted-foreground py-8">
             No messages yet. Say hi!
@@ -364,7 +364,7 @@ export default function ChatClient({
                   className={`px-3 py-2 rounded-2xl text-sm leading-snug whitespace-pre-wrap break-words ${
                     mine
                       ? 'bg-foreground text-background rounded-br-sm'
-                      : 'bg-white border border-stone-200 text-foreground rounded-bl-sm'
+                      : 'bg-card border border-border text-foreground rounded-bl-sm'
                   } ${m.pending ? 'opacity-60' : ''}`}
                 >
                   {m.body}
@@ -386,7 +386,7 @@ export default function ChatClient({
             <div className="flex-shrink-0 w-7">
               <AvatarBubble name={otherName} avatarUrl={otherAvatarUrl} size="sm" />
             </div>
-            <div className="bg-white border border-stone-200 rounded-2xl rounded-bl-sm px-3 py-2.5">
+            <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-3 py-2.5">
               <TypingDots />
             </div>
           </div>
@@ -398,7 +398,7 @@ export default function ChatClient({
       {/* Composer */}
       <form
         onSubmit={handleSend}
-        className="border-t border-stone-200 p-3 flex items-end gap-2 bg-white"
+        className="border-t border-border p-3 flex items-end gap-2 bg-card"
       >
         <textarea
           value={draft}
@@ -416,7 +416,7 @@ export default function ChatClient({
           onBlur={broadcastStopTyping}
           rows={1}
           placeholder="Type a message…"
-          className="flex-1 resize-none rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent max-h-32"
+          className="flex-1 resize-none rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent max-h-32"
           style={{ minHeight: '40px' }}
         />
         <button
@@ -457,13 +457,13 @@ function AvatarBubble({
     .toUpperCase()
   if (avatarUrl) {
     return (
-      <div className={`relative ${sizeClass} rounded-full overflow-hidden bg-stone-200 flex-shrink-0`}>
+      <div className={`relative ${sizeClass} rounded-full overflow-hidden bg-muted flex-shrink-0`}>
         <Image src={avatarUrl} alt={name} fill sizes="40px" className="object-cover" />
       </div>
     )
   }
   return (
-    <div className={`${sizeClass} rounded-full bg-stone-200 text-stone-600 flex items-center justify-center font-medium flex-shrink-0`}>
+    <div className={`${sizeClass} rounded-full bg-muted text-muted-foreground flex items-center justify-center font-medium flex-shrink-0`}>
       {initials || <User className="w-4 h-4" />}
     </div>
   )
@@ -472,9 +472,9 @@ function AvatarBubble({
 function TypingDots() {
   return (
     <span className="inline-flex items-center gap-1">
-      <span className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-      <span className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-      <span className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce"></span>
+      <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+      <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+      <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce"></span>
     </span>
   )
 }

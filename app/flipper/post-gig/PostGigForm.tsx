@@ -282,10 +282,10 @@ export default function PostGigForm({ existingDraft }: Props) {
 
       {/* Resume banner — only shown when we're picking up an existing draft */}
       {step === 'photos' && existingDraft && savedGigId === existingDraft.id && (
-        <div className="card border-amber-300/60 bg-amber-50/50">
+        <div className="card border-accent/40/60 bg-accent/10/50">
           <div className="card-body">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+              <AlertCircle className="w-5 h-5 text-accent mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-foreground">
                   Picking up where you left off
@@ -323,17 +323,17 @@ export default function PostGigForm({ existingDraft }: Props) {
           <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold
             ${step === 'details'
               ? 'bg-accent text-accent-foreground'
-              : 'bg-stone-100 text-muted-foreground'}`}>
+              : 'bg-muted text-muted-foreground'}`}>
             {step === 'photos' ? <Check className="h-4 w-4" /> : '1'}
           </div>
           <span>Job details</span>
         </div>
-        <ChevronRight className="h-4 w-4 text-stone-300" />
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
         <div className={`flex items-center gap-2 ${step === 'photos' ? 'text-foreground' : 'text-muted-foreground'}`}>
           <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold
             ${step === 'photos'
               ? 'bg-accent text-accent-foreground'
-              : 'bg-stone-100 text-muted-foreground'}`}>
+              : 'bg-muted text-muted-foreground'}`}>
             2
           </div>
           <span>Photos</span>

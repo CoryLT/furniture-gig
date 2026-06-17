@@ -162,7 +162,7 @@ export function PublicProfileClient({
           <div className="card-body">
             <div className="flex flex-col sm:flex-row gap-6 items-start">
               {/* Avatar */}
-              <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-stone-200 flex-shrink-0 mx-auto sm:mx-0">
+              <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-muted flex-shrink-0 mx-auto sm:mx-0">
                 {profile.avatarUrl ? (
                   <Image
                     src={profile.avatarUrl}
@@ -173,7 +173,7 @@ export function PublicProfileClient({
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <User className="w-12 h-12 text-slate-400" strokeWidth={1.5} />
+                    <User className="w-12 h-12 text-muted-foreground" strokeWidth={1.5} />
                   </div>
                 )}
               </div>
@@ -272,8 +272,8 @@ export function PublicProfileClient({
           </div>
           <div className="card">
             <div className="card-body flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                <ImageIcon className="w-5 h-5 text-amber-700" />
+              <div className="w-10 h-10 rounded-lg bg-accent/15 flex items-center justify-center flex-shrink-0">
+                <ImageIcon className="w-5 h-5 text-accent" />
               </div>
               <div className="min-w-0">
                 <p className="text-2xl font-semibold text-foreground leading-none">{allPhotos.length}</p>
@@ -429,7 +429,7 @@ export function PublicProfileClient({
               /* Owner-only empty state */
               <div className="card">
                 <div className="card-body text-center py-10">
-                  <Briefcase className="w-10 h-10 mx-auto text-slate-300 mb-3" strokeWidth={1.5} />
+                  <Briefcase className="w-10 h-10 mx-auto text-muted-foreground mb-3" strokeWidth={1.5} />
                   <p className="text-sm text-muted-foreground mb-4">
                     You don&apos;t have any open gigs right now.
                   </p>
@@ -525,7 +525,7 @@ export function PublicProfileClient({
               {allPhotos.map((photo) => (
                 <div
                   key={photo.id}
-                  className="relative aspect-square overflow-hidden bg-stone-100 group"
+                  className="relative aspect-square overflow-hidden bg-muted group"
                 >
                   <Image
                     src={photo.publicUrl}
@@ -540,7 +540,7 @@ export function PublicProfileClient({
           ) : (
             <div className="card">
               <div className="card-body text-center py-12">
-                <ImageIcon className="w-10 h-10 mx-auto text-slate-300 mb-3" strokeWidth={1.5} />
+                <ImageIcon className="w-10 h-10 mx-auto text-muted-foreground mb-3" strokeWidth={1.5} />
                 <p className="text-sm text-muted-foreground">
                   {isOwnProfile
                     ? "No photos yet. Add work samples from your profile editor to showcase what you do."

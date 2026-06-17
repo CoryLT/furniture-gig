@@ -84,16 +84,16 @@ export default function ConversationRow({
       .toUpperCase() || ''
 
   return (
-    <div className="relative flex items-center gap-3 p-4 hover:bg-stone-50 transition-colors">
+    <div className="relative flex items-center gap-3 p-4 hover:bg-muted transition-colors">
       <Link href={href} className="flex items-center gap-3 flex-1 min-w-0">
         {/* Avatar */}
         <div className="flex-shrink-0">
           {avatarUrl ? (
-            <div className="relative w-11 h-11 rounded-full overflow-hidden bg-stone-200">
+            <div className="relative w-11 h-11 rounded-full overflow-hidden bg-muted">
               <Image src={avatarUrl} alt={name} fill sizes="44px" className="object-cover" />
             </div>
           ) : (
-            <div className="w-11 h-11 rounded-full bg-stone-200 text-stone-600 flex items-center justify-center font-medium">
+            <div className="w-11 h-11 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-medium">
               {initials || <User className="w-5 h-5" />}
             </div>
           )}
@@ -134,7 +134,7 @@ export default function ConversationRow({
           type="button"
           onClick={toggleMenu}
           disabled={busy}
-          className="p-2 rounded-lg text-stone-500 hover:bg-stone-200 transition-colors disabled:opacity-50"
+          className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
           aria-label="Conversation options"
         >
           <MoreVertical className="w-4 h-4" />
@@ -148,7 +148,7 @@ export default function ConversationRow({
               onClick={() => setMenuOpen(false)}
             />
             <div
-              className={`absolute right-0 z-20 w-44 bg-white border border-stone-200 rounded-lg shadow-lg overflow-hidden py-1 ${
+              className={`absolute right-0 z-20 w-44 bg-card border border-border rounded-lg shadow-lg overflow-hidden py-1 ${
                 openUp ? 'bottom-full mb-1' : 'top-full mt-1'
               }`}
             >
@@ -156,7 +156,7 @@ export default function ConversationRow({
                 <button
                   type="button"
                   onClick={() => doAction('unarchive')}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-stone-50 text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted text-left"
                 >
                   <ArchiveRestore className="w-4 h-4" />
                   Move to inbox
@@ -165,7 +165,7 @@ export default function ConversationRow({
                 <button
                   type="button"
                   onClick={() => doAction('archive')}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-stone-50 text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted text-left"
                 >
                   <Archive className="w-4 h-4" />
                   Archive
@@ -180,7 +180,7 @@ export default function ConversationRow({
                 Delete
               </button>
               {err && (
-                <p className="px-3 py-2 text-xs text-red-600 border-t border-stone-100">
+                <p className="px-3 py-2 text-xs text-red-600 border-t border-border">
                   {err}
                 </p>
               )}

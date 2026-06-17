@@ -358,7 +358,7 @@ export default async function MessagesInboxPage({
 
       {/* List */}
       {conversations.length === 0 ? (
-        <div className="border border-stone-200 bg-white rounded-lg p-12 text-center space-y-3">
+        <div className="border border-border bg-card rounded-lg p-12 text-center space-y-3">
           <MessageCircle className="w-10 h-10 text-muted-foreground mx-auto" />
           <h2 className="font-medium text-foreground">
             {view === 'archived'
@@ -372,7 +372,7 @@ export default async function MessagesInboxPage({
           </p>
         </div>
       ) : (
-        <div className="border border-stone-200 bg-white rounded-lg divide-y divide-stone-200 overflow-hidden">
+        <div className="border border-border bg-card rounded-lg divide-y divide-border overflow-hidden">
           {conversations.map((c) => {
             const { name, avatarUrl } = getOtherInfo(c)
             const last = lastByConv.get(c.id)

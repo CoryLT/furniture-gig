@@ -208,7 +208,7 @@ export function MessageBell() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative p-2 hover:bg-stone-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-amber-600"
+        className="relative p-2 hover:bg-muted rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
         aria-label="Messages"
       >
         <Mail className="w-5 h-5 text-foreground" />
@@ -220,8 +220,8 @@ export function MessageBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-stone-200 rounded-lg shadow-lg z-50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-stone-200">
+        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-card border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
             <h3 className="text-sm font-semibold text-foreground">Messages</h3>
             <Link
               href="/messages"
@@ -232,14 +232,14 @@ export function MessageBell() {
             </Link>
           </div>
 
-          <div className="max-h-[420px] overflow-y-auto divide-y divide-stone-100">
+          <div className="max-h-[420px] overflow-y-auto divide-y divide-border">
             {loading ? (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                 Loading…
               </div>
             ) : items.length === 0 ? (
               <div className="px-4 py-8 text-center space-y-2">
-                <MessageCircle className="w-8 h-8 mx-auto text-stone-300" strokeWidth={1.5} />
+                <MessageCircle className="w-8 h-8 mx-auto text-muted-foreground" strokeWidth={1.5} />
                 <p className="text-sm text-muted-foreground">No new messages.</p>
                 <p className="text-xs text-muted-foreground">
                   You're all caught up.
@@ -251,7 +251,7 @@ export function MessageBell() {
                   key={it.conversationId}
                   href={`/messages/${it.conversationId}`}
                   onClick={() => setOpen(false)}
-                  className="flex items-start gap-3 px-4 py-3 hover:bg-stone-50 transition-colors"
+                  className="flex items-start gap-3 px-4 py-3 hover:bg-muted transition-colors"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">

@@ -108,32 +108,32 @@ export default function PayoutHandlesSection() {
   const anyFilled = !!(handles.cashapp || handles.venmo || handles.paypal || handles.zelle)
 
   return (
-    <div className="bg-white rounded-lg shadow p-8 mt-6">
+    <div className="bg-card rounded-lg shadow p-8 mt-6">
       <div className="flex items-center gap-2 mb-2">
-        <Wallet className="w-5 h-5 text-slate-700" />
-        <h2 className="text-2xl font-serif font-bold text-slate-900">How you get paid</h2>
+        <Wallet className="w-5 h-5 text-foreground" />
+        <h2 className="text-2xl font-serif font-bold text-foreground">How you get paid</h2>
       </div>
-      <p className="text-sm text-slate-600 mb-6">
+      <p className="text-sm text-muted-foreground mb-6">
         Add the apps you already use. When a poster picks you, they&apos;ll pay you directly on one of
         these — no account to set up, no waiting. Only a poster who has booked you can see these.
       </p>
 
       {loading ? (
-        <p className="text-sm text-slate-600">Loading…</p>
+        <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
         <div className="space-y-4">
           {METHODS.map((m) => (
             <div key={m.key}>
-              <label className="block text-sm font-medium text-slate-800 mb-1">{m.label}</label>
+              <label className="block text-sm font-medium text-foreground mb-1">{m.label}</label>
               <div className="flex items-center gap-3">
                 <input
                   type="text"
                   value={handles[m.key]}
                   onChange={(e) => update(m.key, e.target.value)}
                   placeholder={m.placeholder}
-                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                  className="flex-1 rounded-md border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none"
                 />
-                <label className="flex items-center gap-1.5 text-xs text-slate-600 whitespace-nowrap">
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
                   <input
                     type="radio"
                     name="preferred-payout"
@@ -143,7 +143,7 @@ export default function PayoutHandlesSection() {
                   Preferred
                 </label>
               </div>
-              <p className="text-xs text-slate-400 mt-1">{m.hint}</p>
+              <p className="text-xs text-muted-foreground mt-1">{m.hint}</p>
             </div>
           ))}
 
@@ -157,7 +157,7 @@ export default function PayoutHandlesSection() {
           </div>
 
           {!anyFilled && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted-foreground">
               Add at least one so posters can pay you when you finish a gig.
             </p>
           )}
