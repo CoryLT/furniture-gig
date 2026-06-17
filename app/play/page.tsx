@@ -252,6 +252,33 @@ export default async function PlayPage() {
             </div>
           </div>
 
+          {/* Rank trail — the whole climb; locked ranks dimmed with a lock to nag a little */}
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+            {TIERS.map((t, i) => {
+              const current = i === tierIdx
+              const achieved = i < tierIdx
+              const locked = i > tierIdx
+              return (
+                <span
+                  key={t.title}
+                  className="inline-flex items-center gap-1 whitespace-nowrap font-sans text-[10px] uppercase tracking-wider"
+                  style={{
+                    color: current
+                      ? C.gold
+                      : achieved
+                        ? 'rgba(245,205,130,0.5)'
+                        : 'rgba(169,158,140,0.32)',
+                    fontWeight: current ? 700 : 500,
+                  }}
+                >
+                  {i > 0 ? <span style={{ color: 'rgba(255,255,255,0.12)' }}>{'\u203A'}</span> : null}
+                  {locked ? <Lock className="w-2.5 h-2.5" /> : null}
+                  {t.title}
+                </span>
+              )
+            })}
+          </div>
+
           <div
             className="mt-5 flex items-center justify-center gap-5 font-mono text-sm"
             style={{ color: C.cream }}
