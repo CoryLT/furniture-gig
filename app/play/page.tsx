@@ -5,7 +5,7 @@ import Nav from '@/components/shared/Nav'
 import CountUp from '@/components/play/CountUp'
 import GameBar from '@/components/play/GameBar'
 import type { ReactNode } from 'react'
-import { ImageIcon, ArrowRight, TrendingUp, TrendingDown, Coins, Lock, Crown } from 'lucide-react'
+import { ImageIcon, ArrowRight, TrendingUp, TrendingDown, Coins, Lock, Crown, Target, Check } from 'lucide-react'
 
 // Live data — always fresh.
 export const dynamic = 'force-dynamic'
@@ -132,13 +132,13 @@ export default async function PlayPage() {
   const tiedUp = unsold.reduce((s, p) => s + p.costs, 0)
   const allTimeProfit = sold.reduce((s, p) => s + p.realized, 0)
   const now = new Date()
-  const monthProfit = sold
-    .filter((p: any) => {
-      if (!p.stage_sold_at) return false
-      const d = new Date(p.stage_sold_at)
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
-    })
-    .reduce((s, p) => s + p.realized, 0)
+  const soldThisMonth = sold.filter((p: any) => {
+    if (!p.stage_sold_at) return false
+    const d = new Date(p.stage_sold_at)
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  })
+  const monthProfit = soldThisMonth.reduce((s, p) => s + p.realized, 0)
+  const monthFlips = soldThisMonth.length
 
   // Rank / progress from total profit — the game-score framing.
   const total = allTimeProfit
@@ -159,6 +159,29 @@ export default async function PlayPage() {
     .eq('accounts.type', 'asset')
   let cashFree = 0
   for (const l of (assetLines ?? []) as any[]) cashFree += Number(l.debit) - Number(l.credit)
+
+  // Monthly challenges — short-term, resettable quests on top of the rank ladder.
+  // Targets are easy to tweak.
+  const FLIP_GOAL = 2
+  const PROFIT_GOAL = 250
+  const challenges = [
+    {
+      key: 'flips',
+      icon: <Target className="w-4 h-4" />,
+      title: `Flip ${FLIP_GOAL} this month`,
+      label: `${Math.min(monthFlips, FLIP_GOAL)} / ${FLIP_GOAL}`,
+      pct: Math.min(100, (monthFlips / FLIP_GOAL) * 100),
+      done: monthFlips >= FLIP_GOAL,
+    },
+    {
+      key: 'profit',
+      icon: <Coins className="w-4 h-4" />,
+      title: `Clear $${whole(PROFIT_GOAL)} this month`,
+      label: `$${whole(Math.max(0, monthProfit))} / $${whole(PROFIT_GOAL)}`,
+      pct: Math.min(100, Math.max(0, (monthProfit / PROFIT_GOAL) * 100)),
+      done: monthProfit >= PROFIT_GOAL,
+    },
+  ]
 
   const byStage = (k: Stage) => pieces.filter((p) => p.stage === k)
   const hasPieces = pieces.length > 0
@@ -302,6 +325,55 @@ export default async function PlayPage() {
                 in play
               </span>
             </span>
+          </div>
+        </section>
+
+        {/* Challenges — your next goals to chase */}
+        <section>
+          <h2 className="font-serif text-lg mb-2" style={{ color: C.cream }}>
+            Challenges
+          </h2>
+          <div className="space-y-2">
+            {challenges.map((c) => (
+              <Link
+                key={c.key}
+                href="/flipper/pipeline"
+                className="block rounded-2xl p-4"
+                style={{
+                  background: C.panel,
+                  border: `1px solid ${c.done ? 'rgba(103,211,145,0.4)' : C.panelBorder}`,
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="shrink-0" style={{ color: c.done ? C.green : C.gold }}>
+                      {c.icon}
+                    </span>
+                    <span
+                      className="font-sans text-sm font-medium truncate"
+                      style={{ color: C.cream }}
+                    >
+                      {c.title}
+                    </span>
+                  </div>
+                  {c.done ? (
+                    <span
+                      className="inline-flex items-center gap-1 font-sans text-xs font-bold uppercase tracking-wider shrink-0"
+                      style={{ color: C.green }}
+                    >
+                      <Check className="w-3.5 h-3.5" /> Done
+                    </span>
+                  ) : (
+                    <span className="font-mono text-xs shrink-0" style={{ color: C.muted }}>
+                      {c.label}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2">
+                  <GameBar pct={c.pct} />
+                </div>
+              </Link>
+            ))}
           </div>
         </section>
 
