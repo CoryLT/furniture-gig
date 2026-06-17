@@ -145,12 +145,20 @@ export default async function BooksPage() {
             Your double-entry bookkeeping, built right into FlipWork.
           </p>
         </div>
-        <Link
-          href="/books/expense/new"
-          className="rounded-lg bg-amber-500 px-4 py-2 font-medium text-white hover:bg-amber-600 whitespace-nowrap"
-        >
-          Log an expense
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/books/sale/new"
+            className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 whitespace-nowrap"
+          >
+            Log a sale
+          </Link>
+          <Link
+            href="/books/expense/new"
+            className="rounded-lg bg-amber-500 px-4 py-2 font-medium text-white hover:bg-amber-600 whitespace-nowrap"
+          >
+            Log an expense
+          </Link>
+        </div>
       </div>
 
       <div className="mt-6 rounded-xl border border-neutral-200 p-5">
