@@ -5,26 +5,50 @@ import Link from 'next/link'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// Update the safe header fields (no money change, so the books stay balanced).
+const TYPE_LABELS: Record<string, string> = {
+  asset: 'Where your money sits',
+  income: 'Money coming in',
+  expense: 'Where money goes',
+  equity: 'Owner money',
+  liability: 'Money you owe',
+}
+const TYPE_ORDER = ['asset', 'income', 'expense', 'equity', 'liability']
+
+// Edit the whole entry (amount + accounts too) via the balance-safe helper.
 async function updateTxn(formData: FormData) {
   'use server'
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
-  const me = user.id
 
   const id = String(formData.get('id') || '')
   const date = String(formData.get('date') || '')
+  const amount = Number(formData.get('amount'))
+  const debitAccountId = String(formData.get('debit_account_id') || '')
+  const creditAccountId = String(formData.get('credit_account_id') || '')
   const description = String(formData.get('description') || '')
   const memo = String(formData.get('memo') || '') || null
   const pieceId = String(formData.get('piece_id') || '') || null
   const contactId = String(formData.get('contact_id') || '') || null
 
-  const { error } = await supabase
-    .from('transactions')
-    .update({ date, description, memo, piece_id: pieceId, contact_id: contactId })
-    .eq('id', id)
-    .eq('owner_user_id', me)
+  if (!amount || amount <= 0) {
+    redirect('/books/transaction/' + id + '?error=' + encodeURIComponent('Enter an amount greater than zero.'))
+  }
+  if (!debitAccountId || !creditAccountId) {
+    redirect('/books/transaction/' + id + '?error=' + encodeURIComponent('Both accounts are required.'))
+  }
+
+  const { error } = await supabase.rpc('update_entry', {
+    p_id: id,
+    p_date: date,
+    p_amount: amount,
+    p_debit_account_id: debitAccountId,
+    p_credit_account_id: creditAccountId,
+    p_description: description,
+    p_memo: memo,
+    p_piece_id: pieceId,
+    p_contact_id: contactId,
+  })
 
   if (error) {
     redirect('/books/transaction/' + id + '?error=' + encodeURIComponent(error.message))
@@ -39,18 +63,10 @@ async function deleteTxn(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const me = user.id
-
   const id = String(formData.get('id') || '')
-
-  // remove both lines in one statement (stays balanced), then the header
   await supabase.from('entry_lines').delete().eq('transaction_id', id).eq('owner_user_id', me)
   await supabase.from('transactions').delete().eq('id', id).eq('owner_user_id', me)
-
   redirect('/books')
-}
-
-function money(n: number): string {
-  return '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 export default async function TransactionPage({
@@ -67,16 +83,26 @@ export default async function TransactionPage({
 
   const { data: txn } = await supabase
     .from('transactions')
-    .select('id, date, description, memo, piece_id, contact_id, entry_lines(debit, credit, accounts(name, type))')
+    .select('id, date, description, memo, piece_id, contact_id, entry_lines(debit, credit, account_id)')
     .eq('id', params.id)
     .eq('owner_user_id', me)
     .single()
 
   if (!txn) redirect('/books')
   const t = txn as any
-
   const lines = (t.entry_lines ?? []) as any[]
   const amount = lines.reduce((s, l) => s + Number(l.debit), 0)
+  const debitLine = lines.find((l) => Number(l.debit) > 0)
+  const creditLine = lines.find((l) => Number(l.credit) > 0)
+  const debitAccountId = debitLine ? debitLine.account_id : ''
+  const creditAccountId = creditLine ? creditLine.account_id : ''
+
+  const { data: accountsRaw } = await supabase
+    .from('accounts')
+    .select('id, name, type')
+    .eq('owner_user_id', me)
+    .order('name', { ascending: true })
+  const accounts = (accountsRaw ?? []) as { id: string; name: string; type: string }[]
 
   const { data: piecesRaw } = await supabase
     .from('inventory_pieces')
@@ -93,8 +119,17 @@ export default async function TransactionPage({
   const contacts = (contactsRaw ?? []) as { id: string; name: string }[]
 
   const labelCls = 'block text-sm font-medium text-neutral-700 mb-1'
+  const helpCls = 'mt-1 text-xs text-neutral-400'
   const fieldCls =
     'w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-amber-400'
+
+  const accountOptions = TYPE_ORDER.filter((ty) => accounts.some((a) => a.type === ty)).map((ty) => (
+    <optgroup key={ty} label={TYPE_LABELS[ty] ?? ty}>
+      {accounts.filter((a) => a.type === ty).map((a) => (
+        <option key={a.id} value={a.id}>{a.name}</option>
+      ))}
+    </optgroup>
+  ))
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
@@ -116,26 +151,29 @@ export default async function TransactionPage({
         </div>
       )}
 
-      <div className="mt-6 rounded-xl border border-neutral-200 p-4">
-        <div className="text-xs font-medium uppercase tracking-wide text-neutral-400">Amount</div>
-        <div className="text-2xl font-semibold text-neutral-900">{money(amount)}</div>
-        <ul className="mt-3 space-y-1 text-sm text-neutral-600">
-          {lines.map((l, i) => (
-            <li key={i}>
-              {l.accounts?.name}
-              {' — '}
-              {Number(l.debit) > 0 ? 'money in/cost ' + money(Number(l.debit)) : 'money out ' + money(Number(l.credit))}
-            </li>
-          ))}
-        </ul>
-        <p className="mt-3 text-xs text-neutral-400">
-          To change the amount or accounts, delete this entry and re-log it. Full
-          amount editing is coming next.
-        </p>
-      </div>
-
       <form action={updateTxn} className="mt-6 space-y-5">
         <input type="hidden" name="id" value={t.id} />
+
+        <div>
+          <label className={labelCls} htmlFor="amount">Amount ($)</label>
+          <input id="amount" name="amount" type="number" step="0.01" min="0" defaultValue={amount} className={fieldCls} required />
+        </div>
+
+        <div>
+          <label className={labelCls} htmlFor="debit_account_id">Category / where it landed</label>
+          <select id="debit_account_id" name="debit_account_id" className={fieldCls} defaultValue={debitAccountId} required>
+            {accountOptions}
+          </select>
+          <p className={helpCls}>The cost bucket for an expense, or the account money landed in for a sale.</p>
+        </div>
+
+        <div>
+          <label className={labelCls} htmlFor="credit_account_id">Paid from / income source</label>
+          <select id="credit_account_id" name="credit_account_id" className={fieldCls} defaultValue={creditAccountId} required>
+            {accountOptions}
+          </select>
+          <p className={helpCls}>The account you paid from for an expense, or the income earned for a sale.</p>
+        </div>
 
         <div>
           <label className={labelCls} htmlFor="date">Date</label>
