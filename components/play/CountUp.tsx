@@ -15,6 +15,13 @@ export default function CountUp({
   const startRef = useRef<number | null>(null)
 
   useEffect(() => {
+    const reduce =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (reduce) {
+      setDisplay(value)
+      return
+    }
     let raf = 0
     startRef.current = null
     const step = (t: number) => {

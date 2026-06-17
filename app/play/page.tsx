@@ -3,7 +3,9 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '@/components/shared/Nav'
 import CountUp from '@/components/play/CountUp'
-import { ImageIcon, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react'
+import GameBar from '@/components/play/GameBar'
+import type { ReactNode } from 'react'
+import { ImageIcon, ArrowRight, TrendingUp, TrendingDown, Coins, Lock, Crown } from 'lucide-react'
 
 // Live data — always fresh.
 export const dynamic = 'force-dynamic'
@@ -29,6 +31,20 @@ const TIERS: { min: number; title: string }[] = [
   { min: 10000, title: 'Mogul' },
   { min: 25000, title: 'Tycoon' },
 ]
+
+// Bespoke "workshop after dark" palette, kept local to /play so it doesn't
+// touch the rest of the app's light theme.
+const C = {
+  cream: '#f3ead9',
+  muted: '#a99e8c',
+  gold: '#fbbf24',
+  goldDeep: '#f59e0b',
+  goldLite: '#fde68a',
+  green: '#67d391',
+  red: '#f0917f',
+  panel: 'rgba(255,255,255,0.04)',
+  panelBorder: 'rgba(245,205,130,0.14)',
+}
 
 const n = (v: any) => Number(v ?? 0)
 function money(v: number): string {
@@ -149,61 +165,137 @@ export default async function PlayPage() {
   const hasPieces = pieces.length > 0
 
   return (
-    <div className="min-h-screen bg-background">
+    <div
+      style={{
+        minHeight: '100vh',
+        background:
+          'radial-gradient(115% 70% at 50% -8%, #241a11 0%, #18120c 52%, #100b07 100%)',
+      }}
+    >
       <Nav role="flipper" userName={navName} userUsername={navUsername} />
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-        {/* Hero: your rank, your climbing score, your next goal */}
-        <section className="rounded-2xl border border-border bg-gradient-to-b from-accent/10 to-card px-6 py-7 text-center">
-          <div className="inline-flex items-center rounded-full bg-accent/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-accent">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        {/* Hero: rank crest, glowing score, XP bar */}
+        <section className="text-center pt-2">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-sans text-[11px] font-bold uppercase tracking-[0.18em]"
+            style={{
+              color: '#1a1208',
+              background: `linear-gradient(180deg, ${C.goldLite}, ${C.gold})`,
+              boxShadow: '0 2px 12px rgba(245,158,11,0.35)',
+            }}
+          >
+            <Crown className="w-3.5 h-3.5" />
             {tier.title}
-          </div>
-          <div className="mt-3 font-serif text-5xl sm:text-6xl tracking-tight text-accent">
+          </span>
+
+          <div
+            className="mt-5 font-mono font-bold leading-none"
+            style={{
+              fontSize: 'clamp(3rem, 14vw, 5rem)',
+              backgroundImage: `linear-gradient(180deg, ${C.goldLite} 0%, ${C.gold} 55%, ${C.goldDeep} 100%)`,
+              WebkitBackgroundClip: 'text',
+              backgroundClip: 'text',
+              color: 'transparent',
+              WebkitTextFillColor: 'transparent',
+              filter: 'drop-shadow(0 3px 18px rgba(245,158,11,0.45))',
+            }}
+          >
             <CountUp value={total} />
           </div>
-          <div className="mt-1 text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+          <div
+            className="mt-2 font-sans text-[11px] uppercase tracking-[0.3em]"
+            style={{ color: C.muted }}
+          >
             profit so far
           </div>
 
           {monthProfit > 0 ? (
-            <div className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-green-600">
+            <div
+              className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-sans text-sm font-semibold"
+              style={{
+                color: C.green,
+                background: 'rgba(103,211,145,0.12)',
+                border: '1px solid rgba(103,211,145,0.25)',
+              }}
+            >
               <TrendingUp className="w-4 h-4" /> {money(monthProfit)} this month
             </div>
           ) : monthProfit < 0 ? (
-            <div className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-red-600">
+            <div
+              className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-sans text-sm font-semibold"
+              style={{
+                color: C.red,
+                background: 'rgba(240,145,127,0.12)',
+                border: '1px solid rgba(240,145,127,0.25)',
+              }}
+            >
               <TrendingDown className="w-4 h-4" /> {money(monthProfit)} this month
             </div>
           ) : (
-            <div className="mt-3 text-sm text-muted-foreground">Sell a piece to start the climb</div>
+            <div className="mt-4 font-sans text-sm" style={{ color: C.muted }}>
+              Sell a piece to start the climb
+            </div>
           )}
 
-          {/* progress to the next rank */}
-          <div className="mt-4 max-w-xs mx-auto">
-            <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
-              <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
-            </div>
-            <div className="mt-1.5 text-xs text-muted-foreground">
+          <div className="mt-6 max-w-xs mx-auto">
+            <GameBar pct={pct} />
+            <div className="mt-2 font-sans text-xs" style={{ color: C.muted }}>
               {next ? (
                 <>
-                  {money(toNext)} to <span className="font-medium text-foreground">{next.title}</span>
+                  {money(toNext)} to{' '}
+                  <span className="font-semibold" style={{ color: C.goldLite }}>
+                    {next.title}
+                  </span>
                 </>
               ) : (
-                'Top rank reached'
+                'Top rank — you run this town'
               )}
             </div>
           </div>
 
-          <div className="mt-4 text-xs text-muted-foreground">
-            {sold.length} flipped &middot; {unsold.length} in play
+          <div
+            className="mt-5 flex items-center justify-center gap-5 font-mono text-sm"
+            style={{ color: C.cream }}
+          >
+            <span>
+              <span style={{ color: C.gold }}>{sold.length}</span>{' '}
+              <span
+                className="font-sans text-xs uppercase tracking-wider"
+                style={{ color: C.muted }}
+              >
+                flipped
+              </span>
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.15)' }}>|</span>
+            <span>
+              <span style={{ color: C.gold }}>{unsold.length}</span>{' '}
+              <span
+                className="font-sans text-xs uppercase tracking-wider"
+                style={{ color: C.muted }}
+              >
+                in play
+              </span>
+            </span>
           </div>
         </section>
 
-        {/* Cash free vs tied up */}
+        {/* Cash free vs tied up — HUD resource counters */}
         <section className="grid grid-cols-2 gap-3">
-          <Stat label="Cash free" value={money(cashFree)} hint="ready to spend on the next find" />
-          <Stat label="Tied up" value={money(tiedUp)} hint="riding in pieces you still hold" />
+          <Stat
+            icon={<Coins className="w-3.5 h-3.5" style={{ color: C.gold }} />}
+            label="Cash free"
+            value={money(cashFree)}
+            hint="ready for the next find"
+          />
+          <Stat
+            icon={<Lock className="w-3.5 h-3.5" style={{ color: C.gold }} />}
+            label="Tied up"
+            value={money(tiedUp)}
+            hint="riding in pieces you hold"
+          />
         </section>
 
-        {/* The board */}
+        {/* The board — your pieces as game tokens */}
         {hasPieces ? (
           <section className="space-y-5">
             {STAGES.map((s) => {
@@ -211,14 +303,19 @@ export default async function PlayPage() {
               return (
                 <div key={s.key}>
                   <div className="flex items-baseline justify-between mb-2">
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">
+                    <h2 className="font-serif text-lg" style={{ color: C.cream }}>
                       {s.label}
                     </h2>
-                    <span className="text-xs text-muted-foreground">{items.length}</span>
+                    <span className="font-mono text-xs" style={{ color: C.muted }}>
+                      {items.length}
+                    </span>
                   </div>
                   {items.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border px-4 py-4 text-sm text-muted-foreground">
-                      Nothing here right now.
+                    <div
+                      className="rounded-xl px-4 py-4 font-sans text-sm"
+                      style={{ border: `1px dashed ${C.panelBorder}`, color: 'rgba(169,158,140,0.7)' }}
+                    >
+                      Nothing here yet.
                     </div>
                   ) : (
                     <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
@@ -232,11 +329,16 @@ export default async function PlayPage() {
             })}
           </section>
         ) : (
-          <section className="rounded-xl border border-border bg-card p-8 text-center">
-            <p className="text-foreground font-medium">No pieces on the board yet.</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Add a piece in the Pipeline and it&apos;ll show up here, with the profit
-              landing as you sell.
+          <section
+            className="rounded-2xl p-8 text-center"
+            style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}
+          >
+            <p className="font-serif text-lg" style={{ color: C.cream }}>
+              Your board is empty.
+            </p>
+            <p className="mt-1 font-sans text-sm" style={{ color: C.muted }}>
+              Add your first piece in the Pipeline — watch it move across and the score
+              climb as you sell.
             </p>
           </section>
         )}
@@ -244,7 +346,8 @@ export default async function PlayPage() {
         <div className="text-center pt-1">
           <Link
             href="/flipper/pipeline"
-            className="inline-flex items-center gap-1 text-sm text-accent hover:underline"
+            className="inline-flex items-center gap-1 font-sans text-sm hover:underline"
+            style={{ color: C.goldLite }}
           >
             Open the full Pipeline <ArrowRight className="w-4 h-4" />
           </Link>
@@ -254,14 +357,41 @@ export default async function PlayPage() {
   )
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({
+  icon,
+  label,
+  value,
+  hint,
+}: {
+  icon?: ReactNode
+  label: string
+  value: string
+  hint?: string
+}) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div
+      className="rounded-2xl p-4"
+      style={{
+        background: C.panel,
+        border: `1px solid ${C.panelBorder}`,
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+      }}
+    >
+      <div
+        className="flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-wider"
+        style={{ color: C.muted }}
+      >
+        {icon}
         {label}
       </div>
-      <div className="mt-1 text-2xl font-semibold text-foreground">{value}</div>
-      {hint ? <div className="mt-0.5 text-xs text-muted-foreground">{hint}</div> : null}
+      <div className="mt-1.5 font-mono text-2xl font-bold" style={{ color: C.cream }}>
+        {value}
+      </div>
+      {hint ? (
+        <div className="mt-0.5 font-sans text-xs" style={{ color: 'rgba(169,158,140,0.7)' }}>
+          {hint}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -271,25 +401,39 @@ function PieceCard({ p }: { p: PieceVM }) {
   const scoreText = sold
     ? (p.realized >= 0 ? '+$' : '\u2212$') + whole(p.realized)
     : p.target_price
-      ? 'target $' + whole(n(p.target_price))
+      ? '\u2192 $' + whole(n(p.target_price))
       : '$' + whole(p.costs) + ' in'
-  const scoreClass = sold
+  const scoreColor = sold
     ? p.realized >= 0
-      ? 'text-green-600'
-      : 'text-red-600'
-    : 'text-muted-foreground'
+      ? C.green
+      : C.red
+    : p.target_price
+      ? C.gold
+      : C.muted
   return (
-    <div className="w-32 shrink-0">
-      <div className="aspect-square w-full rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+    <div
+      className="w-32 shrink-0 rounded-xl overflow-hidden"
+      style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}
+    >
+      <div
+        className="aspect-square w-full overflow-hidden flex items-center justify-center"
+        style={{ background: 'rgba(0,0,0,0.25)' }}
+      >
         {p.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={p.imageUrl} alt={p.title} className="w-full h-full object-cover" />
         ) : (
-          <ImageIcon className="w-6 h-6 text-muted-foreground" />
+          <ImageIcon className="w-6 h-6" style={{ color: 'rgba(169,158,140,0.5)' }} />
         )}
       </div>
-      <div className="mt-1.5 text-xs font-medium text-foreground truncate">{p.title}</div>
-      <div className={'text-xs font-semibold ' + scoreClass}>{scoreText}</div>
+      <div className="px-2 py-2">
+        <div className="font-sans text-xs font-medium truncate" style={{ color: C.cream }}>
+          {p.title}
+        </div>
+        <div className="font-mono text-xs font-bold" style={{ color: scoreColor }}>
+          {scoreText}
+        </div>
+      </div>
     </div>
   )
 }
