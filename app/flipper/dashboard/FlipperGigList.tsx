@@ -18,12 +18,14 @@ import {
   Image as ImageIcon,
 } from 'lucide-react'
 import ConfirmActionModal from '@/components/shared/ConfirmActionModal'
+import ShareButton from '@/components/shared/ShareButton'
 import { createClient } from '@/lib/supabase/client'
 
 export type FlipperGig = {
   id: string
   title: string
   status: string
+  slug: string | null
   pay_amount: number
   due_date: string | null
   created_at: string
@@ -37,6 +39,8 @@ interface Props {
   totalClaimsByGig: Record<string, number>
   pendingClaimsByGig: Record<string, number>
   thumbnailByGig?: Record<string, string>
+  /** Absolute site URL (e.g. https://myflipwork.com) for building shareable job links. */
+  siteUrl: string
 }
 
 type FilterKey = 'all' | 'needs_review' | 'open' | 'in_progress' | 'completed'
@@ -62,6 +66,7 @@ export default function FlipperGigList({
   totalClaimsByGig,
   pendingClaimsByGig,
   thumbnailByGig = {},
+  siteUrl,
 }: Props) {
   const router = useRouter()
   const supabase = createClient()
@@ -525,7 +530,15 @@ export default function FlipperGigList({
                   </div>
 
                   {gig.status === 'open' && (
-                    <div className="mt-3 pt-3 border-t border-border">
+                    <div className="mt-3 pt-3 border-t border-border flex items-center gap-4 flex-wrap">
+                      {gig.slug && (
+                        <ShareButton
+                          url={`${siteUrl}/gigs/${gig.slug}`}
+                          title={gig.title}
+                          kind="gig"
+                          className="text-accent border-accent/30"
+                        />
+                      )}
                       <button
                         type="button"
                         onClick={() => {

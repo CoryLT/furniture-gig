@@ -16,7 +16,9 @@ export default async function GigDetailPage({ params }: Props) {
   const supabase = createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
+  // If someone opens a shared job link while logged out, send them back
+  // to THIS job after they sign in (instead of the home screen).
+  if (!user) redirect(`/auth/login?next=${encodeURIComponent('/gigs/' + params.slug)}`)
 
   // Load gig
   const { data: gig } = await supabase

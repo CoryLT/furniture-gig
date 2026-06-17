@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Plus, AlertCircle } from 'lucide-react'
+import { getSiteUrl } from '@/lib/utils'
 import FlipperGigList, { FlipperGig } from './FlipperGigList'
 
 // Always fetch fresh — dashboard data changes constantly
@@ -150,6 +151,7 @@ export default async function FlipperDashboardPage() {
             totalClaimsByGig={totalClaimsByGig}
             pendingClaimsByGig={pendingClaimsByGig}
             thumbnailByGig={thumbnailByGig}
+            siteUrl={getSiteUrl()}
           />
         )}
       </div>
