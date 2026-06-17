@@ -3,6 +3,10 @@
 > Compressed May 28, 2026. Full history lives in `git log`; this doc keeps only
 > what's true *now* plus the gotchas that save the next session real time.
 
+> **Most recent first:** read `HANDOFF_2026-06-17b.md` — data migration from the old
+> Books app is DONE and the `/books/reconcile` screen is live. Then `HANDOFF_2026-06-17.md`
+> for the merge background. The June 3 QuickBooks notes below are older/shelved.
+
 ---
 
 ## Latest session — June 3, 2026 (QuickBooks integration · SANDBOX, not yet live)
