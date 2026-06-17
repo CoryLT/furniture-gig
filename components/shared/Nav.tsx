@@ -26,6 +26,7 @@ const userLinks: NavItem[] = [
   { href: '/flipper/pipeline', label: 'Pipeline' },
   { href: '/flipper/crew', label: 'My Crew' },
   { href: '/flipper/records', label: 'Payment Records' },
+  { href: '/books', label: 'Books' },
   // --- QuickBooks expansion shelved June 4, 2026 (pending Intuit production approval).
   //     Un-comment these two lines to bring the links back (e.g. as a future paid feature). ---
   // { href: '/flipper/receipts', label: 'Snap a Receipt' },
