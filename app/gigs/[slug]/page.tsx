@@ -155,11 +155,8 @@ export default async function GigDetailPage({ params }: Props) {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      {/* Back link + share */}
-      <div className="flex items-center justify-between gap-4">
-        <a href="/gigs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-          ← Back to gigs
-        </a>
+      {/* Share */}
+      <div className="flex items-center justify-end gap-4">
         <ShareButton
           url={`${getSiteUrl()}/gigs/${gig.slug}`}
           title={gig.title}
