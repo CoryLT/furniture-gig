@@ -50,8 +50,17 @@ async function reconcileLine(formData: FormData) {
     .single()
   if (!line) redirect('/books/reconcile')
 
-  // Skip: mark done, no ledger entry.
+  // "Skip for now": leave it unsorted but send it to the back of the line,
+  // so it comes back after the fresh ones. "Not business": done for good.
   if (action === 'skip') {
+    await supabase
+      .from('books_bank_feed')
+      .update({ status: 'skipped' })
+      .eq('id', lineId)
+      .eq('owner_user_id', me)
+    redirect('/books/reconcile')
+  }
+  if (action === 'dismiss') {
     await supabase
       .from('books_bank_feed')
       .update({ handled: true })
@@ -138,6 +147,7 @@ export default async function ReconcilePage({
     .select('id, amount, posted_date, raw_description')
     .eq('owner_user_id', me)
     .eq('handled', false)
+    .order('status', { ascending: true })
     .order('posted_date', { ascending: true })
     .order('imported_at', { ascending: true })
     .limit(1)
@@ -321,7 +331,7 @@ export default async function ReconcilePage({
           </select>
         </div>
 
-        <div className="flex items-center gap-3 pt-1">
+        <div className="flex flex-wrap items-center gap-3 pt-1">
           <button
             type="submit"
             name="action"
@@ -334,11 +344,23 @@ export default async function ReconcilePage({
             type="submit"
             name="action"
             value="skip"
-            className="rounded-lg border border-neutral-300 px-5 py-2.5 font-medium text-neutral-600 hover:bg-neutral-50"
+            className="rounded-lg border border-neutral-300 px-5 py-2.5 font-medium text-neutral-700 hover:bg-neutral-50"
           >
-            Skip (not business)
+            Skip for now
+          </button>
+          <button
+            type="submit"
+            name="action"
+            value="dismiss"
+            className="rounded-lg px-3 py-2.5 text-sm font-medium text-neutral-400 hover:text-neutral-600"
+          >
+            Not business
           </button>
         </div>
+        <p className="text-xs text-neutral-400">
+          <span className="font-medium">Skip for now</span> sends it to the back to revisit later.{' '}
+          <span className="font-medium">Not business</span> removes it for good.
+        </p>
       </form>
     </main>
   )
