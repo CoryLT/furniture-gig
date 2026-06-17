@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import Link from 'next/link'
+import ThemeToggle from './ThemeToggle'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Armchair, Menu } from 'lucide-react'
@@ -303,7 +304,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
   }
 
   return (
-    <nav className="border-b border-stone-200 bg-white sticky top-0 z-40">
+    <nav className="border-b border-border bg-card sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
         <Link href={logoHref} className="flex items-center gap-2 font-serif text-xl font-bold text-foreground">
           <Armchair className="w-5 h-5" />
@@ -315,17 +316,18 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
         <div className="flex items-center gap-2 sm:gap-3">
           {role !== 'admin' && <MessageBell />}
           {role !== 'admin' && <NotificationBell />}
+          <ThemeToggle />
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="relative p-2 hover:bg-stone-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-amber-600"
+              className="relative p-2 hover:bg-muted rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-amber-600"
               aria-label="Menu"
             >
               <Menu className="w-5 h-5 text-foreground" />
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 max-h-[calc(100vh-5rem)] overflow-y-auto overscroll-contain bg-white border border-stone-200 rounded-lg shadow-lg py-1 z-50">
+              <div className="absolute right-0 mt-2 w-56 max-h-[calc(100vh-5rem)] overflow-y-auto overscroll-contain bg-card border border-border rounded-lg shadow-lg py-1 z-50">
                 {/* Primary nav (now collapsed into here on every viewport) */}
                 {links.map((link, i) =>
                   'divider' in link ? (
@@ -337,8 +339,8 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
                       onClick={() => setDropdownOpen(false)}
                       className={`flex items-center justify-between gap-2 px-4 py-2 text-sm transition-colors ${
                         pathname === link.href
-                          ? 'text-accent bg-stone-50'
-                          : 'text-foreground hover:bg-stone-50 hover:text-accent'
+                          ? 'text-accent bg-muted'
+                          : 'text-foreground hover:bg-muted hover:text-accent'
                       }`}
                     >
                       <span>{link.label}</span>
@@ -355,21 +357,21 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
                   <Link
                     href={getPublicProfileUrl()!}
                     onClick={() => setDropdownOpen(false)}
-                    className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
+                    className="block px-4 py-2 text-sm text-foreground hover:bg-muted hover:text-accent transition-colors"
                   >
                     My Profile
                   </Link>
                 )}
                 <Link
                   href="/profile"
-                  className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
+                  className="block px-4 py-2 text-sm text-foreground hover:bg-muted hover:text-accent transition-colors"
                   onClick={() => setDropdownOpen(false)}
                 >
                   Account Settings
                 </Link>
                 <Link
                   href="/support"
-                  className="block px-4 py-2 text-sm text-foreground hover:bg-stone-50 hover:text-accent transition-colors"
+                  className="block px-4 py-2 text-sm text-foreground hover:bg-muted hover:text-accent transition-colors"
                   onClick={() => setDropdownOpen(false)}
                 >
                   Support
@@ -383,7 +385,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
                   >
                     Terms
                   </Link>
-                  <span className="text-stone-300">·</span>
+                  <span className="text-muted-foreground">·</span>
                   <Link
                     href="/legal/privacy"
                     className="hover:text-foreground transition-colors"
@@ -398,7 +400,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
                     handleLogout()
                     setDropdownOpen(false)
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-stone-50 transition-colors"
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-muted transition-colors"
                 >
                   Logout
                 </button>

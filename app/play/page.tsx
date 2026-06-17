@@ -36,15 +36,15 @@ const TIERS: { min: number; title: string }[] = [
 // Bespoke "workshop after dark" palette, kept local to /play so it doesn't
 // touch the rest of the app's light theme.
 const C = {
-  cream: '#f3ead9',
-  muted: '#a99e8c',
-  gold: '#fbbf24',
-  goldDeep: '#f59e0b',
-  goldLite: '#fde68a',
-  green: '#67d391',
-  red: '#f0917f',
-  panel: 'rgba(255,255,255,0.04)',
-  panelBorder: 'rgba(245,205,130,0.14)',
+  cream: 'var(--play-ink)',
+  muted: 'var(--play-muted)',
+  gold: 'var(--play-gold)',
+  goldDeep: 'var(--play-gold-deep)',
+  goldLite: 'var(--play-gold-lite)',
+  green: 'var(--play-green)',
+  red: 'var(--play-red)',
+  panel: 'var(--play-panel)',
+  panelBorder: 'var(--play-border)',
 }
 
 // Subtle film grain so the dark background reads as textured, not flat black.
@@ -201,8 +201,7 @@ export default async function PlayPage() {
     <div
       style={{
         minHeight: '100vh',
-        background:
-          'radial-gradient(115% 70% at 50% -8%, #241a11 0%, #18120c 52%, #100b07 100%)',
+        background: 'var(--play-bg)',
       }}
     >
       <div
@@ -327,7 +326,7 @@ export default async function PlayPage() {
                 flipped
               </span>
             </span>
-            <span style={{ color: 'rgba(255,255,255,0.15)' }}>|</span>
+            <span style={{ color: C.panelBorder }}>|</span>
             <span>
               <span style={{ color: C.gold }}>{unsold.length}</span>{' '}
               <span
@@ -423,7 +422,7 @@ export default async function PlayPage() {
                   {items.length === 0 ? (
                     <div
                       className="rounded-xl px-4 py-4 font-sans text-sm"
-                      style={{ border: `1px dashed ${C.panelBorder}`, color: 'rgba(169,158,140,0.7)' }}
+                      style={{ border: `1px dashed ${C.panelBorder}`, color: C.muted }}
                     >
                       Nothing here yet.
                     </div>
@@ -498,7 +497,7 @@ function Stat({
         {value}
       </div>
       {hint ? (
-        <div className="mt-0.5 font-sans text-xs" style={{ color: 'rgba(169,158,140,0.7)' }}>
+        <div className="mt-0.5 font-sans text-xs" style={{ color: C.muted }}>
           {hint}
         </div>
       ) : null}

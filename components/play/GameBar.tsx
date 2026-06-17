@@ -24,7 +24,7 @@ export default function GameBar({ pct }: { pct: number }) {
       style={{
         height: 10,
         borderRadius: 999,
-        background: 'rgba(255,255,255,0.07)',
+        background: 'var(--play-bar-track)',
         overflow: 'hidden',
         boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.5)',
       }}

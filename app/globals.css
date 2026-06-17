@@ -39,6 +39,54 @@
 
     /* Radius */
     --radius: 0.5rem;
+
+    /* Play (game screen) palette — light */
+    --play-bg: radial-gradient(115% 70% at 50% -8%, #fffaf2 0%, #f6efe2 58%, #efe6d4 100%);
+    --play-ink: #2a2018;
+    --play-muted: #6f6453;
+    --play-gold: #c9801f;
+    --play-gold-deep: #a9670f;
+    --play-gold-lite: #e6a945;
+    --play-green: #2f9e5e;
+    --play-red: #c2452f;
+    --play-panel: rgba(60,45,20,0.05);
+    --play-border: rgba(120,90,40,0.18);
+    --play-bar-track: rgba(0,0,0,0.10);
+    --play-tooltip-bg: #ffffff;
+  }
+
+  .dark {
+    --background: 24 14% 8%;
+    --foreground: 36 22% 92%;
+    --card: 24 12% 12%;
+    --card-foreground: 36 22% 92%;
+    --primary: 36 22% 92%;
+    --primary-foreground: 24 14% 8%;
+    --secondary: 24 10% 18%;
+    --secondary-foreground: 36 22% 92%;
+    --muted: 24 10% 16%;
+    --muted-foreground: 30 8% 62%;
+    --accent: 32 90% 52%;
+    --accent-foreground: 24 14% 8%;
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 8% 22%;
+    --input: 30 8% 22%;
+    --ring: 32 90% 52%;
+
+    /* Play (game screen) palette — dark */
+    --play-bg: radial-gradient(115% 70% at 50% -8%, #241a11 0%, #18120c 52%, #100b07 100%);
+    --play-ink: #f3ead9;
+    --play-muted: #a99e8c;
+    --play-gold: #fbbf24;
+    --play-gold-deep: #f59e0b;
+    --play-gold-lite: #fde68a;
+    --play-green: #67d391;
+    --play-red: #f0917f;
+    --play-panel: rgba(255,255,255,0.04);
+    --play-border: rgba(245,205,130,0.14);
+    --play-bar-track: rgba(255,255,255,0.07);
+    --play-tooltip-bg: #1c1510;
   }
 }
 

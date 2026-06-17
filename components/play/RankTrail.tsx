@@ -37,7 +37,7 @@ export default function RankTrail({
         const req = i === 0 ? 'The starting line' : `Reach ${fmt(t.min)} profit`
         const status =
           i < tierIdx ? 'Earned \u2713' : i === tierIdx ? "You're here" : `${fmt(t.min - total)} to go`
-        const statusColor = i < tierIdx ? '#67d391' : i === tierIdx ? '#f3ead9' : '#fbbf24'
+        const statusColor = i < tierIdx ? colors.green : i === tierIdx ? colors.cream : colors.gold
         const open = active === i
         return (
           <div
@@ -87,18 +87,18 @@ export default function RankTrail({
                 role="tooltip"
                 className="absolute bottom-full left-1/2 z-20 mb-2 w-40 -translate-x-1/2 rounded-xl px-3 py-2 text-center"
                 style={{
-                  background: '#1c1510',
+                  background: 'var(--play-tooltip-bg)',
                   border: `1px solid ${colors.panelBorder}`,
                   boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
                 }}
               >
                 <div
                   className="font-sans text-xs font-bold uppercase tracking-wide"
-                  style={{ color: '#fbbf24' }}
+                  style={{ color: colors.gold }}
                 >
                   {t.title}
                 </div>
-                <div className="mt-0.5 font-sans text-[11px]" style={{ color: '#cdbfa8' }}>
+                <div className="mt-0.5 font-sans text-[11px]" style={{ color: colors.muted }}>
                   {req}
                 </div>
                 <div className="mt-1 font-mono text-[11px] font-bold" style={{ color: statusColor }}>
