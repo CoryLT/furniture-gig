@@ -17,7 +17,7 @@ export default async function HomePage() {
   } = await supabase.auth.getUser()
 
   if (user) {
-    redirect('/home')
+    redirect('/play')
   }
 
   // Founding member counts for the landing-page counter.

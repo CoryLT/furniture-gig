@@ -63,7 +63,7 @@ export default function LoginPage() {
       router.push(safeNext && safeNext.startsWith('/admin') ? safeNext : '/admin')
     } else {
       // Workers/flippers follow any safe ?next=; otherwise dashboard
-      router.push(safeNext && !safeNext.startsWith('/admin') ? safeNext : '/home')
+      router.push(safeNext && !safeNext.startsWith('/admin') ? safeNext : '/play')
     }
   }
 

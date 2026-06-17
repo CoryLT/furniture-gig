@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'FlipWork',
     short_name: 'FlipWork',
     description: 'Run your flipping business — jobs, crew, pipeline, and payments in one place.',
-    start_url: '/home',
+    start_url: '/play',
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',
