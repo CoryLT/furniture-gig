@@ -167,6 +167,7 @@ export default async function PlayPage() {
   const challenges = [
     {
       key: 'flips',
+      href: '/flipper/pipeline',
       icon: <Target className="w-4 h-4" />,
       title: `Flip ${FLIP_GOAL} this month`,
       label: `${Math.min(monthFlips, FLIP_GOAL)} / ${FLIP_GOAL}`,
@@ -175,6 +176,7 @@ export default async function PlayPage() {
     },
     {
       key: 'profit',
+      href: '/books/sale/new',
       icon: <Coins className="w-4 h-4" />,
       title: `Clear $${whole(PROFIT_GOAL)} this month`,
       label: `$${whole(Math.max(0, monthProfit))} / $${whole(PROFIT_GOAL)}`,
@@ -337,7 +339,7 @@ export default async function PlayPage() {
             {challenges.map((c) => (
               <Link
                 key={c.key}
-                href="/flipper/pipeline"
+                href={c.href}
                 className="block rounded-2xl p-4"
                 style={{
                   background: C.panel,
