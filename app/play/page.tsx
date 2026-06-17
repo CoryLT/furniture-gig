@@ -4,8 +4,9 @@ import Link from 'next/link'
 import Nav from '@/components/shared/Nav'
 import CountUp from '@/components/play/CountUp'
 import GameBar from '@/components/play/GameBar'
+import RankEmblem from '@/components/play/RankEmblem'
 import type { ReactNode } from 'react'
-import { ImageIcon, ArrowRight, TrendingUp, TrendingDown, Coins, Lock, Crown, Target, Check } from 'lucide-react'
+import { ImageIcon, ArrowRight, TrendingUp, TrendingDown, Coins, Lock, Target, Check } from 'lucide-react'
 
 // Live data — always fresh.
 export const dynamic = 'force-dynamic'
@@ -44,6 +45,13 @@ const C = {
   panel: 'rgba(255,255,255,0.04)',
   panelBorder: 'rgba(245,205,130,0.14)',
 }
+
+// Subtle film grain so the dark background reads as textured, not flat black.
+const GRAIN =
+  'data:image/svg+xml,' +
+  encodeURIComponent(
+    "<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>"
+  )
 
 const n = (v: any) => Number(v ?? 0)
 function money(v: number): string {
@@ -196,24 +204,38 @@ export default async function PlayPage() {
           'radial-gradient(115% 70% at 50% -8%, #241a11 0%, #18120c 52%, #100b07 100%)',
       }}
     >
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0"
+        style={{ backgroundImage: `url("${GRAIN}")`, opacity: 0.04, mixBlendMode: 'overlay', zIndex: 0 }}
+      />
       <Nav role="flipper" userName={navName} userUsername={navUsername} />
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-        {/* Hero: rank crest, glowing score, XP bar */}
-        <section className="text-center pt-2">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-sans text-[11px] font-bold uppercase tracking-[0.18em]"
+      <main className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        {/* Hero: rank emblem, glowing score, XP bar */}
+        <section className="relative text-center pt-2">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2"
             style={{
-              color: '#1a1208',
-              background: `linear-gradient(180deg, ${C.goldLite}, ${C.gold})`,
-              boxShadow: '0 2px 12px rgba(245,158,11,0.35)',
+              width: 340,
+              height: 300,
+              zIndex: -1,
+              background:
+                'radial-gradient(circle at 50% 32%, rgba(245,158,11,0.16), rgba(245,158,11,0) 68%)',
             }}
-          >
-            <Crown className="w-3.5 h-3.5" />
-            {tier.title}
-          </span>
+          />
+          <div className="flex flex-col items-center">
+            <RankEmblem index={tierIdx} size={78} state="current" idSuffix="hero" />
+            <span
+              className="mt-2 font-sans text-[11px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: C.gold }}
+            >
+              {tier.title}
+            </span>
+          </div>
 
           <div
-            className="mt-5 font-mono font-bold leading-none"
+            className="mt-4 font-mono font-bold leading-none"
             style={{
               fontSize: 'clamp(3rem, 14vw, 5rem)',
               backgroundImage: `linear-gradient(180deg, ${C.goldLite} 0%, ${C.gold} 55%, ${C.goldDeep} 100%)`,
@@ -277,29 +299,37 @@ export default async function PlayPage() {
             </div>
           </div>
 
-          {/* Rank trail — the whole climb; locked ranks dimmed with a lock to nag a little */}
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+          {/* Rank trail — the whole climb as medallions; locked ones grayed */}
+          <div className="mt-6 flex items-start justify-center gap-2 overflow-x-auto pb-1">
             {TIERS.map((t, i) => {
-              const current = i === tierIdx
-              const achieved = i < tierIdx
-              const locked = i > tierIdx
+              const state = i === tierIdx ? 'current' : i < tierIdx ? 'achieved' : 'locked'
               return (
-                <span
+                <div
                   key={t.title}
-                  className="inline-flex items-center gap-1 whitespace-nowrap font-sans text-[10px] uppercase tracking-wider"
-                  style={{
-                    color: current
-                      ? C.gold
-                      : achieved
-                        ? 'rgba(245,205,130,0.5)'
-                        : 'rgba(169,158,140,0.32)',
-                    fontWeight: current ? 700 : 500,
-                  }}
+                  className="flex shrink-0 flex-col items-center gap-1"
+                  style={{ width: 54 }}
                 >
-                  {i > 0 ? <span style={{ color: 'rgba(255,255,255,0.12)' }}>{'\u203A'}</span> : null}
-                  {locked ? <Lock className="w-2.5 h-2.5" /> : null}
-                  {t.title}
-                </span>
+                  <RankEmblem
+                    index={i}
+                    size={i === tierIdx ? 42 : 34}
+                    state={state}
+                    idSuffix={`trail-${i}`}
+                  />
+                  <span
+                    className="text-center font-sans text-[9px] uppercase leading-tight tracking-wide"
+                    style={{
+                      color:
+                        state === 'current'
+                          ? C.gold
+                          : state === 'achieved'
+                            ? 'rgba(245,205,130,0.55)'
+                            : 'rgba(169,158,140,0.4)',
+                      fontWeight: state === 'current' ? 700 : 500,
+                    }}
+                  >
+                    {t.title}
+                  </span>
+                </div>
               )
             })}
           </div>
