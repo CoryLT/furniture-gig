@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import AddableSelect from '@/components/books/AddableSelect'
 
 // Live, per-operator data — always fresh.
 export const dynamic = 'force-dynamic'
@@ -36,8 +37,10 @@ async function reconcileLine(formData: FormData) {
   const accountId = String(formData.get('account_id') || '') || null
   const bankAccountId = String(formData.get('bank_account_id') || '') || null
   const description = String(formData.get('description') || '')
-  const pieceId = String(formData.get('piece_id') || '') || null
-  const contactId = String(formData.get('contact_id') || '') || null
+  const pieceIdRaw = String(formData.get('piece_id') || '') || null
+  const contactIdRaw = String(formData.get('contact_id') || '') || null
+  let pieceId = pieceIdRaw
+  let contactId = contactIdRaw
 
   if (!lineId) redirect('/books/reconcile')
 
@@ -81,6 +84,32 @@ async function reconcileLine(formData: FormData) {
   }
   if (!amount || amount <= 0) {
     redirect('/books/reconcile?error=' + encodeURIComponent('This line has no amount to sort.'))
+  }
+
+  // "+ Add a new piece…" / "+ Add someone new…" chosen: create now, use new id.
+  if (pieceId === '__new__') {
+    const title = String(formData.get('new_piece_title') || '').trim()
+    pieceId = null
+    if (title) {
+      const { data: np } = await supabase
+        .from('inventory_pieces')
+        .insert({ owner_user_id: me, title })
+        .select('id')
+        .single()
+      pieceId = np?.id ?? null
+    }
+  }
+  if (contactId === '__new__') {
+    const cname = String(formData.get('new_contact_name') || '').trim()
+    contactId = null
+    if (cname) {
+      const { data: nc } = await supabase
+        .from('contacts')
+        .insert({ owner_user_id: me, name: cname, type: 'other' })
+        .select('id')
+        .single()
+      contactId = nc?.id ?? null
+    }
   }
 
   let newTxnId: string | null = null
@@ -311,24 +340,26 @@ export default async function ReconcilePage({
 
         <div>
           <label className={labelCls} htmlFor="piece_id">Tag to a piece (optional)</label>
-          <select id="piece_id" name="piece_id" className={fieldCls} defaultValue="">
-            <option value="">— none —</option>
-            {pieces.map((p) => (
-              <option key={p.id} value={p.id}>{p.title || 'Untitled piece'}</option>
-            ))}
-          </select>
+          <AddableSelect
+            name="piece_id"
+            newName="new_piece_title"
+            options={pieces.map((p) => ({ id: p.id, label: p.title || 'Untitled piece' }))}
+            addLabel="+ Add a new piece…"
+            placeholder="New piece name"
+          />
         </div>
 
         <div>
           <label className={labelCls} htmlFor="contact_id">
             {isMoneyIn ? 'From (customer, optional)' : 'Paid to (optional)'}
           </label>
-          <select id="contact_id" name="contact_id" className={fieldCls} defaultValue="">
-            <option value="">— none —</option>
-            {contacts.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <AddableSelect
+            name="contact_id"
+            newName="new_contact_name"
+            options={contacts.map((c) => ({ id: c.id, label: c.name }))}
+            addLabel="+ Add someone new…"
+            placeholder={isMoneyIn ? 'New customer name' : 'New person or vendor name'}
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-3 pt-1">
