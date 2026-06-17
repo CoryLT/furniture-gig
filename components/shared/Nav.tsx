@@ -8,7 +8,6 @@ import { Armchair, Menu } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 import { NotificationBell } from '@/components/shared/NotificationBell'
 import { MessageBell } from '@/components/shared/MessageBell'
-import HeaderSearch from '@/components/shared/HeaderSearch'
 
 interface NavProps {
   role: 'worker' | 'admin' | 'flipper'
@@ -304,8 +303,6 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
           <Armchair className="w-5 h-5" />
           FlipWork
         </Link>
-
-        <HeaderSearch />
 
         <div className="flex items-center gap-2 sm:gap-3">
           {role !== 'admin' && <MessageBell />}
