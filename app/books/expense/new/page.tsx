@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import AddableSelect from '@/components/books/AddableSelect'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -19,8 +20,35 @@ async function logExpense(formData: FormData) {
   const paidFromAccountId = String(formData.get('paid_from_account_id') || '')
   const description = String(formData.get('description') || '')
   const memo = String(formData.get('memo') || '') || null
-  const pieceId = String(formData.get('piece_id') || '') || null
-  const contactId = String(formData.get('contact_id') || '') || null
+  let pieceId = String(formData.get('piece_id') || '') || null
+  let contactId = String(formData.get('contact_id') || '') || null
+
+  // "+ Add a new piece…" chosen: create it now and use the new id.
+  if (pieceId === '__new__') {
+    const title = String(formData.get('new_piece_title') || '').trim()
+    pieceId = null
+    if (title) {
+      const { data: np } = await supabase
+        .from('inventory_pieces')
+        .insert({ owner_user_id: user.id, title })
+        .select('id')
+        .single()
+      pieceId = np?.id ?? null
+    }
+  }
+  // "+ Add someone new…" chosen: create the contact now.
+  if (contactId === '__new__') {
+    const cname = String(formData.get('new_contact_name') || '').trim()
+    contactId = null
+    if (cname) {
+      const { data: nc } = await supabase
+        .from('contacts')
+        .insert({ owner_user_id: user.id, name: cname, type: 'other' })
+        .select('id')
+        .single()
+      contactId = nc?.id ?? null
+    }
+  }
 
   if (!amount || amount <= 0) {
     redirect('/books/expense/new?error=' + encodeURIComponent('Enter an amount greater than zero.'))
@@ -142,22 +170,24 @@ export default async function NewExpensePage({
 
         <div>
           <label className={labelCls} htmlFor="piece_id">Tag to a piece (optional)</label>
-          <select id="piece_id" name="piece_id" className={fieldCls}>
-            <option value="">— none —</option>
-            {pieces.map((p) => (
-              <option key={p.id} value={p.id}>{p.title || 'Untitled piece'}</option>
-            ))}
-          </select>
+          <AddableSelect
+            name="piece_id"
+            newName="new_piece_title"
+            options={pieces.map((p) => ({ id: p.id, label: p.title || 'Untitled piece' }))}
+            addLabel="+ Add a new piece…"
+            placeholder="New piece name"
+          />
         </div>
 
         <div>
           <label className={labelCls} htmlFor="contact_id">Paid to (optional)</label>
-          <select id="contact_id" name="contact_id" className={fieldCls}>
-            <option value="">— none —</option>
-            {contacts.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <AddableSelect
+            name="contact_id"
+            newName="new_contact_name"
+            options={contacts.map((c) => ({ id: c.id, label: c.name }))}
+            addLabel="+ Add someone new…"
+            placeholder="New person or vendor name"
+          />
         </div>
 
         <button
