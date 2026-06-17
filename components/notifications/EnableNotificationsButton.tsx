@@ -210,7 +210,7 @@ export default function EnableNotificationsButton({
   if (dismissed && placement === 'dashboard') return null
 
   const card =
-    'rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm flex items-center gap-3'
+    'rounded-lg border border-border bg-card px-4 py-3 text-sm flex items-center gap-3'
 
   if (status === 'unsupported') return null // quietly hide on browsers that can't
 
@@ -236,7 +236,7 @@ export default function EnableNotificationsButton({
     // controls live in Account Settings instead, so the dashboard stays clean.
     if (placement === 'dashboard') return null
     return (
-      <div className="rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm">
+      <div className="rounded-lg border border-border bg-card px-4 py-3 text-sm">
         <div className="flex items-center justify-between gap-3">
           <span className="flex items-center gap-2 text-foreground">
             <BellRing className="w-5 h-5 text-accent shrink-0" />
