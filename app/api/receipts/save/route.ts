@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 // Logs each line as a real expense in the owner's books (the double-entry
 // ledger, via the record_expense function), tags it to a piece when chosen,
 // records the vendor as a contact, and attaches the receipt photo to every
-// entry it creates. No QuickBooks involved.
+// entry it creates. Logs straight to the owner's own books \u2014 no outside service.
 export async function POST(req: Request) {
   const supabase = createClient()
   const {

@@ -116,8 +116,8 @@ const ITEMS: ItemDef[] = [
     id: 'books',
     title: 'Set up bookkeeping',
     blurb:
-      'Track income and expenses from day one. Wave is free; QuickBooks is popular. A simple spreadsheet counts too.',
-    inputs: [{ kind: 'text', field: 'bookkeeping_tool', label: 'What you use', placeholder: 'e.g. Wave, QuickBooks, Spreadsheet' }],
+      'Track income and expenses from day one. FlipWork has Books built in, or use a spreadsheet \u2014 whatever you\u2019ll keep up with.',
+    inputs: [{ kind: 'text', field: 'bookkeeping_tool', label: 'What you use', placeholder: 'e.g. FlipWork Books, Spreadsheet' }],
     isDone: (p) => !!(p.bookkeeping_tool && p.bookkeeping_tool.trim()),
     summary: (p) => p.bookkeeping_tool || '',
   },

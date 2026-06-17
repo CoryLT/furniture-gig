@@ -28,10 +28,6 @@ const userLinks: NavItem[] = [
   { href: '/flipper/post-gig', label: 'Post a Job' },
   { href: '/flipper/dashboard', label: 'My Jobs' },
   { href: '/flipper/records', label: 'Payment Records' },
-  // --- QuickBooks expansion shelved June 4, 2026 (pending Intuit production approval).
-  //     Un-comment these two lines to bring the links back (e.g. as a future paid feature). ---
-  // { href: '/flipper/receipts', label: 'Snap a Receipt' },
-  // { href: '/flipper/quickbooks', label: 'QuickBooks' },
   // ---------------------------------------------------------------------------
   // Shelved June 17, 2026 for the operator-hub focus (the worker side, selling,
   // and the social feature). These pages still work by direct URL — un-comment
