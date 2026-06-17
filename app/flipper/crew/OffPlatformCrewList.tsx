@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
-import { Star, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Star, ThumbsUp, ThumbsDown, Trash2 } from 'lucide-react'
 
 export type OffRow = {
   id: string
@@ -49,6 +49,26 @@ function OffCard({ row }: { row: OffRow }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [removing, setRemoving] = useState(false)
+
+  async function remove() {
+    if (
+      !window.confirm(
+        `Remove "${row.name}" from your crew? This deletes this off-platform entry. ` +
+          `(Use this if they're a duplicate of someone already on your crew.)`
+      )
+    )
+      return
+    setRemoving(true)
+    setError('')
+    const { error: err } = await supabase.from('crew_members').delete().eq('id', row.id)
+    if (err) {
+      setRemoving(false)
+      setError('Could not remove. Try again.')
+      return
+    }
+    router.refresh()
+  }
 
   async function save() {
     setSaving(true)
@@ -165,6 +185,15 @@ function OffCard({ row }: { row: OffRow }) {
         </Button>
         {saved && <span className="text-sm text-green-600">Saved ✓</span>}
         {error && <span className="text-sm text-red-600">{error}</span>}
+        <button
+          type="button"
+          onClick={remove}
+          disabled={removing}
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-red-600 ml-auto disabled:opacity-50"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          {removing ? 'Removing…' : 'Remove'}
+        </button>
       </div>
     </div>
   )
