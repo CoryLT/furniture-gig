@@ -3,81 +3,126 @@
 > This is the **standing context** for the FlipWork project. Paste it into the
 > Claude Project Instructions so every new conversation starts from reality.
 > It changes slowly. For "what we did last session" detail, read `HANDOFF.md`
-> in the repo (and the dated `HANDOFF_*.md` files) — that's the living log.
+> in the repo (it points to the newest dated `HANDOFF_*.md`) — that's the living log.
 >
-> Last rewritten: June 1, 2026, after a full read of the live repo. The old
-> context file (simple worker/admin tool, PayPal-only, no marketplace, phases
-> 2–7 "not started") was ~6 months stale and was the cause of confused answers.
->
-> June 3, 2026 update: refocused on the **operator-hub direction** — see
-> "Current direction" below. HANDOFF.md has the full session detail.
->
-> June 3, 2026 (later session): shipped installable app + push, "stay logged in,"
-> dashboard cleanup, the Jobs/Gigs wording split, the job→pipeline link (pay now
-> logs a labor expense that hits profit), and off-platform name-only crew.
+> Last rewritten: June 17, 2026 (session D), after shipping the "piece is the hub"
+> direction. The big change from the prior version: the **Books ledger is now the
+> single source of truth for every cost AND every worker payment**, and the
+> **worker/gig + marketplace side is shelved** (operator-only). The old PayPal/Stripe
+> notes and the on-platform "direct pay" handshake are gone — see Payments below.
 
 ---
 
 ## What FlipWork actually is (now)
 
-A live, two-sided platform for the **flipping economy**. It started as a
-furniture-flipping gig tool ("furniture-gig" is still the code/repo name) and
-grew into "anything that can legally be flipped." Real people use it.
-
-The same logged-in user can do any of these — there is no rigid worker/admin
-split anymore:
-
-- **Post gigs** (you need furniture work done → you're the "flipper"/poster)
-- **Claim/apply to gigs** (you do the work → you're the "worker")
-- **Sell items** on a marketplace
-- **Advertise services** you offer (up to 10) on your public profile
-- **Message** other users, **follow** people, browse a **search** + feed
+A **hub / light resource-management ("tycoon") tool for one customer: the flipping
+operator** — someone running a flipping business (furniture and anything else legally
+flippable) who wants to source, fix, sell, and hire contract help without Craigslist
+sketchiness or W-2 overhead. It started as a two-sided furniture-gig marketplace
+("furniture-gig" is still the repo name) and a general flip marketplace; **both of
+those are now shelved.** The operator does everything inside FlipWork themselves.
 
 - **Brand:** FlipWork · **Repo:** `github.com/CoryLT/furniture-gig`
 - **Live domain:** myflipwork.com (deployed on Vercel)
 - **Operating entity:** Groovy Greens, LLC (NC), d/b/a FlipWork. NC governing
   law; binding arbitration + class waiver in the TOS.
-- **Admin:** Cory (single admin). `/admin` is **analytics + support queue only** —
-  all gig posting/editing is user-side now.
+- **Admin:** Cory (single admin). `/admin` is analytics + support queue only.
+- **Front door:** logged-in users land on **`/play`** (the gamified home).
 
 ---
 
-## Current direction (June 2026) — Operator Hub
+## Current direction (June 2026) — Operator Hub, operator-only
 
-The focus has narrowed from "two-sided everything-flippable marketplace" to ONE
-customer: the **flipping operator** — someone running a flipping business who wants
-to hire and manage contract help without Craigslist sketchiness or W-2 overhead.
-FlipWork is becoming their **hub / light resource-management ("tycoon") tool**. The
-worker/marketplace side still works but is de-emphasized; operator screens now say
-**"Jobs"** and **"crew."**
+Focus is ONE user: the operator. The worker app, the gig marketplace, and the
+item/services marketplace are **mothballed** (code still exists, reachable only by
+direct URL; the menu entries are commented out). Monetization stays a pro/business
+subscription (never a cut of payments); validate by dogfooding + micro-influencer
+outreach before charging. Standing legal caution: the contractor model risks
+worker-misclassification — route Cory to a NC employment/tax attorney. Not legal advice.
 
-Operator features built (HANDOFF.md has detail):
-- **Installable app + push** — FlipWork installs to the phone home screen (PWA) and
-  sends Web Push notifications (e.g. on a new message). On/off + a "test buzz" live in
-  Account Settings (`/profile`). iOS needs home-screen install + one "Allow" tap.
-- **Dashboard `/home`** has a **Business Setup** card — guided check-offs that capture
-  business details (name, structure, EIN, bank, bookkeeping, W-9/contractor) into a profile.
-- **My Crew** (`/flipper/crew`) — roster + private rating / notes / would-rehire.
-  Now also holds **off-platform, name-only crew** (people you hired in person who have
-  no account), with a running jobs/cash tally and the same rating/notes/name editing.
-- **Payment Records** (`/flipper/records`) — per-worker per-year payouts, a year-correct
-  1099 flag ($600 ≤2025, $2,000 2026+), and CSV export.
-- **Pipeline** (`/flipper/pipeline`) — pieces Sourced→Sold with photos, an itemized
-  expense ledger, and a profit / cash-tied-up HUD (the resource-game core). Posting a
-  job can **auto-create a piece**; paying the worker (or closing a job off-platform)
-  logs the pay as a **labor expense** on that piece, so profit reflects it.
+**The core loop the app supports:** source a piece → log what you paid → fix it
+(log materials/labor) → list it → sell it → see profit and cash-tied-up. Hiring help
+is just a labor expense on a piece, tagged to a person.
 
-New/changed tables: `crew_members` (now allows name-only off-platform members —
-nullable `worker_user_id` plus `worker_name`/`jobs_count`/`paid_total`), `business_profiles`,
-`inventory_pieces` (+`source_gig_id`, linking a piece to the job it came from),
-`piece_expenses` (the LIVE cost source — `category='labor'` rows hold worker pay; the
-old `inventory_pieces.labor_cost`/`materials_cost` columns are unused by the UI).
-`operator_business` is an unused orphan — drop when convenient.
+**The golden rule: log each thing ONCE, in the right place.**
+- Purchase price → the Pipeline new-piece field (writes a ledger purchase txn).
+- A single-piece cost (no receipt) → the piece's "Add expense."
+- A multi-piece or general receipt → the Books **receipt scanner** (one photo, one
+  line per item, each line tagged to a piece or left General, with a category).
+- Paying a worker → a **Labor** expense on the piece, **tagged to a crew member**
+  (this is what feeds Payment Records + the 1099 alert — see Payments).
+- A business cost that isn't tied to a piece → Books "Log an expense," no piece.
 
-Monetization stays a pro/business subscription (never a cut of payments); validate by
-dogfooding + micro-influencer outreach before charging. Standing legal caution: the
-contractor model risks worker-misclassification — route Cory to a NC employment/tax
-attorney. Not legal advice.
+### Operator features built
+- **Dashboard `/play`** — gamified "tycoon" home: rank/score, momentum, challenges,
+  cash-free vs tied-up, a pieces-by-stage board, interactive profit charts
+  (`components/play/ProfitCharts.tsx`), and a **"Needs you"** board
+  (`components/play/NeedsYou.tsx`) that surfaces real problems (no price, no photo,
+  cash stuck ≥30 days). Plus a few utility cards (messages, business setup,
+  notifications, add-to-home-screen).
+- **Pipeline `/flipper/pipeline`** — pieces Sourced→Sold with photos, an expense
+  ledger per piece, and a profit / cash-tied-up HUD. Each piece has a **"Find help"**
+  ad generator (`components/pipeline/FindHelpCard.tsx`) — copy/paste text to recruit
+  a hand off-platform.
+- **Books `/books`** — the full double-entry ledger (the money truth). Charts,
+  receipt scanner, and bank-feed **reconcile**.
+- **My Crew `/flipper/crew`** — roster + private rating / notes / would-rehire,
+  including **off-platform, name-only** people (no account). A worker's paid total
+  and payment history are derived from the ledger (so they match everywhere).
+- **Payment Records `/flipper/records`** — per-worker, per-year payouts derived from
+  logged labor, with a year-correct 1099 flag ($600 ≤2025, $2,000 2026+) and CSV export.
+- **Installable app + push** — PWA install to the home screen + Web Push (e.g. new
+  message). On/off + a "test buzz" in Account Settings (`/profile`).
+
+---
+
+## Payments — the operator logs labor; the LEDGER is the truth
+
+> The old on-platform "direct pay" handshake (worker saves a payout handle, operator
+> picks, marks paid, worker confirms — `gig_payments`) is **shelved**, along with the
+> earlier Stripe/PayPal processing. FlipWork never touches gig money.
+
+- The operator pays workers however they already do (Cash App, Venmo, Zelle, cash),
+  off-platform, then **logs it as a Labor expense on the piece and tags which crew
+  member** they paid.
+- `transactions.crew_member_id` tags a ledger expense to a crew member. The
+  **`worker_payments` view** (one row per tagged expense) is THE per-worker pay
+  source. Payment Records and the 1099 alert both read it.
+- **1099 alert:** after a tagged labor expense, `/api/payments/check-1099` sums that
+  worker's tagged labor for the year and fires once (in-app + push + email) when they
+  cross the threshold. Notification type `1099_threshold`; name comes from
+  `data.worker_name`.
+- Untagged labor still counts as the piece's cost, just not per-worker.
+- Dormant Stripe/PayPal/`gig_payments` code still sits in the repo (mothballed). The
+  on-platform pay components (`PayWorkerCard`, `FlipperGigList`) are unreachable from
+  the menu.
+
+---
+
+## Data model — the ledger is the cost truth
+
+- **Books ledger = single source of truth for ALL costs and worker pay.**
+  `accounts` (asset/income/expense/equity/liability) + `transactions` (date,
+  description, memo, **piece_id**, contact_id, **crew_member_id**, receipt_path) +
+  `entry_lines` (debit/credit, cascade-delete with the txn).
+  - `piece_id` tags an expense to a piece; `crew_member_id` tags it to a worker.
+  - Purchase price is a txn with memo `acq:<pieceId>` (legacy `mig:acq:`).
+- **Views:** `piece_costs` (per-piece total cost) and `worker_payments` (per-worker
+  payments). Both `security_invoker`.
+- **RPCs:** `add_piece_expense(p_piece_id, p_amount, p_category, p_note,
+  p_crew_member_id)` and `set_piece_purchase(p_piece_id, p_amount)`. Helpers
+  `_fw_expense_account`, `_fw_cash_account`. (These use `auth.uid()`, so they only
+  work for a signed-in client, not SQL-editor migrations.)
+- `piece_expenses` table = **RETIRED from live code** (kept as a backup; migrated into
+  the ledger). `inventory_pieces.acquisition_cost / labor_cost / materials_cost` are
+  legacy and ignored for cost math.
+- `crew_members` (id, operator_user_id, worker_user_id [nullable = off-platform],
+  worker_name, rating, notes, would_rehire, jobs_count, paid_total [now legacy],
+  hidden). `inventory_pieces` (stages sourced→in_progress→listed→sold; source_gig_id;
+  photos in public bucket `marketplace-photos`).
+- `gig_payments`, gig/claim tables, marketplace tables, `worker_services` — all
+  **legacy/mothballed**. `notifications` (type CHECK incl `1099_threshold`).
+- `operator_business` is an unused orphan — drop when convenient.
 
 ---
 
@@ -92,33 +137,29 @@ attorney. Not legal advice.
    `ask_user_input_v0` with 2–3 options.
 5. **Cory sends screenshots / URLs when stuck.** If something only "kinda"
    worked, ask for the URL or screenshot before guessing.
-6. **SQL is the ONE copy/paste exception.** Supabase changes can't be done for
-   him. Save SQL in `supabase/`, then give crystal-clear steps:
-   "open the raw file → copy all → Supabase → SQL Editor → New query → paste → Run."
-7. **GitHub raw pages cache hard.** If a re-pushed file looks stale to Cory, send
-   the `raw.githubusercontent.com` URL and tell him to hard-refresh (Cmd/Ctrl+Shift+R).
-8. Cory can do **basic** VS Code things (pull, push) but is NOT comfortable
-   surgically inserting or replacing code. Keep anything you ever ask him to do
-   dead simple.
+6. **SQL is the ONE copy/paste exception.** Save SQL in `supabase/`, then give
+   crystal-clear steps: "hard-refresh the raw file → copy all → Supabase → SQL
+   Editor → New query → paste → Run." **Use uniquely NAMED dollar tags** (`$ape$`,
+   `$mig$`, …) in functions — Supabase mis-parses repeated bare `$$`.
+7. **GitHub raw pages cache hard.** If a re-pushed file looks stale, send the
+   `raw.githubusercontent.com` URL and tell Cory to hard-refresh (Cmd/Ctrl+Shift+R).
+8. Cory can do **basic** VS Code things (pull, push) but is NOT comfortable editing
+   code. Keep anything you ask him to do dead simple.
 
 ---
 
 ## GitHub token + deploy flow
 
-- Cory pastes a **fresh GitHub personal access token** into chat at the start of
-  each session. Claude uses it to clone/commit/push. Cory revokes it after the
-  session. **That revoke-after-session is the security model — do NOT suggest
-  storing it in a file, env var, .env, or secrets manager, and do NOT lecture
-  about token security. Just take it and use it.**
+- Cory pastes a **fresh GitHub personal access token** into chat at the start of each
+  session and revokes it after. **That revoke-after-session is the security model —
+  do NOT suggest storing it anywhere, and do NOT lecture about token security.**
 - Push from sandbox: `git push https://CoryLT:<TOKEN>@github.com/CoryLT/furniture-gig.git main`
-  (or the GitHub Contents API).
-- **Vercel does NOT auto-deploy from Claude's API/sandbox pushes.** After Claude
-  pushes, Cory runs in VS Code: `git pull` → `git push`, then waits ~45–60s for
-  Vercel. Cory's local push is what triggers the deploy.
-- **Push gotcha:** when editing via the Contents API, encode the FINAL file
-  immediately before the PUT, then read it back from `raw.githubusercontent.com`
-  and grep for a marker to confirm — a push has reported "OK" while shipping a
-  stale version.
+- **Vercel does NOT auto-deploy from Claude's pushes.** After Claude pushes, Cory runs
+  in VS Code: `git pull` → `git push`, then waits ~45–60s for Vercel. Cory's local
+  push is what triggers the deploy.
+- Pre-push check: `npx esbuild <file> --jsx=automatic --bundle=false
+  --loader:.tsx=tsx --outfile=/dev/null` (`--loader:.ts=ts` for `.ts`).
+  `git restore tsconfig.tsbuildinfo` before `git add`.
 
 ---
 
@@ -128,133 +169,40 @@ attorney. Not legal advice.
 |---|---|
 | Framework | Next.js 14.1 (App Router) |
 | Database / Auth / Storage | Supabase (Postgres) |
-| Styling | Tailwind 3.3 + Radix UI primitives (manual shadcn-style) |
+| Styling | Tailwind 3.3 + Radix UI primitives (manual shadcn-style); `darkMode:'class'` |
 | Email | Resend (`lib/email.ts`, FROM `notifications@myflipwork.com`) |
 | Image moderation | Sightengine (on all upload paths) |
-| AI support chat | Anthropic (Haiku 4.5) |
+| AI (support chat + receipt scan) | Anthropic (Haiku 4.5) |
 | Deployment | Vercel |
 
-- `next.config.js` has `ignoreBuildErrors` + `ignoreDuringBuilds` true, so TS/
-  ESLint won't block a Vercel build. A local `next build` still catches real
-  syntax errors — that's the useful pre-push check.
+- `next.config.js` has `ignoreBuildErrors` + `ignoreDuringBuilds` true, so TS/ESLint
+  won't block a Vercel build. A local `next build` still catches real syntax errors.
 - Fonts: DM Sans (body), DM Serif Display (headings), DM Mono.
 - Color: warm neutral base, near-black primary, amber accent (`hsl(32 90% 48%)`).
-
----
-
-## Payments — DIRECT PAY (Stripe was removed from the live flow, May 31, 2026)
-
-This is the biggest change from the old context file, which is now wrong.
-
-- **No processor, no platform fee, no holds.** FlipWork never touches gig money.
-  The old 2%-per-gig fee is **gone**. The poster pays the worker **directly** on
-  whatever the worker already uses (Cash App, Venmo, PayPal, Zelle, or cash).
-- **Why:** Stripe forced workers through heavy bank+ID onboarding — a wall for
-  low-tech, Cash-App-only workers. Free + direct removes that wall.
-- **Live flow:**
-  1. Worker saves a pay handle on `/profile` ("How you get paid" —
-     `components/profile/PayoutHandlesSection.tsx`).
-  2. Worker applies — no payment onboarding.
-  3. Poster picks the worker — no card, no hold (`/api/stripe/pick-worker` is
-     gutted to just the `approve_applicant` RPC).
-  4. Worker does checklist + photos → "Submit for review."
-  5. Poster approves the work at `/flipper/review/[claimId]` → a **"Pay
-     [worker]" card** (`components/shared/PayWorkerCard.tsx`) shows the handle +
-     amount + "Mark as paid."
-  6. Worker taps **"Did you get paid?"** (`components/shared/ConfirmReceivedCard.tsx`)
-     → both sides show "Paid & confirmed."
-- **Tables:** `worker_payout_handles` (RLS-gated; only a booked poster can read a
-  worker's handle) and `gig_payments` (one row per gig; `marked_paid_at` +
-  `worker_confirmed_at` = the two-sided handshake). Both SQL files are run.
-- **Dormant Stripe/PayPal code still sits in the repo** (lots of it) but nothing
-  live uses it. It isn't breaking anything; sweep when convenient. See
-  `HANDOFF.md` for the exact delete/keep/edit list. **The one live landmine:**
-  the *admin* review path `app/admin/review/[claimId]/ReviewActions.tsx` still
-  calls the dead `capture-payment` route — fix that first if touched.
-- **Keep (Stripe-named but still used):** `app/api/stripe/pick-worker/route.ts`
-  (the "pick" path) and `app/api/stripe/cancel-pick/route.ts` +
-  `CancelPickButton` (the "un-pick / reopen" path).
-
----
-
-## What's built and working
-
-**Identity & profiles**
-- Unified account; anyone can post, claim, sell, or offer services.
-- Profile editor `/profile` → `/api/profile/unified-save`.
-- Public profile `/u/[username]`: hero card + sections (Available gigs, Services
-  offered, Listings for sale, Work Samples). Empty sections hide from strangers.
-- A profile with **no username has no public page** and is filtered out of search.
-
-**Gigs**
-- Post/edit/browse gigs (city/state filter; own posts get a "Your post" badge).
-  Draft flow: step 1 saves `draft`, "Finish & post" flips to `open`.
-- **Application/approval flow** (poster reviews applicants and picks one) —
-  this replaced the old first-to-claim model.
-- Worker execution: `/my-gigs/[claimId]` — checklist, notes, photo uploads,
-  submit for review.
-
-**Marketplace**
-- `/marketplace`: post/edit/sell/hide items, public feed, photo carousels.
-- **Items | Services** toggle — services come from `worker_services`, filtered by
-  the provider's profile city.
-
-**Services offered (supply side)**
-- Up to 10 per worker. Tables: `service_categories` (59 physical-labor
-  categories) + `worker_services` (blurb, price_type, optional cover image).
-- Manage at `/profile/worker/services`; shows on the public profile.
-
-**Messaging — THREE kinds**, all unioned in the `/messages` inbox:
-1. **Gig** (`gig_conversations`/`gig_messages`)
-2. **Listing** (`listing_conversations`/`listing_messages`)
-3. **User-to-user** (`user_conversations`/`user_messages`) — "Contact Me" on a
-   public profile.
-- Inbox/Archived tabs, per-row Archive/Delete (`conversation_user_state`; delete
-  is a per-user hide). Block + report from the chat header. New-message email via
-  Resend (throttled to ~1 per conversation per recipient per hour). **Gap: no
-  admin UI yet to review reported messages.**
-
-**Search** — header bar → `/search`, groups People / Services / Listings / Gigs.
-Listings & gigs are **title-only** (deliberate). Logged-out users can search/see
-but not act.
-
-**Other shipped**
-- Landing: `/` public (founder note), `/home` is the protected logged-in hub.
-- AI support chat `/support` (Haiku 4.5; reads the user's own data; escalates to
-  admin queue `/admin/support`).
-- TOS + Privacy v1.0 live at `/legal/terms` + `/legal/privacy`; unaccepted-
-  required agreements gate redirects to `/auth/agreements`.
-- Image moderation on all upload paths; HEIC→JPEG in-browser
-  (`lib/imageCompression.ts`).
-- Founding member system (first 25 workers + 25 flippers; badge + counter).
-- Follows/connections, ShareButton, BackToTopButton, message bell, notification
-  bell.
-
-Repo scale for reference: ~49 pages, ~52 API routes, ~80 SQL files in `supabase/`.
+  `/play` uses its own `--play-*` theme vars; standard screens use the base tokens.
 
 ---
 
 ## Load-bearing gotchas (read before editing)
 
-- **Name columns are inconsistent — this is a live bug source.** `full_name` is
-  the going-forward column and the canonical save path (`unified-save`) writes it.
-  BUT `first_name`/`last_name` were never dropped and **~25 files still read
-  them** — those show blank or "User" for anyone whose profile was saved through
-  the newer path. `supabase/schema.sql` and `types/database.ts` are STALE here
-  (still show first/last only). When you touch a file that displays a worker's
-  name, prefer `full_name`; treat any `first_name`/`last_name` read as suspect.
-- **`users` table RLS** lets a user read only their OWN row (admins read all). Do
-  NOT add an "existence check" against `users` for another user — it false-fails.
-  FK constraints already enforce real IDs.
-- **SQL ordering:** if a policy references another table, create the referenced
-  table FIRST in the file.
-- **`/home` is protected** — never send logged-out users there. Public landing is `/`.
-- **iPhone HEIC uploads** can have an empty MIME type before conversion — use
-  `looksLikeHeic()` / `isAcceptableImageFile()` in `lib/imageCompression.ts`, not
-  `file.type`.
-- **Vercel deploy** only fires on Cory's local `git push`, not Claude's pushes.
-- **Resend** needs `RESEND_API_KEY` on Vercel (it's set). If a new email type
-  doesn't arrive, first confirm any FlipWork email works at all.
+- **The ledger is the cost truth.** Don't reintroduce `piece_expenses` reads. Costs
+  read from the `piece_costs` view / ledger; worker pay reads from `worker_payments`.
+  Write through the RPCs (`add_piece_expense`, `set_piece_purchase`).
+- **Name columns are inconsistent (live bug source).** `full_name` is the
+  going-forward column (the `unified-save` path writes it), but `first_name`/
+  `last_name` still exist and ~25 files read them. Prefer `full_name`; treat
+  first/last reads as suspect. `schema.sql` + `types/database.ts` are stale here.
+- **`users` table RLS** lets a user read only their OWN row (admins read all). Don't
+  add an "existence check" against `users` for another user — it false-fails.
+- **SQL ordering:** if a policy references another table, create that table FIRST.
+  **Named dollar tags** in functions (see workflow rule 6).
+- **`/play` and `/home` are protected** — never send logged-out users there. Public
+  landing is `/`. (`/home` just redirects to `/play`.)
+- **iPhone HEIC uploads** can have an empty MIME type — use `looksLikeHeic()` /
+  `isAcceptableImageFile()` in `lib/imageCompression.ts`, not `file.type`.
+- **Vercel deploy** only fires on Cory's local `git push`.
+- **`notifications`** has no client INSERT policy — insert via `createAdminClient`
+  (service role) or a SECURITY DEFINER function. `type` has a CHECK constraint.
 
 ---
 
@@ -266,38 +214,30 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_ADMIN_EMAIL=
 RESEND_API_KEY=
-NEXT_PUBLIC_SITE_URL=        (getSiteUrl() helper in lib/utils.ts prefers this)
-ANTHROPIC_API_KEY=           (AI support)
+NEXT_PUBLIC_SITE_URL=        (getSiteUrl() in lib/utils.ts prefers this)
+ANTHROPIC_API_KEY=           (AI support + receipt scan)
 SIGHTENGINE_*=               (image moderation)
 ```
-(Plus dormant Stripe keys still referenced by dead code.)
+(Plus dormant Stripe/QuickBooks keys still referenced by mothballed code.)
 
 ---
 
 ## What's next (candidates, not committed)
 
-From the May 31 payments pivot, in priority order:
-1. **Stripe/PayPal dead-code cleanup** — start by fixing the admin
-   `ReviewActions.tsx` capture call (the only live landmine).
-2. **Ratings & reputation** — nothing exists yet; this is the keystone (trust now
-   comes from track record, e.g. "47 gigs, all confirmed paid"). Needs a spec.
-3. **Verified badge** — currently parked (it ran on Stripe). Rebuild as a
-   track-record badge + optional ID check.
-4. **No-show button** — reopen a gig when a worker doesn't show (un-pick plumbing
-   already exists). Low priority now that it's not a money issue.
-5. **Monetization** — later, NOT a cut of payments: a flat fee to unlock a new
-   worker connection + optional business subscription. Workers always free.
-
-Pre-pivot loose ends still valid:
-- Admin screen to review `message_reports` (reports file with nowhere to action them).
-- Blocked-users management page.
-- Browse services by category (search is text-only; data model supports it).
-- Notify route should use `getSiteUrl()` instead of the hardcoded domain.
+- Switch the crew-card "jobs" count to a ledger **payments** count (only the $ amounts
+  are unified today).
+- Optionally pull historical on-platform `gig_payments` into Payment Records (it reads
+  `worker_payments` only now).
+- Retire the `piece_expenses` table once confident (backup only).
+- Dark-mode Stage 2 sweep (esp. Books screens that hardcode white/gray).
+- Trim the `NeedsYou` "approve" signal that still points at the shelved gig flow.
+- Ratings / reputation system — not built; would be the trust keystone if revisited.
 
 ---
 
 ## How to start a session
 
-Cory pastes a fresh GitHub token. Claude clones the repo, reads `HANDOFF.md` for
-the latest session detail, then confirms in plain English what it's about to do
-before doing it. Build one file at a time; SQL is the only thing Cory pastes.
+Cory pastes a fresh GitHub token. Claude clones the repo, reads `HANDOFF.md` (which
+points to the newest dated handoff) for the latest session detail, then confirms in
+plain English what it's about to do before doing it. Build one file at a time; SQL is
+the only thing Cory pastes.
