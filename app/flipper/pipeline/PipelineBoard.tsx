@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Plus, ArrowRight, Trash2, ImageIcon, X, ChevronDown, Users } from 'lucide-react'
+import { Plus, ArrowRight, Trash2, ImageIcon, X, ChevronDown, Users, Package } from 'lucide-react'
 import { compressImageForUpload, isAcceptableImageFile } from '@/lib/imageCompression'
 import FindHelpCard, { type HelpAd } from '@/components/pipeline/FindHelpCard'
 
@@ -16,6 +16,23 @@ type Expense = {
   category: string | null
   note: string
   spent_on: string | null
+}
+
+type UsedSupply = {
+  id: string
+  item_id: string | null
+  item_name: string
+  unit_cost: number
+  qty: number
+}
+
+type InvItem = {
+  id: string
+  name: string
+  unit: string | null
+  avg_cost: number
+  quantity: number
+  reorder_level: number | null
 }
 
 type Piece = {
@@ -33,6 +50,7 @@ type Piece = {
   sold_at: string | null
   help_ad: HelpAd | null
   expenses: Expense[]
+  supplies: UsedSupply[]
 }
 
 const STAGES: { key: Stage; label: string }[] = [
@@ -55,14 +73,17 @@ export default function PipelineBoard({
   userId,
   initialPieces,
   crew,
+  inventory: initialInventory,
 }: {
   userId: string
   initialPieces: Piece[]
   crew: { id: string; label: string }[]
+  inventory: InvItem[]
 }) {
   const router = useRouter()
   const supabase = createClient()
   const [pieces, setPieces] = useState<Piece[]>(initialPieces)
+  const [inventory, setInventory] = useState<InvItem[]>(initialInventory)
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState('')
   const [openStat, setOpenStat] = useState<string | null>(null)
@@ -239,6 +260,60 @@ export default function PipelineBoard({
     return true
   }
 
+  // ---- supplies used on a piece (from the inventory tracker) ----
+  async function useSupply(pieceId: string, itemId: string, q: number) {
+    setError('')
+    const { data, error: err } = await supabase.rpc('use_supply_on_piece', {
+      p_item_id: itemId,
+      p_piece_id: pieceId,
+      p_qty: q,
+    })
+    const row: any = Array.isArray(data) ? data[0] : data
+    if (err || !row) {
+      setError('Could not use that supply. Try again.')
+      return false
+    }
+    const used: UsedSupply = {
+      id: row.usage_id,
+      item_id: itemId,
+      item_name: row.item_name || '',
+      unit_cost: Number(row.unit_cost ?? 0),
+      qty: Number(row.qty ?? q),
+    }
+    setPieces((prev) =>
+      prev.map((p) =>
+        p.id === pieceId ? { ...p, supplies: [...(p.supplies ?? []), used] } : p
+      )
+    )
+    setInventory((prev) =>
+      prev.map((it) => (it.id === itemId ? { ...it, quantity: Number(row.new_quantity ?? it.quantity) } : it))
+    )
+    return true
+  }
+
+  async function removeSupply(pieceId: string, usage: UsedSupply) {
+    setError('')
+    const { error: err } = await supabase.rpc('remove_piece_supply', { p_id: usage.id })
+    if (err) {
+      setError('Could not undo that. Try again.')
+      return
+    }
+    setPieces((prev) =>
+      prev.map((p) =>
+        p.id === pieceId
+          ? { ...p, supplies: (p.supplies ?? []).filter((s) => s.id !== usage.id) }
+          : p
+      )
+    )
+    if (usage.item_id) {
+      setInventory((prev) =>
+        prev.map((it) =>
+          it.id === usage.item_id ? { ...it, quantity: it.quantity + usage.qty } : it
+        )
+      )
+    }
+  }
+
   async function deleteExpense(pieceId: string, expenseId: string) {
     setError('')
     // expenseId is now the ledger transaction id; deleting it cascades its lines.
@@ -372,6 +447,9 @@ export default function PipelineBoard({
                       onAddExpense={addExpense}
                       crew={crew}
                       onDeleteExpense={deleteExpense}
+                      inventory={inventory}
+                      onUseSupply={useSupply}
+                      onRemoveSupply={removeSupply}
                     />
                   ))
                 )}
@@ -654,6 +732,9 @@ function PieceCard({
   onAddExpense,
   onDeleteExpense,
   crew,
+  inventory,
+  onUseSupply,
+  onRemoveSupply,
 }: {
   piece: Piece
   imgUrl: string | null
@@ -667,6 +748,9 @@ function PieceCard({
   ) => Promise<boolean>
   onDeleteExpense: (pieceId: string, expenseId: string) => void
   crew: { id: string; label: string }[]
+  inventory: InvItem[]
+  onUseSupply: (pieceId: string, itemId: string, qty: number) => Promise<boolean>
+  onRemoveSupply: (pieceId: string, usage: UsedSupply) => void
 }) {
   const [open, setOpen] = useState(false)
   const [zoom, setZoom] = useState(false)
@@ -681,6 +765,11 @@ function PieceCard({
   const [newCrew, setNewCrew] = useState('')
   const [addingExp, setAddingExp] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [showSupplies, setShowSupplies] = useState(false)
+  const [supplyPick, setSupplyPick] = useState('')
+  const [supplyQty, setSupplyQty] = useState('1')
+  const [supplySearch, setSupplySearch] = useState('')
+  const [usingSupply, setUsingSupply] = useState(false)
 
   const isSold = piece.stage === 'sold'
   const profit = isSold ? realized(piece) : expected(piece)
@@ -837,6 +926,125 @@ function PieceCard({
                 initial={piece.help_ad ?? null}
                 onSave={(ad) => onUpdate(piece.id, { help_ad: ad })}
               />
+            )}
+          </div>
+
+          {/* Hardware from inventory — deducts from your supplies stock */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setShowSupplies((v) => !v)}
+              className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline"
+              aria-expanded={showSupplies}
+            >
+              <Package className="w-3.5 h-3.5" />
+              {showSupplies
+                ? 'Hide hardware'
+                : (piece.supplies ?? []).length > 0
+                  ? `Hardware used (${(piece.supplies ?? []).length})`
+                  : 'Add hardware from inventory'}
+            </button>
+
+            {showSupplies && (
+              <div className="space-y-3 rounded-lg border border-border p-3">
+                {/* What's already on this piece */}
+                {(piece.supplies ?? []).length > 0 ? (
+                  <div className="space-y-1">
+                    {(piece.supplies ?? []).map((u) => (
+                      <div key={u.id} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="text-muted-foreground truncate">
+                          {u.item_name} · {n(u.qty)} × {money(u.unit_cost)}
+                        </span>
+                        <span className="flex items-center gap-2 shrink-0">
+                          <span className="text-foreground">{money(u.unit_cost * u.qty)}</span>
+                          <button
+                            type="button"
+                            onClick={() => onRemoveSupply(piece.id, u)}
+                            className="text-muted-foreground hover:text-red-600"
+                            aria-label="Undo (put back in stock)"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between border-t border-border pt-1 text-xs">
+                      <span className="font-medium text-foreground">Hardware used</span>
+                      <span className="font-medium text-foreground">
+                        {money((piece.supplies ?? []).reduce((s, u) => s + u.unit_cost * u.qty, 0))}
+                      </span>
+                    </div>
+                    <p className="text-[10px] leading-snug text-muted-foreground">
+                      Already counted in your Supplies expense — shown here so you can see what went
+                      into this piece.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Nothing from stock on this piece yet.</p>
+                )}
+
+                {/* Picker */}
+                {inventory.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Your supplies inventory is empty. Add items under Books → Supplies.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      value={supplySearch}
+                      onChange={(e) => setSupplySearch(e.target.value)}
+                      placeholder="Search your supplies…"
+                      className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    />
+                    <div className="flex gap-2">
+                      <select
+                        value={supplyPick}
+                        onChange={(e) => setSupplyPick(e.target.value)}
+                        className="flex-1 min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+                      >
+                        <option value="">Pick a supply…</option>
+                        {inventory
+                          .filter(
+                            (it) =>
+                              !supplySearch.trim() ||
+                              it.name.toLowerCase().includes(supplySearch.trim().toLowerCase())
+                          )
+                          .map((it) => (
+                            <option key={it.id} value={it.id}>
+                              {it.name} ({n(it.quantity)} left)
+                            </option>
+                          ))}
+                      </select>
+                      <input
+                        value={supplyQty}
+                        onChange={(e) => setSupplyQty(e.target.value)}
+                        inputMode="decimal"
+                        className="w-16 rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+                        aria-label="How many"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!supplyPick || usingSupply}
+                      onClick={async () => {
+                        const q = parseFloat(supplyQty) || 0
+                        if (!supplyPick || q <= 0) return
+                        setUsingSupply(true)
+                        const ok = await onUseSupply(piece.id, supplyPick, q)
+                        setUsingSupply(false)
+                        if (ok) {
+                          setSupplyPick('')
+                          setSupplyQty('1')
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      {usingSupply ? 'Using…' : 'Use on this piece'}
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

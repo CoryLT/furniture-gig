@@ -48,10 +48,29 @@ export default async function PipelinePage() {
     }
   }
 
+  // Supplies used on each piece (from the inventory tracker).
+  const { data: psRaw } = await supabase
+    .from('piece_supplies')
+    .select('id, piece_id, item_id, item_name, unit_cost, qty')
+    .eq('owner_user_id', me)
+    .order('created_at', { ascending: true })
+  const suppliesByPiece: Record<string, any[]> = {}
+  for (const s of (psRaw ?? []) as any[]) {
+    if (!suppliesByPiece[s.piece_id]) suppliesByPiece[s.piece_id] = []
+    suppliesByPiece[s.piece_id].push({
+      id: s.id,
+      item_id: s.item_id,
+      item_name: s.item_name,
+      unit_cost: Number(s.unit_cost ?? 0),
+      qty: Number(s.qty ?? 0),
+    })
+  }
+
   const pieces = ((piecesRaw ?? []) as any[]).map((p) => ({
     ...p,
     acquisition_cost: acqByPiece[p.id] ?? 0,
     expenses: expByPiece[p.id] ?? [],
+    supplies: suppliesByPiece[p.id] ?? [],
   }))
 
   // Crew list for the "who did you pay?" picker on labor expenses.
@@ -79,6 +98,21 @@ export default async function PipelinePage() {
     label: c.worker_user_id ? nameById[c.worker_user_id] || 'Crew' : c.worker_name || 'Crew',
   }))
 
+  // Supplies stock for the "use a supply" picker on each piece.
+  const { data: invRaw } = await supabase
+    .from('books_inventory_items')
+    .select('id, name, unit, avg_cost, quantity, reorder_level')
+    .eq('owner_user_id', me)
+    .order('name', { ascending: true })
+  const inventory = ((invRaw ?? []) as any[]).map((r) => ({
+    id: r.id,
+    name: r.name || 'Untitled item',
+    unit: r.unit ?? null,
+    avg_cost: Number(r.avg_cost ?? 0),
+    quantity: Number(r.quantity ?? 0),
+    reorder_level: r.reorder_level == null ? null : Number(r.reorder_level),
+  }))
+
   return (
     <div className="space-y-8">
       <div>
@@ -88,7 +122,7 @@ export default async function PipelinePage() {
           they progress and watch the profit land.
         </p>
       </div>
-      <PipelineBoard userId={me} initialPieces={pieces} crew={crew} />
+      <PipelineBoard userId={me} initialPieces={pieces} crew={crew} inventory={inventory} />
     </div>
   )
 }
