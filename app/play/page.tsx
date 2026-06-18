@@ -675,8 +675,9 @@ function PieceCard({ p }: { p: PieceVM }) {
       ? C.gold
       : C.muted
   return (
-    <div
-      className="w-32 shrink-0 rounded-xl overflow-hidden"
+    <Link
+      href="/flipper/pipeline"
+      className="block w-32 shrink-0 rounded-xl overflow-hidden transition hover:opacity-90 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-400/40"
       style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}
     >
       <div
@@ -698,6 +699,6 @@ function PieceCard({ p }: { p: PieceVM }) {
           {scoreText}
         </div>
       </div>
-    </div>
+    </Link>
   )
 }
