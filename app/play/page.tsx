@@ -162,6 +162,23 @@ export default async function PlayPage() {
   const monthProfit = soldThisMonth.reduce((s, p) => s + p.realized, 0)
   const monthFlips = soldThisMonth.length
 
+  // Climb chart: profit realized per month over the last 6 months.
+  const climbMonths: { label: string; profit: number }[] = []
+  const climbIdx: Record<string, number> = {}
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    climbIdx[`${d.getFullYear()}-${d.getMonth()}`] = climbMonths.length
+    climbMonths.push({ label: d.toLocaleDateString('en-US', { month: 'short' }), profit: 0 })
+  }
+  for (const p of sold as any[]) {
+    if (!p.stage_sold_at) continue
+    const d = new Date(p.stage_sold_at)
+    const idx = climbIdx[`${d.getFullYear()}-${d.getMonth()}`]
+    if (idx !== undefined) climbMonths[idx].profit += p.realized
+  }
+  const maxClimb = Math.max(1, ...climbMonths.map((m) => Math.max(0, m.profit)))
+  const showClimb = sold.length > 0
+
   // Rank / progress from total profit — the game-score framing.
   const total = allTimeProfit
   let tierIdx = 0
@@ -351,6 +368,40 @@ export default async function PlayPage() {
             </span>
           </div>
         </section>
+
+        {/* Profit by month — the score, climbing */}
+        {showClimb && (
+          <section>
+            <h2 className="font-serif text-lg mb-2" style={{ color: C.cream }}>
+              Profit by month
+            </h2>
+            <div
+              className="rounded-2xl p-5"
+              style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}
+            >
+              <div className="flex items-end gap-3 h-32">
+                {climbMonths.map((m, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full">
+                    <div className="flex-1 w-full flex items-end justify-center">
+                      <div
+                        className="w-5 rounded-t"
+                        style={{
+                          height: `${(Math.max(0, m.profit) / maxClimb) * 100}%`,
+                          minHeight: m.profit > 0 ? 3 : 0,
+                          background: C.green,
+                        }}
+                        title={`${m.label}: ${money(m.profit)}`}
+                      />
+                    </div>
+                    <span className="font-mono text-[10px]" style={{ color: C.muted }}>
+                      {m.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Challenges — your next goals to chase */}
         <section>
