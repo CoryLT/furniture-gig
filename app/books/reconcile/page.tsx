@@ -277,7 +277,7 @@ export default async function ReconcilePage({
         <p className="mt-3 break-words text-sm text-muted-foreground">{cleanDesc(line.raw_description)}</p>
       </div>
 
-      <form action={reconcileLine} className="mt-6 space-y-5">
+      <form key={line.id} action={reconcileLine} className="mt-6 space-y-5">
         <input type="hidden" name="line_id" value={line.id} />
 
         <div>
