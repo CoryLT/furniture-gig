@@ -32,11 +32,11 @@ const STAGES: { key: Stage; label: string }[] = [
 // Easy to rename or re-space these later.
 const TIERS: { min: number; title: string }[] = [
   { min: 0, title: 'Rookie' },
-  { min: 250, title: 'Flipper' },
-  { min: 1000, title: 'Heavy Hitter' },
-  { min: 2500, title: 'Expert' },
-  { min: 10000, title: 'Mogul' },
-  { min: 25000, title: 'Tycoon' },
+  { min: 3000, title: 'Flipper' },
+  { min: 10000, title: 'Heavy Hitter' },
+  { min: 50000, title: 'Expert' },
+  { min: 100000, title: 'Mogul' },
+  { min: 200000, title: 'Tycoon' },
 ]
 
 // Bespoke "workshop after dark" palette, kept local to /play so it doesn't

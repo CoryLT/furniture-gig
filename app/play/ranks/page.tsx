@@ -12,11 +12,11 @@ export const revalidate = 0
 // Ranks by total (all-time) profit — same ladder the dashboard uses.
 const TIERS: { min: number; title: string; blurb: string }[] = [
   { min: 0, title: 'Rookie', blurb: "Where everyone starts. You're on the board the moment you add your first piece." },
-  { min: 250, title: 'Flipper', blurb: 'A couple of solid flips and you’re officially in the game.' },
-  { min: 1000, title: 'Heavy Hitter', blurb: 'You’re flipping regularly now and the profit is adding up.' },
-  { min: 2500, title: 'Expert', blurb: 'Your eye for good deals is clearly paying off.' },
-  { min: 10000, title: 'Mogul', blurb: 'This isn’t a hobby anymore — it’s a real business.' },
-  { min: 25000, title: 'Tycoon', blurb: 'The top rank. You run this town.' },
+  { min: 3000, title: 'Flipper', blurb: "You've cleared your first few thousand — this is a real side hustle now." },
+  { min: 10000, title: 'Heavy Hitter', blurb: "Five figures in profit. You're flipping seriously and it shows." },
+  { min: 50000, title: 'Expert', blurb: 'You know your market cold. This is a real income stream.' },
+  { min: 100000, title: 'Mogul', blurb: 'Six figures cleared. This is a business, not a hobby.' },
+  { min: 200000, title: 'Tycoon', blurb: "The top rank. You've built something most flippers only dream about." },
 ]
 
 const C = {
