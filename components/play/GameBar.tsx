@@ -34,8 +34,8 @@ export default function GameBar({ pct }: { pct: number }) {
           height: '100%',
           width: `${w}%`,
           borderRadius: 999,
-          background: 'linear-gradient(90deg, #f59e0b 0%, #fde68a 100%)',
-          boxShadow: '0 0 12px rgba(245,158,11,0.65)',
+          background: 'linear-gradient(90deg, #e0a92a 0%, #fde68a 100%)',
+          boxShadow: '0 0 12px rgba(224,169,42,0.6)',
           transition: 'width 1100ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       />

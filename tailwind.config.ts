@@ -37,6 +37,32 @@ const config: Config = {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
+        // Brand gold ramp — remaps Tailwind's default `amber-*` utilities to
+        // true gold (was orange-yellow). `gold-*` is an alias of the same ramp.
+        amber: {
+          50: '#FBF7E8',
+          100: '#F6EBC2',
+          200: '#EEDB94',
+          300: '#E4C65C',
+          400: '#D9B032',
+          500: '#C99E1E',
+          600: '#AC8417',
+          700: '#836314',
+          800: '#5E4711',
+          900: '#41310B',
+        },
+        gold: {
+          50: '#FBF7E8',
+          100: '#F6EBC2',
+          200: '#EEDB94',
+          300: '#E4C65C',
+          400: '#D9B032',
+          500: '#C99E1E',
+          600: '#AC8417',
+          700: '#836314',
+          800: '#5E4711',
+          900: '#41310B',
+        },
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',

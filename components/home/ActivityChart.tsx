@@ -177,7 +177,7 @@ export default function ActivityChart({ data }: { data: DayBucket[] }) {
                     y={earnedY}
                     width={barW}
                     height={earnedH}
-                    fill="hsl(32 90% 48%)"
+                    fill="hsl(150 58% 38%)"
                     opacity={isHover ? 1 : 0.9}
                     rx={1}
                   />
