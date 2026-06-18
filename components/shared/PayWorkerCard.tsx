@@ -114,8 +114,7 @@ export default function PayWorkerCard({ gigId, workerId, workerName, amount, fli
       return
     }
     // Record what you actually paid as a LABOR expense on the linked pipeline
-    // piece, so it flows into the profit HUD (which sums piece_expenses, NOT
-    // the legacy labor_cost column). Best-effort: only if a piece is linked.
+    // piece, so it flows into the piece's cost (now the ledger). Best-effort.
     try {
       const { data: piece } = await db
         .from('inventory_pieces')
@@ -124,12 +123,11 @@ export default function PayWorkerCard({ gigId, workerId, workerName, amount, fli
         .eq('owner_user_id', flipperUserId)
         .maybeSingle()
       if (piece?.id) {
-        await db.from('piece_expenses').insert({
-          piece_id: piece.id,
-          owner_user_id: flipperUserId,
-          amount: payAmount,
-          category: 'labor',
-          note: `Paid ${workerName}`,
+        await db.rpc('add_piece_expense', {
+          p_piece_id: piece.id,
+          p_amount: payAmount,
+          p_category: 'labor',
+          p_note: `Paid ${workerName}`,
         })
       }
     } catch {}

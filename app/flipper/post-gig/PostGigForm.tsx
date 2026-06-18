@@ -215,14 +215,24 @@ export default function PostGigForm({ existingDraft }: Props) {
           data: { user },
         } = await supabase.auth.getUser()
         if (user) {
-          await supabase.from('inventory_pieces').insert({
-            owner_user_id: user.id,
-            source_gig_id: published.id,
-            title: published.title || form.title || 'New piece',
-            stage: 'sourced',
-            acquisition_cost: parseFloat(pieceCost) || 0,
-            notes: published.summary || '',
-          })
+          const { data: newPiece } = await supabase
+            .from('inventory_pieces')
+            .insert({
+              owner_user_id: user.id,
+              source_gig_id: published.id,
+              title: published.title || form.title || 'New piece',
+              stage: 'sourced',
+              notes: published.summary || '',
+            })
+            .select('id')
+            .single()
+          const cost = parseFloat(pieceCost) || 0
+          if (newPiece?.id && cost > 0) {
+            await supabase.rpc('set_piece_purchase', {
+              p_piece_id: newPiece.id,
+              p_amount: cost,
+            })
+          }
         }
       } catch (e) {
         console.error('[post-gig] pipeline auto-create failed (ignored):', e)

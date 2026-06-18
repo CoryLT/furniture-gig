@@ -126,18 +126,19 @@ export default async function PlayPage() {
     .select('id, title, stage, acquisition_cost, target_price, sale_price, image_path, sold_at, created_at')
     .eq('owner_user_id', me)
     .order('created_at', { ascending: false })
-  const { data: expRaw } = await supabase
-    .from('piece_expenses')
-    .select('piece_id, amount')
+  // Each piece's total cost now comes from the ledger (the one source of
+  // truth): purchase + every expense tagged to that piece.
+  const { data: costRaw } = await supabase
+    .from('piece_costs')
+    .select('piece_id, total_cost')
     .eq('owner_user_id', me)
-
-  const expByPiece: Record<string, number> = {}
-  for (const e of (expRaw ?? []) as any[]) {
-    expByPiece[e.piece_id] = (expByPiece[e.piece_id] ?? 0) + n(e.amount)
+  const costByPiece: Record<string, number> = {}
+  for (const c of (costRaw ?? []) as any[]) {
+    costByPiece[c.piece_id] = Number(c.total_cost)
   }
 
   const pieces: PieceVM[] = ((piecesRaw ?? []) as any[]).map((p) => {
-    const costs = n(p.acquisition_cost) + (expByPiece[p.id] ?? 0)
+    const costs = costByPiece[p.id] ?? 0
     return {
       id: p.id as string,
       title: (p.title as string) || 'Untitled piece',

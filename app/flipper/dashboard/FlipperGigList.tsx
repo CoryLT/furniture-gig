@@ -190,8 +190,8 @@ export default function FlipperGigList({
         .eq('id', offTarget.id)
       if (gigErr) throw gigErr
 
-      // 3) Log the cash as a LABOR expense on the linked pipeline piece (the
-      //    profit HUD sums piece_expenses, not the legacy labor_cost column).
+      // 3) Log the cash as a LABOR expense on the linked pipeline piece (now
+      //    the ledger — the one source of truth for piece costs).
       const { data: piece } = await supabase
         .from('inventory_pieces')
         .select('id')
@@ -199,12 +199,11 @@ export default function FlipperGigList({
         .eq('owner_user_id', user.id)
         .maybeSingle()
       if (piece?.id) {
-        await supabase.from('piece_expenses').insert({
-          piece_id: piece.id,
-          owner_user_id: user.id,
-          amount,
-          category: 'labor',
-          note: `Paid ${name} (off-platform)`,
+        await supabase.rpc('add_piece_expense', {
+          p_piece_id: piece.id,
+          p_amount: amount,
+          p_category: 'labor',
+          p_note: `Paid ${name} (off-platform)`,
         })
       }
 

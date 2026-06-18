@@ -126,12 +126,13 @@ export default function PipelineBoard({
   // ---- piece mutations ----
   async function createPiece(fields: Partial<Piece>, file?: File | null) {
     setError('')
+    const { acquisition_cost: acqCost, ...rest } = fields as any
     const { data, error: err } = await (supabase.from('inventory_pieces') as any)
       .insert({
         owner_user_id: userId,
         stage: 'sourced',
         acquired_at: new Date().toISOString().slice(0, 10),
-        ...fields,
+        ...rest,
       })
       .select()
       .single()
@@ -139,7 +140,19 @@ export default function PipelineBoard({
       setError('Could not add the piece. Try again.')
       return
     }
-    const piece = { ...(data as Piece), expenses: [] as Expense[] }
+    // Purchase price becomes a ledger expense tagged to the piece — the one
+    // source of truth. (No separate piece column anymore.)
+    if (acqCost && Number(acqCost) > 0) {
+      await supabase.rpc('set_piece_purchase', {
+        p_piece_id: (data as any).id,
+        p_amount: Number(acqCost),
+      })
+    }
+    const piece = {
+      ...(data as Piece),
+      acquisition_cost: Number(acqCost) || 0,
+      expenses: [] as Expense[],
+    }
     if (file) {
       const path = await uploadImage(piece.id, file)
       if (path) piece.image_path = path
@@ -151,12 +164,18 @@ export default function PipelineBoard({
 
   async function updatePiece(id: string, patch: Partial<Piece>) {
     setError('')
-    const { error: err } = await (supabase.from('inventory_pieces') as any)
-      .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq('id', id)
-    if (err) {
-      setError('Could not save. Try again.')
-      return false
+    const { acquisition_cost: acqPatch, ...colPatch } = patch as any
+    if (acqPatch !== undefined) {
+      await supabase.rpc('set_piece_purchase', { p_piece_id: id, p_amount: Number(acqPatch) || 0 })
+    }
+    if (Object.keys(colPatch).length > 0) {
+      const { error: err } = await (supabase.from('inventory_pieces') as any)
+        .update({ ...colPatch, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (err) {
+        setError('Could not save. Try again.')
+        return false
+      }
     }
     setPieces((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)))
     router.refresh()
@@ -180,23 +199,27 @@ export default function PipelineBoard({
     fields: { amount: number; note: string; category: string | null }
   ) {
     setError('')
-    const { data, error: err } = await (supabase.from('piece_expenses') as any)
-      .insert({
-        piece_id: pieceId,
-        owner_user_id: userId,
-        amount: fields.amount,
-        note: fields.note,
-        category: fields.category,
-      })
-      .select()
-      .single()
-    if (err || !data) {
+    const { data, error: err } = await supabase.rpc('add_piece_expense', {
+      p_piece_id: pieceId,
+      p_amount: fields.amount,
+      p_category: fields.category,
+      p_note: fields.note,
+    })
+    const row: any = Array.isArray(data) ? data[0] : data
+    if (err || !row) {
       setError('Could not add expense. Try again.')
       return false
     }
+    const exp: Expense = {
+      id: row.txn_id,
+      amount: Number(row.amount),
+      category: row.category,
+      note: row.note || '',
+      spent_on: row.spent_on,
+    }
     setPieces((prev) =>
       prev.map((p) =>
-        p.id === pieceId ? { ...p, expenses: [...(p.expenses ?? []), data as Expense] } : p
+        p.id === pieceId ? { ...p, expenses: [...(p.expenses ?? []), exp] } : p
       )
     )
     router.refresh()
@@ -205,7 +228,8 @@ export default function PipelineBoard({
 
   async function deleteExpense(pieceId: string, expenseId: string) {
     setError('')
-    const { error: err } = await (supabase.from('piece_expenses') as any)
+    // expenseId is now the ledger transaction id; deleting it cascades its lines.
+    const { error: err } = await (supabase.from('transactions') as any)
       .delete()
       .eq('id', expenseId)
     if (err) {

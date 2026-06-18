@@ -16,20 +16,41 @@ export default async function PipelinePage() {
     .eq('owner_user_id', me)
     .order('created_at', { ascending: false })
 
-  const { data: expRaw } = await supabase
-    .from('piece_expenses')
-    .select('id, piece_id, amount, category, note, spent_on')
+  // Expenses AND the purchase price now live in the ledger, tagged to the
+  // piece. The purchase entry is marked with an 'acq:' / 'mig:acq:' memo.
+  const { data: txnRaw } = await supabase
+    .from('transactions')
+    .select('id, piece_id, date, description, memo, entry_lines(debit, credit, accounts(name, type))')
     .eq('owner_user_id', me)
-    .order('created_at', { ascending: true })
+    .not('piece_id', 'is', null)
+    .order('date', { ascending: true })
 
+  const acqByPiece: Record<string, number> = {}
   const expByPiece: Record<string, any[]> = {}
-  for (const e of (expRaw ?? []) as any[]) {
-    if (!expByPiece[e.piece_id]) expByPiece[e.piece_id] = []
-    expByPiece[e.piece_id].push(e)
+  for (const t of (txnRaw ?? []) as any[]) {
+    const lines = (t.entry_lines ?? []) as any[]
+    const expLine = lines.find((l) => l.accounts?.type === 'expense')
+    if (!expLine) continue
+    const amount = Number(expLine.debit) - Number(expLine.credit)
+    const memo = typeof t.memo === 'string' ? t.memo : ''
+    const isPurchase = memo.startsWith('acq:') || memo.startsWith('mig:acq:')
+    if (isPurchase) {
+      acqByPiece[t.piece_id] = (acqByPiece[t.piece_id] ?? 0) + amount
+    } else {
+      if (!expByPiece[t.piece_id]) expByPiece[t.piece_id] = []
+      expByPiece[t.piece_id].push({
+        id: t.id,
+        amount,
+        category: expLine.accounts?.name ?? null,
+        note: t.description ?? '',
+        spent_on: t.date,
+      })
+    }
   }
 
   const pieces = ((piecesRaw ?? []) as any[]).map((p) => ({
     ...p,
+    acquisition_cost: acqByPiece[p.id] ?? 0,
     expenses: expByPiece[p.id] ?? [],
   }))
 
