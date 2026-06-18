@@ -247,6 +247,9 @@ export function NotificationBell() {
     if (n.type === 'gig_application' && n.data?.gig_id) {
       clickHref = `/flipper/gigs/${n.data.gig_id}`
     }
+    if (n.type === '1099_threshold') {
+      clickHref = '/flipper/records'
+    }
     const message = renderMessage(n, actor)
     const when = timeAgo(n.created_at)
     const initials = actor
@@ -322,6 +325,15 @@ export function NotificationBell() {
             {who} applied to
             {title ? <span className="font-medium text-foreground"> {title}</span> : ' your gig'}
             .
+          </>
+        )
+      }
+      case '1099_threshold': {
+        const total = n.data?.total as number | undefined
+        const totalLabel = total != null ? `$${Number(total).toFixed(0)}` : 'enough'
+        return (
+          <>
+            You&apos;ve paid {who} {totalLabel} this year — you&apos;ll likely need a 1099.
           </>
         )
       }

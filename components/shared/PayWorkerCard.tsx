@@ -133,6 +133,15 @@ export default function PayWorkerCard({ gigId, workerId, workerName, amount, fli
         })
       }
     } catch {}
+    // Heads-up if this payment pushed the worker over the 1099 threshold
+    // for the year. Best-effort; never blocks the payment.
+    try {
+      await fetch('/api/payments/check-1099', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workerId, amountPaid: payAmount }),
+      })
+    } catch {}
     const { data: p } = await db.from('gig_payments').select('*').eq('gig_id', gigId).maybeSingle()
     setPayment(p ?? null)
     setSaving(false)

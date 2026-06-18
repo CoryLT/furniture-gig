@@ -67,6 +67,7 @@ export type EmailEventType =
   | 'gig_picked'
   | 'gig_rejected'
   | 'new_message'
+  | 'tax_1099_threshold'
   | 'test'
 
 // Map each event type to the column on notification_preferences
@@ -76,6 +77,7 @@ const EVENT_TO_PREFERENCE_COLUMN: Record<EmailEventType, string | null> = {
   gig_picked: 'email_picked',
   gig_rejected: 'email_rejected',
   new_message: 'email_messages',
+  tax_1099_threshold: null,
   test: null,
 }
 
