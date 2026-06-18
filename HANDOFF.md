@@ -3,10 +3,15 @@
 > Compressed May 28, 2026. Full history lives in `git log`; this doc keeps only
 > what's true *now* plus the gotchas that save the next session real time.
 
-> **Most recent first:** read `HANDOFF_2026-06-17c.md` — the game layer (`/play`) and
-> the Post-a-Job **share-link** shipped, and it captures the agreed NEXT direction
-> (merge My Jobs into the Pipeline; the *piece* becomes the hub, with a "Find help"
-> ad generator). Then `HANDOFF_2026-06-17b.md` (Books migration + photos done) and
+> **Most recent first:** read `HANDOFF_2026-06-17d.md` — this session executed the
+> "make the piece the hub" plan: the **Books ledger is now the one source of truth
+> for every cost AND every worker payment** (a piece is a tag, a worker is a tag),
+> the **worker/gig side is shelved** (operator-only — Post a Job + My Jobs hidden),
+> worker pay + 1099 tracking now run off **logged labor tagged to a crew member**,
+> and a worker's paid numbers match across My Crew, their page, and Payment Records.
+> It also lists the SQL Cory still needs to run + the deploy checklist. Then
+> `HANDOFF_2026-06-17c.md` (the game layer `/play` + share-link + the direction this
+> session built), `HANDOFF_2026-06-17b.md` (Books migration + photos) and
 > `HANDOFF_2026-06-17.md` (merge background). The June 3 QuickBooks notes below are
 > older/shelved.
 
