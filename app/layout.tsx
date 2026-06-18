@@ -33,15 +33,15 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
   },
   title: {
-    default: 'FlipWork — Profits, not paychecks',
+    default: 'FlipWork — Flip furniture, build your empire',
     template: '%s · FlipWork',
   },
   description:
-    'Where working people take back control of their income. Post gigs, find work, get paid.',
+    "Turn flipping into a game you'll actually play. Track every dollar from buy to sold, climb the ranks, and watch your real profit grow. Free to start.",
   openGraph: {
-    title: 'FlipWork — Profits, not paychecks',
+    title: 'FlipWork — Flip furniture, build your empire',
     description:
-      'Where working people take back control of their income. Post gigs, find work, get paid.',
+      "Turn flipping into a game you'll actually play. Track every dollar from buy to sold, climb the ranks, and watch your real profit grow. Free to start.",
     url: 'https://myflipwork.com',
     siteName: 'FlipWork',
     type: 'website',
@@ -51,15 +51,15 @@ export const metadata: Metadata = {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'FlipWork — Profits, not paychecks. Post gigs, find work, get paid.',
+        alt: 'FlipWork — flip furniture, build your empire. Track every flip and climb the ranks.',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'FlipWork — Profits, not paychecks',
+    title: 'FlipWork — Flip furniture, build your empire',
     description:
-      'Where working people take back control of their income. Post gigs, find work, get paid.',
+      "Turn flipping into a game you'll actually play. Track every dollar from buy to sold, climb the ranks, and watch your real profit grow. Free to start.",
     images: ['/og-image.png'],
   },
 }
