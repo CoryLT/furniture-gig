@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
+import BooksCharts from './BooksCharts'
 
 // The books are live, per-operator data — always fresh.
 export const dynamic = 'force-dynamic'
@@ -143,6 +144,54 @@ export default async function BooksPage() {
     }
   })
 
+  // ---- Chart data: last 6 months of income vs expenses + top categories ----
+  const now = new Date()
+  const windowStart = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+  const { data: chartRaw } = await supabase
+    .from('transactions')
+    .select('date, entry_lines(debit, credit, accounts(type, name))')
+    .eq('owner_user_id', me)
+    .gte('date', windowStart.toISOString().slice(0, 10))
+  const chartTxns = (chartRaw ?? []) as any[]
+
+  const months: { label: string; income: number; expense: number }[] = []
+  const monthIndex: Record<string, number> = {}
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    monthIndex[`${d.getFullYear()}-${d.getMonth()}`] = months.length
+    months.push({ label: d.toLocaleDateString('en-US', { month: 'short' }), income: 0, expense: 0 })
+  }
+
+  const catTotals: Record<string, number> = {}
+  let totalIncome = 0
+  let totalExpense = 0
+  for (const t of chartTxns) {
+    const d = new Date(t.date)
+    const idx = monthIndex[`${d.getFullYear()}-${d.getMonth()}`]
+    for (const l of (t.entry_lines ?? []) as any[]) {
+      const type = l.accounts?.type
+      const name = l.accounts?.name || 'Other'
+      const debit = Number(l.debit || 0)
+      const credit = Number(l.credit || 0)
+      if (type === 'income') {
+        const v = credit - debit
+        totalIncome += v
+        if (idx !== undefined) months[idx].income += v
+      } else if (type === 'expense') {
+        const v = debit - credit
+        totalExpense += v
+        catTotals[name] = (catTotals[name] || 0) + v
+        if (idx !== undefined) months[idx].expense += v
+      }
+    }
+  }
+  const topCats = Object.entries(catTotals)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, amount]) => ({ name, amount }))
+  const hasChartData = totalIncome > 0 || totalExpense > 0
+
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between">
@@ -195,6 +244,15 @@ export default async function BooksPage() {
           </div>
           <span className="whitespace-nowrap rounded-lg bg-accent px-4 py-2 font-medium text-accent-foreground">Reconcile →</span>
         </Link>
+      )}
+
+      {hasChartData && (
+        <BooksCharts
+          months={months}
+          totalIncome={totalIncome}
+          totalExpense={totalExpense}
+          topCats={topCats}
+        />
       )}
 
       <section className="mt-8">
