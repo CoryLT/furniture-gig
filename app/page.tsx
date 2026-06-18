@@ -1,6 +1,18 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Armchair, Hammer, DollarSign, CheckCircle2, ShoppingBag, MessageCircle, Sparkle } from 'lucide-react'
+import {
+  Armchair,
+  Camera,
+  Hammer,
+  DollarSign,
+  LineChart,
+  Receipt,
+  Users,
+  Trophy,
+  Wallet,
+  MessageCircle,
+  Sparkle,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import PublicTopBar from '@/components/shared/PublicTopBar'
 import { Button } from '@/components/ui/button'
@@ -20,21 +32,17 @@ export default async function HomePage() {
     redirect('/play')
   }
 
-  // Founding member counts for the landing-page counter.
-  // We call a SECURITY DEFINER function so anonymous visitors can see
-  // counts without exposing the underlying profile tables.
+  // Founding member counter (flippers only — the worker side is retired).
   const { data: foundingRaw } = await supabase.rpc('founding_member_counts')
   const founding = (foundingRaw as Array<{
     workers_taken: number
     flippers_taken: number
     cap: number
   }> | null)?.[0]
-  const workersTaken = founding?.workers_taken ?? 0
   const flippersTaken = founding?.flippers_taken ?? 0
   const cap = founding?.cap ?? 25
-  const workerSpotsLeft = Math.max(0, cap - workersTaken)
   const flipperSpotsLeft = Math.max(0, cap - flippersTaken)
-  const showFoundingCounter = workerSpotsLeft > 0 || flipperSpotsLeft > 0
+  const showFoundingCounter = flipperSpotsLeft > 0
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -46,28 +54,28 @@ export default async function HomePage() {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-16 pb-20 sm:pt-24 sm:pb-28 text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-medium font-mono mb-6">
               <Armchair className="w-3.5 h-3.5" strokeWidth={2} />
-              PROFITS, NOT PAYCHECKS
+              RUN YOUR FLIP LIKE A BUSINESS
             </div>
             <h1 className="font-serif text-4xl sm:text-6xl leading-tight tracking-tight text-foreground mb-5">
-              Hire help.
+              Flip smarter.
               <br />
-              <span className="text-accent">Or get hired.</span>
+              <span className="text-accent">Keep more profit.</span>
             </h1>
             <p className="max-w-2xl mx-auto text-base sm:text-lg text-muted-foreground mb-8 leading-relaxed">
-              FlipWork is where working people take back control of their
-              income. Post a gig and hire skilled help, or pick up work near
-              you and get paid for what you do. Be a poster, a worker, or
-              both — it's your call.
+              FlipWork is the command center for furniture flippers — and anyone who
+              flips for a living. Track every piece from curb to sold, see your real
+              profit and how much cash is tied up, manage your crew and 1099s, and let
+              the books keep themselves.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link href="/auth/signup">
                 <Button variant="accent" size="lg" className="w-full sm:w-auto">
-                  Sign up free
+                  Start flipping free
                 </Button>
               </Link>
-              <Link href="/marketplace">
+              <Link href="#how">
                 <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                  Browse the marketplace
+                  See how it works
                 </Button>
               </Link>
             </div>
@@ -78,16 +86,7 @@ export default async function HomePage() {
                 <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-full bg-amber-50 border border-amber-200">
                   <Sparkle className="w-4 h-4 fill-amber-500 stroke-amber-700" strokeWidth={1.5} />
                   <span className="text-xs sm:text-sm font-medium text-amber-900">
-                    {workerSpotsLeft > 0 && flipperSpotsLeft > 0 ? (
-                      <>
-                        {workerSpotsLeft} worker + {flipperSpotsLeft} flipper
-                        founding spots left
-                      </>
-                    ) : workerSpotsLeft > 0 ? (
-                      <>{workerSpotsLeft} founding worker spots left</>
-                    ) : (
-                      <>{flipperSpotsLeft} founding flipper spots left</>
-                    )}
+                    {flipperSpotsLeft} founding member spots left
                   </span>
                 </div>
               </div>
@@ -95,84 +94,90 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* HOW IT WORKS */}
-        <section className="border-t border-border bg-card">
+        {/* HOW IT WORKS — the core loop */}
+        <section id="how" className="border-t border-border bg-card scroll-mt-20">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
             <div className="text-center mb-12">
               <h2 className="font-serif text-3xl sm:text-4xl text-foreground mb-3">
                 How FlipWork works
               </h2>
               <p className="text-muted-foreground">
-                Three steps. No middlemen. Get paid fast.
+                Source it. Fix it. Sell it. See your profit. That simple.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Step
                 number="1"
-                icon={<Hammer className="w-6 h-6" strokeWidth={1.5} />}
-                title="Post or apply"
-                body="Need something done? Post a gig with photos, a budget, and a checklist. Looking to earn? Browse gigs near you and apply to the ones that fit your skills."
+                icon={<Camera className="w-6 h-6" strokeWidth={1.5} />}
+                title="Log what you grab"
+                body="Add a piece and what you paid for it, then snap a photo. It lands in your pipeline as 'Sourced' and starts tracking its own cost."
               />
               <Step
                 number="2"
-                icon={<CheckCircle2 className="w-6 h-6" strokeWidth={1.5} />}
-                title="Match and work"
-                body="Posters pick the worker they want. Workers check off tasks and upload photos as they go. Everyone stays in the loop with built-in messaging."
+                icon={<Hammer className="w-6 h-6" strokeWidth={1.5} />}
+                title="Fix it up, track every cost"
+                body="Log materials and labor as you go — even tag which crew member you paid. Snap a receipt and split it across pieces. Your true cost adds up by itself."
               />
               <Step
                 number="3"
                 icon={<DollarSign className="w-6 h-6" strokeWidth={1.5} />}
-                title="Get paid"
-                body="When the work is approved, payment is released through Stripe straight to the worker's bank. No chasing invoices. No PayPal back-and-forth."
+                title="Sell it, see your profit"
+                body="Mark it sold and enter the price. Your profit and cash-tied-up update instantly, and your lifetime profit climbs you up the ranks."
               />
             </div>
           </div>
         </section>
 
-        {/* TWO-SIDED PITCH */}
+        {/* WHAT YOU GET */}
         <section className="border-t border-border">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* For posters */}
-              <div className="card p-8">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-accent/10 text-accent mb-4">
-                  <Armchair className="w-6 h-6" strokeWidth={1.5} />
-                </div>
-                <h3 className="font-serif text-2xl text-foreground mb-2">
-                  Need to hire help?
-                </h3>
-                <p className="text-muted-foreground mb-6 leading-relaxed">
-                  Post your gig, set your budget, and bring on skilled local
-                  help to get it done. You approve the work before any money
-                  moves.
-                </p>
-                <Link href="/auth/signup?as=flipper">
-                  <Button variant="default" size="default">
-                    Post a gig
-                  </Button>
-                </Link>
-              </div>
+            <div className="text-center mb-12">
+              <h2 className="font-serif text-3xl sm:text-4xl text-foreground mb-3">
+                Everything your flip needs, in one place
+              </h2>
+              <p className="text-muted-foreground">
+                No spreadsheets. No shoebox of receipts. No accounting degree.
+              </p>
+            </div>
 
-              {/* For workers */}
-              <div className="card p-8">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-accent/10 text-accent mb-4">
-                  <Hammer className="w-6 h-6" strokeWidth={1.5} />
-                </div>
-                <h3 className="font-serif text-2xl text-foreground mb-2">
-                  Want to earn on your terms?
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Feature
+                icon={<LineChart className="w-6 h-6" strokeWidth={1.5} />}
+                title="A pipeline that shows the money"
+                body="Watch every piece move from Sourced to Sold, with real profit and how much cash you have frozen in unsold inventory — always up to date."
+              />
+              <Feature
+                icon={<Receipt className="w-6 h-6" strokeWidth={1.5} />}
+                title="Books that do themselves"
+                body="A real double-entry ledger under the hood, but you'll never feel it. Scan receipts, reconcile your bank feed, and see clean numbers without the headache."
+              />
+              <Feature
+                icon={<Users className="w-6 h-6" strokeWidth={1.5} />}
+                title="Your crew, handled"
+                body="Keep a private roster with ratings and 'would I rehire' notes. Pay folks however you already do — FlipWork tracks each person's total and flags 1099s automatically."
+              />
+              <Feature
+                icon={<Trophy className="w-6 h-6" strokeWidth={1.5} />}
+                title="A game you'll actually want to play"
+                body="Ranks, scores, and a 'Needs you' board that points straight at the pieces costing you money — so the boring stuff feels like leveling up."
+              />
+            </div>
+
+            {/* Trust line */}
+            <div className="mt-8 card p-6 sm:p-8 flex flex-col sm:flex-row items-start gap-4">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-accent/10 text-accent shrink-0">
+                <Wallet className="w-6 h-6" strokeWidth={1.5} />
+              </div>
+              <div>
+                <h3 className="font-serif text-xl text-foreground mb-1">
+                  We never touch your money
                 </h3>
-                <p className="text-muted-foreground mb-6 leading-relaxed">
-                  Turn your skills into income. Browse local gigs, apply to the
-                  ones you want, and get paid through Stripe when the work is
-                  approved. Build a profile and a portfolio as you go — profits,
-                  not paychecks.
+                <p className="text-muted-foreground leading-relaxed">
+                  Pay your help however you already do — Cash App, Venmo, Zelle, cash.
+                  FlipWork never sits between you and your money or takes a cut. It just
+                  keeps the records straight and the taxman happy.
                 </p>
-                <Link href="/auth/signup?as=worker">
-                  <Button variant="default" size="default">
-                    Find work
-                  </Button>
-                </Link>
               </div>
             </div>
           </div>
@@ -200,24 +205,19 @@ export default async function HomePage() {
                     Why I built FlipWork
                   </h2>
                   <div className="space-y-4 text-muted-foreground leading-relaxed">
+                    <p>I'm Cory. I flip furniture in Raleigh, NC.</p>
                     <p>
-                      I'm Cory. I flip furniture in Raleigh, NC.
+                      For years I ran my whole flip out of my head, a notes app, and a
+                      drawer full of receipts. I never really knew which pieces made
+                      money, how much cash I had tied up in stuff that wasn't selling, or
+                      what I'd paid my help come tax time.
                     </p>
                     <p>
-                      I built FlipWork because I got tired of running my
-                      business on Facebook Marketplace and Craigslist.
-                      Facebook is impossible to escape but full of scams.
-                      Craigslist works, but hiring help off it feels sketchy
-                      every single time.
-                    </p>
-                    <p>
-                      So I built somewhere better — a real place for people to
-                      hire help, find work, and earn from what they create. It
-                      started with furniture flipping, but it's grown into
-                      something bigger: a platform for working people who'd
-                      rather build their own income than wait on a callback.
-                      It's brand new, so we're still filling in. But every gig
-                      and every dollar paid is real.
+                      So I built the tool I wished I had — one place to track every piece
+                      from curb to sold, see my true profit, manage the people I hire, and
+                      keep books that don't make me want to quit. It turned the messy parts
+                      of flipping into something I can actually see and steer. If you flip
+                      too, I built this for you.
                     </p>
                   </div>
                 </div>
@@ -236,41 +236,19 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* MARKETPLACE TEASER */}
-        <section className="border-t border-border bg-card">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20 text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-accent/10 text-accent mb-4">
-              <ShoppingBag className="w-6 h-6" strokeWidth={1.5} />
-            </div>
-            <h2 className="font-serif text-3xl sm:text-4xl text-foreground mb-3">
-              Plus a marketplace
-            </h2>
-            <p className="max-w-xl mx-auto text-muted-foreground mb-6 leading-relaxed">
-              Looking to buy or sell? FlipWork has a public marketplace where
-              people list finished pieces for sale and offer their services to
-              neighbors nearby.
-            </p>
-            <Link href="/marketplace">
-              <Button variant="outline" size="default">
-                Browse the marketplace
-              </Button>
-            </Link>
-          </div>
-        </section>
-
         {/* FINAL CTA */}
-        <section className="border-t border-border">
+        <section className="border-t border-border bg-card">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-20 text-center">
             <h2 className="font-serif text-3xl sm:text-4xl text-foreground mb-3">
-              Ready to get started?
+              Ready to run your flips like a business?
             </h2>
             <p className="text-muted-foreground mb-8">
-              Sign up takes less than a minute. It's free.
+              Sign up takes less than a minute. It's free to start.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link href="/auth/signup">
                 <Button variant="accent" size="lg" className="w-full sm:w-auto">
-                  Sign up free
+                  Start flipping free
                 </Button>
               </Link>
               <Link href="/auth/login">
@@ -321,6 +299,26 @@ function Step({
       </div>
       <h3 className="font-serif text-xl text-foreground mb-2">{title}</h3>
       <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
+    </div>
+  )
+}
+
+function Feature({
+  icon,
+  title,
+  body,
+}: {
+  icon: React.ReactNode
+  title: string
+  body: string
+}) {
+  return (
+    <div className="card p-6 sm:p-8">
+      <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-accent/10 text-accent mb-4">
+        {icon}
+      </div>
+      <h3 className="font-serif text-2xl text-foreground mb-2">{title}</h3>
+      <p className="text-muted-foreground leading-relaxed">{body}</p>
     </div>
   )
 }
