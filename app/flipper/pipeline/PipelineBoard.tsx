@@ -345,7 +345,7 @@ export default function PipelineBoard({
       </div>
 
       {/* Board */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {STAGES.map((stage) => {
           const inStage = pieces.filter((p) => p.stage === stage.key)
           return (
@@ -750,11 +750,12 @@ function PieceCard({
             <p className="font-medium text-foreground text-sm truncate">{piece.title || 'Untitled piece'}</p>
             {piece.source && <p className="text-xs text-muted-foreground truncate">{piece.source}</p>}
           </div>
-          <ChevronDown
-            className={`w-4 h-4 text-muted-foreground shrink-0 mt-0.5 transition-transform ${
-              open ? 'rotate-180' : ''
-            }`}
-          />
+          <span className="flex items-center gap-1 text-accent shrink-0 mt-0.5">
+            <span className="text-xs font-medium">{open ? 'Close' : 'Edit'}</span>
+            <ChevronDown
+              className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`}
+            />
+          </span>
         </div>
 
         <div className="text-xs text-muted-foreground space-y-0.5">
