@@ -201,6 +201,25 @@ export default function PipelineBoard({
       }
     }
     setPieces((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)))
+
+    // If this piece is sold, keep its Books income entry in sync so it shows
+    // in the charts. record_piece_sale keeps it to one entry per piece.
+    const after: any = { ...(pieces.find((p) => p.id === id) as any), ...patch }
+    if (after.stage === 'sold') {
+      const dateStr = after.sold_at
+        ? String(after.sold_at).slice(0, 10)
+        : new Date().toISOString().slice(0, 10)
+      const amt = after.sale_price != null ? Number(after.sale_price) : 0
+      const { error: se } = await supabase.rpc('record_piece_sale', {
+        p_piece_id: id,
+        p_amount: amt,
+        p_date: dateStr,
+      })
+      if (se) {
+        setError('Saved — but it didn’t reach Books. Make sure your Books accounts are set up.')
+      }
+    }
+
     router.refresh()
     return true
   }
