@@ -240,6 +240,17 @@ export default async function BooksPage() {
         </Link>
       </div>
 
+      <Link
+        href="/books/inventory"
+        className="mt-4 flex items-center justify-between rounded-xl border border-border px-5 py-4 hover:bg-muted"
+      >
+        <div>
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Supplies</div>
+          <div className="mt-0.5 text-lg font-semibold text-foreground">Inventory &amp; reorder list</div>
+        </div>
+        <span className="whitespace-nowrap text-sm font-medium text-accent">Open →</span>
+      </Link>
+
       {(toSort ?? 0) > 0 && (
         <Link
           href="/books/reconcile"
