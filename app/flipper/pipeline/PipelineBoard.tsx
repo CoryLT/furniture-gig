@@ -759,6 +759,7 @@ function PieceCard({
   const [acq, setAcq] = useState(String(piece.acquisition_cost ?? ''))
   const [target, setTarget] = useState(String(piece.target_price ?? ''))
   const [sale, setSale] = useState(String(piece.sale_price ?? ''))
+  const [soldDate, setSoldDate] = useState(piece.sold_at ? piece.sold_at.slice(0, 10) : '')
   const [newAmt, setNewAmt] = useState('')
   const [newNote, setNewNote] = useState('')
   const [newCat, setNewCat] = useState('')
@@ -781,7 +782,10 @@ function PieceCard({
       acquisition_cost: acq ? parseFloat(acq) || 0 : 0,
       target_price: target ? parseFloat(target) : null,
     }
-    if (isSold) patch.sale_price = sale ? parseFloat(sale) : null
+    if (isSold) {
+      patch.sale_price = sale ? parseFloat(sale) : null
+      if (soldDate) patch.sold_at = new Date(soldDate + 'T12:00:00').toISOString()
+    }
     const ok = await onUpdate(piece.id, patch)
     setSaving(false)
     if (ok) setOpen(false)
@@ -1135,6 +1139,17 @@ function PieceCard({
             <NumField label="Target" value={target} onChange={setTarget} />
             {isSold && <NumField label="Sold for" value={sale} onChange={setSale} />}
           </div>
+          {isSold && (
+            <label className="block text-xs text-muted-foreground">
+              Sale date
+              <input
+                type="date"
+                value={soldDate}
+                onChange={(e) => setSoldDate(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+              />
+            </label>
+          )}
           <div className="flex items-center gap-3">
             <Button variant="accent" onClick={save} disabled={saving}>
               {saving ? 'Saving…' : 'Save'}
