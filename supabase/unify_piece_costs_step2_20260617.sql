@@ -6,10 +6,11 @@
 -- Adds two helpers the app calls so a piece's expense / purchase always
 -- lands in the ledger (tagged to the piece). Also re-runs the safe
 -- backfill to catch anything logged since step 1.
+-- Each block uses its own $tag$ quoting so the SQL editor can't misparse.
 -- ============================================================
 
 -- 0) Straggler backfill (idempotent — same logic as step 1).
-do $$
+do $mig$
 declare
   r record; v_exp uuid; v_cash uuid; v_txn uuid; v_name text;
 begin
@@ -52,11 +53,12 @@ begin
     insert into public.entry_lines (owner_user_id, transaction_id, account_id, debit, credit)
     values (r.owner_user_id, v_txn, v_exp, r.acquisition_cost, 0), (r.owner_user_id, v_txn, v_cash, 0, r.acquisition_cost);
   end loop;
-end $$;
+end
+$mig$;
 
--- helper: resolve this user's expense account for a category name + default cash
+-- helper: resolve this user's expense account for a category name
 create or replace function public._fw_expense_account(p_uid uuid, p_category text)
-returns uuid language sql stable as $$
+returns uuid language sql stable as $fa$
   select coalesce(
     (select id from public.accounts where owner_user_id=p_uid and type='expense' and name =
       case lower(coalesce(p_category,''))
@@ -65,19 +67,20 @@ returns uuid language sql stable as $$
         when 'purchase' then 'Pieces Purchased' else 'Office & Admin' end limit 1),
     (select id from public.accounts where owner_user_id=p_uid and type='expense' order by name limit 1)
   );
-$$;
+$fa$;
 
+-- helper: this user's default cash/bank account
 create or replace function public._fw_cash_account(p_uid uuid)
-returns uuid language sql stable as $$
+returns uuid language sql stable as $fc$
   select id from public.accounts where owner_user_id=p_uid and type='asset'
   order by (name <> 'Cash on Hand'), name limit 1;
-$$;
+$fc$;
 
 -- 1) Add a piece expense as a ledger entry tagged to the piece.
 create or replace function public.add_piece_expense(
   p_piece_id uuid, p_amount numeric, p_category text, p_note text default ''
 ) returns table(txn_id uuid, amount numeric, category text, note text, spent_on date)
-language plpgsql as $$
+language plpgsql as $ape$
 declare
   v_uid uuid := auth.uid(); v_exp uuid; v_cash uuid; v_name text; v_txn uuid; v_owner uuid;
 begin
@@ -98,11 +101,12 @@ begin
   values (v_uid, v_txn, v_exp, p_amount, 0), (v_uid, v_txn, v_cash, 0, p_amount);
 
   return query select v_txn, p_amount, v_name, coalesce(nullif(p_note,''), v_name), current_date;
-end $$;
+end
+$ape$;
 
 -- 2) Set (or replace) a piece's purchase price as one "Pieces Purchased" entry.
 create or replace function public.set_piece_purchase(p_piece_id uuid, p_amount numeric)
-returns void language plpgsql as $$
+returns void language plpgsql as $spp$
 declare
   v_uid uuid := auth.uid(); v_exp uuid; v_cash uuid; v_txn uuid; v_owner uuid;
 begin
@@ -125,4 +129,5 @@ begin
   returning id into v_txn;
   insert into public.entry_lines (owner_user_id, transaction_id, account_id, debit, credit)
   values (v_uid, v_txn, v_exp, p_amount, 0), (v_uid, v_txn, v_cash, 0, p_amount);
-end $$;
+end
+$spp$;
