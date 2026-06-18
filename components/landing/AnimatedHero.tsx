@@ -144,7 +144,7 @@ export default function AnimatedHero({
             <span className="fwh-dot" /> Source · Fix · Sell · Level up
           </span>
           <h1 className="fwh-h1">
-            <span className="fwh-ln">Flip furniture.</span>
+            <span className="fwh-ln">Flip anything.</span>
             <span className="fwh-ln">
               <span className="fwh-hl">Build your empire.</span>
             </span>

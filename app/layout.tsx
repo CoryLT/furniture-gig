@@ -33,13 +33,13 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
   },
   title: {
-    default: 'FlipWork — Flip furniture, build your empire',
+    default: 'FlipWork — Flip anything, build your empire',
     template: '%s · FlipWork',
   },
   description:
     "Turn flipping into a game you'll actually play. Track every dollar from buy to sold, climb the ranks, and watch your real profit grow. Free to start.",
   openGraph: {
-    title: 'FlipWork — Flip furniture, build your empire',
+    title: 'FlipWork — Flip anything, build your empire',
     description:
       "Turn flipping into a game you'll actually play. Track every dollar from buy to sold, climb the ranks, and watch your real profit grow. Free to start.",
     url: 'https://myflipwork.com',
@@ -51,13 +51,13 @@ export const metadata: Metadata = {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'FlipWork — flip furniture, build your empire. Track every flip and climb the ranks.',
+        alt: 'FlipWork — flip anything, build your empire. Track every flip and climb the ranks.',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'FlipWork — Flip furniture, build your empire',
+    title: 'FlipWork — Flip anything, build your empire',
     description:
       "Turn flipping into a game you'll actually play. Track every dollar from buy to sold, climb the ranks, and watch your real profit grow. Free to start.",
     images: ['/og-image.png'],
