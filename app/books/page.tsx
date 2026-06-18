@@ -131,16 +131,23 @@ export default async function BooksPage() {
     .limit(8)
   const txns = ((txnsRaw ?? []) as any[]).map((t) => {
     const lines = (t.entry_lines ?? []) as any[]
-    const amount = lines.reduce((s, l) => s + Number(l.debit), 0)
-    const types = lines.map((l) => l.accounts?.type)
-    const isIncome = types.includes('income')
-    const isExpense = types.includes('expense')
+    // Direction by what actually happened to CASH (asset accounts):
+    // money in = assets went up (green), money out = assets went down (red).
+    // This treats owner's draws as money out and contributions as money in,
+    // which reads more naturally than labelling by income/expense type.
+    let assetDelta = 0
+    for (const l of lines) {
+      if (l.accounts?.type === 'asset') assetDelta += Number(l.debit) - Number(l.credit)
+    }
+    const totalDebits = lines.reduce((s, l) => s + Number(l.debit), 0)
+    const dir = assetDelta > 0.005 ? 'in' : assetDelta < -0.005 ? 'out' : 'flat'
+    const amount = Math.abs(assetDelta) > 0.005 ? Math.abs(assetDelta) : totalDebits
     return {
       id: t.id,
       date: t.date as string,
       description: (t.description as string) || '(no description)',
       amount,
-      dir: isIncome ? 'in' : isExpense ? 'out' : 'flat',
+      dir,
     }
   })
 
