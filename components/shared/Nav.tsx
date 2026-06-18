@@ -24,8 +24,10 @@ const userLinks: NavItem[] = [
   { href: '/messages', label: 'Messages' },
   { divider: true },
   { href: '/flipper/crew', label: 'My Crew' },
-  { href: '/flipper/post-gig', label: 'Post a Job' },
-  { href: '/flipper/dashboard', label: 'My Jobs' },
+  // Shelved for the operator-only direction (no worker app / marketplace).
+  // The Pipeline + Find help ad + ledger cover these. Reversible — just uncomment.
+  // { href: '/flipper/post-gig', label: 'Post a Job' },
+  // { href: '/flipper/dashboard', label: 'My Jobs' },
   { href: '/flipper/records', label: 'Payment Records' },
   // ---------------------------------------------------------------------------
   // Shelved June 17, 2026 for the operator-hub focus (the worker side, selling,

@@ -319,6 +319,7 @@ export function PublicProfileClient({
                   </span>
                 )}
               </h2>
+              {/* Post a gig shelved (operator-only direction). Reversible.
               {isOwnProfile && (
                 <Link
                   href="/flipper/post-gig"
@@ -326,7 +327,7 @@ export function PublicProfileClient({
                 >
                   + Post a gig
                 </Link>
-              )}
+              )} */}
             </div>
 
             {openGigs.length > 0 ? (
