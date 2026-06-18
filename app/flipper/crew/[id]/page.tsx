@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency } from '@/lib/utils'
-import { ArrowLeft, Star, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Star } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -45,10 +45,20 @@ export default async function CrewPersonPage({ params }: { params: { id: string 
   const me = user.id
   const id = params.id
 
-  // ---- Off-platform person? (a name-only crew_members row I own) ----
+  // Figure out who this is. The id is either an off-platform crew_members row
+  // (name-only) or an on-platform worker_user_id. Either way we end up with a
+  // crew_member id, which is how the ledger tags payments.
+  let crewMemberId: string | null = null
+  let name = 'Worker'
+  let subtitle = ''
+  let username: string | null = null
+  let rating: number | null = null
+  let wouldRehire: boolean | null = null
+  let notes = ''
+
   const { data: off } = await supabase
     .from('crew_members')
-    .select('id, worker_name, jobs_count, paid_total, rating, notes, would_rehire')
+    .select('id, worker_name, rating, notes, would_rehire')
     .eq('id', id)
     .eq('operator_user_id', me)
     .is('worker_user_id', null)
@@ -56,82 +66,58 @@ export default async function CrewPersonPage({ params }: { params: { id: string 
 
   if (off) {
     const o = off as any
-    const name = (o.worker_name || 'Unnamed').trim() || 'Unnamed'
-    return (
-      <div className="space-y-6 max-w-2xl">
-        <BackLink />
-        <Header name={name} subtitle="Off-platform crew" />
-        <SummaryCards
-          jobs={o.jobs_count ?? 0}
-          paid={Number(o.paid_total ?? 0)}
-          paidLabel="Cash paid (your tally)"
-        />
-        <RatingNotes rating={o.rating ?? null} wouldRehire={o.would_rehire ?? null} notes={o.notes ?? ''} />
-        <div className="card card-body text-sm text-muted-foreground">
-          This person was hired in person, so there&apos;s no line-by-line history yet — just
-          the running tally above. Edit their rating, notes, jobs, and cash on the{' '}
-          <Link href="/flipper/crew" className="text-accent hover:underline">My Crew</Link> page.
-        </div>
-      </div>
-    )
+    crewMemberId = o.id
+    name = (o.worker_name || 'Unnamed').trim() || 'Unnamed'
+    subtitle = 'Off-platform crew'
+    rating = o.rating ?? null
+    wouldRehire = o.would_rehire ?? null
+    notes = o.notes ?? ''
+  } else {
+    const { data: prof } = await supabase
+      .from('worker_profiles')
+      .select('user_id, full_name, first_name, last_name, username')
+      .eq('user_id', id)
+      .maybeSingle()
+    const { data: cm } = await supabase
+      .from('crew_members')
+      .select('id, rating, notes, would_rehire')
+      .eq('operator_user_id', me)
+      .eq('worker_user_id', id)
+      .maybeSingle()
+    if (!prof && !cm) notFound()
+    crewMemberId = (cm as any)?.id ?? null
+    name = displayName(prof as any)
+    subtitle = 'On-platform crew'
+    username = (prof as any)?.username ?? null
+    rating = (cm as any)?.rating ?? null
+    wouldRehire = (cm as any)?.would_rehire ?? null
+    notes = (cm as any)?.notes ?? ''
   }
 
-  // ---- Otherwise treat id as an on-platform worker (worker_user_id) ----
-  const { data: prof } = await supabase
-    .from('worker_profiles')
-    .select('user_id, full_name, first_name, last_name, username')
-    .eq('user_id', id)
-    .maybeSingle()
-
-  const { data: payRaw } = await supabase
-    .from('gig_payments')
-    .select('gig_id, amount, marked_paid_at, worker_confirmed_at')
-    .eq('flipper_user_id', me)
-    .eq('worker_user_id', id)
-  const payments = (payRaw ?? []) as {
-    gig_id: string
-    amount: number | null
-    marked_paid_at: string | null
-    worker_confirmed_at: string | null
-  }[]
-
-  // If there's no profile AND no payments with me, this id isn't my crew.
-  if (!prof && payments.length === 0) notFound()
-
-  const { data: note } = await supabase
-    .from('crew_members')
-    .select('rating, notes, would_rehire')
-    .eq('operator_user_id', me)
-    .eq('worker_user_id', id)
-    .maybeSingle()
-
-  // Job titles for the history list.
-  const gigIds = payments.map((p) => p.gig_id)
-  const titleById: Record<string, string> = {}
-  if (gigIds.length) {
-    const { data: gigs } = await supabase.from('gigs').select('id, title').in('id', gigIds)
-    for (const g of (gigs ?? []) as any[]) titleById[g.id] = g.title || 'Untitled job'
+  // Payment history = labor you logged and tagged to this person (the ledger).
+  let history: { date: string; note: string; amount: number }[] = []
+  if (crewMemberId) {
+    const { data: payRaw } = await supabase
+      .from('worker_payments')
+      .select('date, description, amount')
+      .eq('owner_user_id', me)
+      .eq('crew_member_id', crewMemberId)
+    history = ((payRaw ?? []) as any[])
+      .map((p) => ({
+        date: p.date as string,
+        note: (p.description as string) || 'Labor',
+        amount: Number(p.amount || 0),
+      }))
+      .sort((a, b) => (a.date < b.date ? 1 : -1))
   }
-
-  const confirmedPaid = payments
-    .filter((p) => p.worker_confirmed_at && p.amount)
-    .reduce((s, p) => s + Number(p.amount), 0)
-  const jobsPaid = payments.length
-
-  const sorted = [...payments].sort((a, b) => {
-    const ad = a.marked_paid_at ? Date.parse(a.marked_paid_at) : 0
-    const bd = b.marked_paid_at ? Date.parse(b.marked_paid_at) : 0
-    return bd - ad
-  })
-
-  const name = displayName(prof as any)
-  const username = (prof as any)?.username ?? null
+  const paid = history.reduce((s, h) => s + h.amount, 0)
+  const count = history.length
 
   return (
     <div className="space-y-6 max-w-2xl">
       <BackLink />
       <div className="flex items-start justify-between gap-3">
-        <Header name={name} subtitle="On-platform crew" />
+        <Header name={name} subtitle={subtitle} />
         {username && (
           <Link
             href={`/u/${username}`}
@@ -142,48 +128,32 @@ export default async function CrewPersonPage({ params }: { params: { id: string 
         )}
       </div>
 
-      <SummaryCards jobs={jobsPaid} paid={confirmedPaid} paidLabel="Paid & confirmed" />
-      <RatingNotes
-        rating={(note as any)?.rating ?? null}
-        wouldRehire={(note as any)?.would_rehire ?? null}
-        notes={(note as any)?.notes ?? ''}
-      />
+      <SummaryCards count={count} paid={paid} />
+      <RatingNotes rating={rating} wouldRehire={wouldRehire} notes={notes} />
 
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-foreground">Payment history</h2>
-        {sorted.length === 0 ? (
+        {history.length === 0 ? (
           <div className="card card-body text-sm text-muted-foreground">
-            No payments logged with this person yet.
+            No payments logged for this person yet. When you pay them, log it as a Labor expense
+            on the piece and tag their name — it&apos;ll show up here.
           </div>
         ) : (
           <div className="card divide-y divide-border">
-            {sorted.map((p) => {
-              const status = p.worker_confirmed_at
-                ? { label: 'Paid & confirmed', cls: 'text-emerald-600' }
-                : p.marked_paid_at
-                  ? { label: 'Marked paid', cls: 'text-accent' }
-                  : { label: 'Not paid yet', cls: 'text-muted-foreground' }
-              const when = p.marked_paid_at
-                ? new Date(p.marked_paid_at).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })
-                : null
+            {history.map((h, i) => {
+              const when = new Date(h.date + 'T00:00:00').toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })
               return (
-                <div key={p.gig_id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div key={i} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {titleById[p.gig_id] || 'Job'}
-                    </p>
-                    <p className={`text-xs ${status.cls} flex items-center gap-1`}>
-                      {p.worker_confirmed_at && <CheckCircle2 className="w-3 h-3" />}
-                      {status.label}
-                      {when ? ` · ${when}` : ''}
-                    </p>
+                    <p className="text-sm font-medium text-foreground truncate">{h.note}</p>
+                    <p className="text-xs text-muted-foreground">{when}</p>
                   </div>
                   <p className="text-sm font-semibold text-foreground shrink-0">
-                    {p.amount != null ? formatCurrency(Number(p.amount)) : '—'}
+                    {formatCurrency(h.amount)}
                   </p>
                 </div>
               )
@@ -221,24 +191,16 @@ function Header({ name, subtitle }: { name: string; subtitle: string }) {
   )
 }
 
-function SummaryCards({
-  jobs,
-  paid,
-  paidLabel,
-}: {
-  jobs: number
-  paid: number
-  paidLabel: string
-}) {
+function SummaryCards({ count, paid }: { count: number; paid: number }) {
   return (
     <div className="grid grid-cols-2 gap-4">
       <div className="card card-body">
-        <p className="text-2xl font-semibold text-foreground leading-none">{jobs}</p>
-        <p className="text-sm text-muted-foreground mt-1">Jobs</p>
+        <p className="text-2xl font-semibold text-foreground leading-none">{count}</p>
+        <p className="text-sm text-muted-foreground mt-1">Payment{count === 1 ? '' : 's'}</p>
       </div>
       <div className="card card-body">
         <p className="text-2xl font-semibold text-foreground leading-none">{formatCurrency(paid)}</p>
-        <p className="text-sm text-muted-foreground mt-1">{paidLabel}</p>
+        <p className="text-sm text-muted-foreground mt-1">Paid (from your books)</p>
       </div>
     </div>
   )

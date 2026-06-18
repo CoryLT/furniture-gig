@@ -97,7 +97,7 @@ export default async function CrewPage() {
   // 5) My existing private notes/ratings for these workers.
   const { data: noteRaw } = await supabase
     .from('crew_members')
-    .select('worker_user_id, rating, notes, would_rehire, hidden')
+    .select('id, worker_user_id, rating, notes, would_rehire, hidden')
     .eq('operator_user_id', me)
   const noteById: Record<
     string,
@@ -117,6 +117,23 @@ export default async function CrewPage() {
     }
   }
 
+  // Map each on-platform worker to their crew_member id, then pull "paid" totals
+  // straight from the ledger (the same source as Payment Records) so a worker's
+  // number matches everywhere.
+  const crewIdByWorker: Record<string, string> = {}
+  for (const n of (noteRaw ?? []) as any[]) {
+    if (n.worker_user_id && n.id) crewIdByWorker[n.worker_user_id] = n.id
+  }
+  const { data: wpRaw } = await supabase
+    .from('worker_payments')
+    .select('crew_member_id, amount')
+    .eq('owner_user_id', me)
+  const paidByCrewId: Record<string, number> = {}
+  for (const w of (wpRaw ?? []) as any[]) {
+    const cid = w.crew_member_id as string
+    paidByCrewId[cid] = (paidByCrewId[cid] ?? 0) + Number(w.amount || 0)
+  }
+
   const crew = workerIds
     .map((id) => {
       const prof = profById[id]
@@ -127,7 +144,7 @@ export default async function CrewPage() {
         username: prof?.username ?? null,
         jobs: stats[id].jobs,
         completed: stats[id].completed,
-        paid: stats[id].paid,
+        paid: paidByCrewId[crewIdByWorker[id]] ?? 0,
         rating: note?.rating ?? null,
         notes: note?.notes ?? '',
         wouldRehire: note?.would_rehire ?? null,
@@ -149,7 +166,7 @@ export default async function CrewPage() {
     id: m.id as string,
     name: ((m.worker_name as string) || 'Unnamed').trim() || 'Unnamed',
     jobs: (m.jobs_count as number) ?? 0,
-    paid: Number(m.paid_total ?? 0),
+    paid: paidByCrewId[m.id as string] ?? 0,
     rating: (m.rating as number) ?? null,
     notes: (m.notes as string) ?? '',
     wouldRehire: (m.would_rehire as boolean) ?? null,
