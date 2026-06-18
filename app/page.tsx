@@ -62,10 +62,10 @@ export default async function HomePage() {
               <span className="text-accent">Keep more profit.</span>
             </h1>
             <p className="max-w-2xl mx-auto text-base sm:text-lg text-muted-foreground mb-8 leading-relaxed">
-              FlipWork is the command center for furniture flippers — and anyone who
-              flips for a living. Track every piece from curb to sold, see your real
-              profit and how much cash is tied up, manage your crew and 1099s, and let
-              the books keep themselves.
+              FlipWork is the command center for resellers and flippers of every kind —
+              furniture, thrift-store finds, eBay hauls, you name it. Track every item
+              from buy to sold, see your real profit and how much cash is tied up, manage
+              any help you hire, and let the books keep themselves.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link href="/auth/signup">
@@ -102,7 +102,7 @@ export default async function HomePage() {
                 How FlipWork works
               </h2>
               <p className="text-muted-foreground">
-                Source it. Fix it. Sell it. See your profit. That simple.
+                Buy it. Clean it up. Sell it. See your profit. That simple.
               </p>
             </div>
 
@@ -111,19 +111,19 @@ export default async function HomePage() {
                 number="1"
                 icon={<Camera className="w-6 h-6" strokeWidth={1.5} />}
                 title="Log what you grab"
-                body="Add a piece and what you paid for it, then snap a photo. It lands in your pipeline as 'Sourced' and starts tracking its own cost."
+                body="Add an item and what you paid for it — thrift store, estate sale, marketplace, wherever — then snap a photo. It lands in your pipeline and starts tracking its own cost."
               />
               <Step
                 number="2"
                 icon={<Hammer className="w-6 h-6" strokeWidth={1.5} />}
-                title="Fix it up, track every cost"
-                body="Log materials and labor as you go — even tag which crew member you paid. Snap a receipt and split it across pieces. Your true cost adds up by itself."
+                title="Get it ready, track every cost"
+                body="Cleaning supplies, parts, shipping, repairs, a hand you paid to help — log it all as you go. Snap a receipt and split it across items. Your true cost adds up by itself."
               />
               <Step
                 number="3"
                 icon={<DollarSign className="w-6 h-6" strokeWidth={1.5} />}
                 title="Sell it, see your profit"
-                body="Mark it sold and enter the price. Your profit and cash-tied-up update instantly, and your lifetime profit climbs you up the ranks."
+                body="Sell it wherever you sell — eBay, Facebook, in person — then mark it sold and enter the price. Your profit and cash-tied-up update instantly, and your lifetime profit climbs you up the ranks."
               />
             </div>
           </div>
@@ -216,8 +216,9 @@ export default async function HomePage() {
                       So I built the tool I wished I had — one place to track every piece
                       from curb to sold, see my true profit, manage the people I hire, and
                       keep books that don't make me want to quit. It turned the messy parts
-                      of flipping into something I can actually see and steer. If you flip
-                      too, I built this for you.
+                      of flipping into something I can actually see and steer. Furniture,
+                      thrift finds, eBay hauls — whatever you flip, if you buy low and sell
+                      high, I built this for you.
                     </p>
                   </div>
                 </div>
