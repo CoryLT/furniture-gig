@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import {
-  Armchair,
   Camera,
   Hammer,
   DollarSign,
@@ -11,11 +10,11 @@ import {
   Trophy,
   Wallet,
   MessageCircle,
-  Sparkle,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import PublicTopBar from '@/components/shared/PublicTopBar'
 import { Button } from '@/components/ui/button'
+import AnimatedHero from '@/components/landing/AnimatedHero'
 
 // Logged-in users go straight to their dashboard.
 // Logged-out users see the marketing landing page.
@@ -42,57 +41,14 @@ export default async function HomePage() {
   const flippersTaken = founding?.flippers_taken ?? 0
   const cap = founding?.cap ?? 25
   const flipperSpotsLeft = Math.max(0, cap - flippersTaken)
-  const showFoundingCounter = flipperSpotsLeft > 0
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <PublicTopBar current={null} />
 
       <main className="flex-1">
-        {/* HERO */}
-        <section className="relative overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-16 pb-20 sm:pt-24 sm:pb-28 text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-medium font-mono mb-6">
-              <Armchair className="w-3.5 h-3.5" strokeWidth={2} />
-              RUN YOUR FLIP LIKE A BUSINESS
-            </div>
-            <h1 className="font-serif text-4xl sm:text-6xl leading-tight tracking-tight text-foreground mb-5">
-              Flip smarter.
-              <br />
-              <span className="text-accent">Keep more profit.</span>
-            </h1>
-            <p className="max-w-2xl mx-auto text-base sm:text-lg text-muted-foreground mb-8 leading-relaxed">
-              FlipWork is the command center for resellers and flippers of every kind —
-              furniture, thrift-store finds, eBay hauls, you name it. Track every item
-              from buy to sold, see your real profit and how much cash is tied up, manage
-              any help you hire, and let the books keep themselves.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href="/auth/signup">
-                <Button variant="accent" size="lg" className="w-full sm:w-auto">
-                  Start flipping free
-                </Button>
-              </Link>
-              <Link href="#how">
-                <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                  See how it works
-                </Button>
-              </Link>
-            </div>
-
-            {/* Founding member counter */}
-            {showFoundingCounter && (
-              <div className="mt-8 flex justify-center">
-                <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-full bg-amber-50 border border-amber-200">
-                  <Sparkle className="w-4 h-4 fill-amber-500 stroke-amber-700" strokeWidth={1.5} />
-                  <span className="text-xs sm:text-sm font-medium text-amber-900">
-                    {flipperSpotsLeft} founding member spots left
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
+        {/* HERO (animated) */}
+        <AnimatedHero foundingSpotsLeft={flipperSpotsLeft} />
 
         {/* HOW IT WORKS — the core loop */}
         <section id="how" className="border-t border-border bg-card scroll-mt-20">
