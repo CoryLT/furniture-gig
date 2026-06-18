@@ -230,3 +230,10 @@
   margin: 0.5rem 0;
   color: rgb(87 83 78);
 }
+
+/* "Needs you" urgent card — gentle border pulse to draw the eye */
+@keyframes play-pulse {
+  0%, 100% { border-color: var(--play-border); }
+  50% { border-color: var(--play-red); }
+}
+.play-pulse { animation: play-pulse 1.6s ease-in-out infinite; }

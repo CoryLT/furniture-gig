@@ -7,6 +7,7 @@ import GameBar from '@/components/play/GameBar'
 import RankEmblem from '@/components/play/RankEmblem'
 import RankTrail from '@/components/play/RankTrail'
 import ProfitCharts from '@/components/play/ProfitCharts'
+import NeedsYou, { type NeedItem } from '@/components/play/NeedsYou'
 import EnableNotificationsButton from '@/components/notifications/EnableNotificationsButton'
 import AddToHomeScreenPrompt from '@/components/notifications/AddToHomeScreenPrompt'
 import UnreadMessagesCard from '@/components/home/UnreadMessagesCard'
@@ -77,6 +78,7 @@ type PieceVM = {
   target_price: number | null
   costs: number
   realized: number
+  createdAt: string | null
 }
 
 export default async function PlayPage() {
@@ -147,6 +149,7 @@ export default async function PlayPage() {
         ? supabase.storage.from('marketplace-photos').getPublicUrl(p.image_path).data.publicUrl
         : null,
       stage_sold_at: p.sold_at,
+      createdAt: (p.created_at as string) ?? null,
     } as any
   })
 
@@ -249,6 +252,79 @@ export default async function PlayPage() {
       done: monthProfit >= PROFIT_GOAL,
     },
   ]
+
+  // ---- "Needs you" — real problems to resolve, most urgent first ----
+  const DAY = 86400000
+  const AGING_DAYS = 30
+  const needs: NeedItem[] = []
+  for (const p of unsold as any[]) {
+    if (!p.target_price || Number(p.target_price) <= 0) {
+      needs.push({
+        id: 'price-' + p.id, kind: 'no_price', sev: 'warning', title: p.title,
+        badge: 'no price', detail: "Can't sell what isn't priced",
+        fixLabel: 'Set a price', href: '/flipper/pipeline', imageUrl: p.imageUrl,
+      })
+    } else if (!p.imageUrl) {
+      needs.push({
+        id: 'photo-' + p.id, kind: 'no_photo', sev: 'warning', title: p.title,
+        badge: 'no photo', detail: 'Photos sell pieces far faster',
+        fixLabel: 'Add a photo', href: '/flipper/pipeline', imageUrl: null,
+      })
+    } else if (p.createdAt) {
+      const days = Math.floor((Date.now() - new Date(p.createdAt).getTime()) / DAY)
+      if (days >= AGING_DAYS) {
+        needs.push({
+          id: 'aging-' + p.id, kind: 'cash_stuck', sev: 'danger', title: p.title,
+          badge: 'cash stuck', detail: `${days} days unsold · ${money(p.costs)} frozen`,
+          fixLabel: 'Drop the price', href: '/flipper/pipeline', imageUrl: p.imageUrl,
+        })
+      }
+    }
+  }
+
+  // Work your crew submitted that's waiting on your approval + payment.
+  const { data: myGigs } = await supabase
+    .from('gigs')
+    .select('id, title')
+    .eq('poster_user_id', me)
+  const gigIds = ((myGigs ?? []) as any[]).map((g) => g.id)
+  const gigTitle: Record<string, string> = {}
+  for (const g of (myGigs ?? []) as any[]) gigTitle[g.id] = g.title
+  if (gigIds.length) {
+    const { data: reviewClaims } = await supabase
+      .from('gig_claims')
+      .select('id, gig_id, worker_user_id')
+      .eq('status', 'submitted_for_review')
+      .in('gig_id', gigIds)
+    const claims = (reviewClaims ?? []) as any[]
+    const wIds = Array.from(new Set(claims.map((c) => c.worker_user_id).filter(Boolean)))
+    const wName: Record<string, string> = {}
+    if (wIds.length) {
+      const { data: wp } = await supabase
+        .from('worker_profiles')
+        .select('user_id, full_name, first_name, last_name')
+        .in('user_id', wIds)
+      for (const w of (wp ?? []) as any[]) {
+        wName[w.user_id] =
+          (w.full_name || '').trim() ||
+          [w.first_name, w.last_name].filter(Boolean).join(' ').trim() ||
+          'Your crew'
+      }
+    }
+    for (const c of claims) {
+      needs.push({
+        id: 'review-' + c.id, kind: 'approve', sev: 'info',
+        title: wName[c.worker_user_id] || 'Your crew', badge: 'waiting on you',
+        detail: `Finished ${gigTitle[c.gig_id] || 'a job'} — approve & pay`,
+        fixLabel: 'Approve & pay', href: `/flipper/review/${c.id}`, imageUrl: null,
+      })
+    }
+  }
+
+  const sevRank: Record<string, number> = { danger: 0, info: 1, warning: 2 }
+  needs.sort((a, b) => sevRank[a.sev] - sevRank[b.sev])
+  const needsTop = needs.slice(0, 8)
+  const needsExtra = needs.length - needsTop.length
 
   const byStage = (k: Stage) => pieces.filter((p) => p.stage === k)
   const hasPieces = pieces.length > 0
@@ -394,6 +470,11 @@ export default async function PlayPage() {
             </span>
           </div>
         </section>
+
+        {/* Needs you — real problems to resolve, the heart of the loop */}
+        {(needs.length > 0 || hasPieces) && (
+          <NeedsYou items={needsTop} extra={needsExtra} />
+        )}
 
         {/* Profit detail + this month's expense breakdown */}
         {hasBooksData && (
