@@ -331,9 +331,10 @@ export function NotificationBell() {
       case '1099_threshold': {
         const total = n.data?.total as number | undefined
         const totalLabel = total != null ? `$${Number(total).toFixed(0)}` : 'enough'
+        const wname = (n.data?.worker_name as string) || 'a worker'
         return (
           <>
-            You&apos;ve paid {who} {totalLabel} this year — you&apos;ll likely need a 1099.
+            You&apos;ve paid <span className="font-medium text-foreground">{wname}</span> {totalLabel} this year — you&apos;ll likely need a 1099.
           </>
         )
       }

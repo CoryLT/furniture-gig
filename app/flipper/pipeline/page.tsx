@@ -54,6 +54,31 @@ export default async function PipelinePage() {
     expenses: expByPiece[p.id] ?? [],
   }))
 
+  // Crew list for the "who did you pay?" picker on labor expenses.
+  const { data: crewRaw } = await supabase
+    .from('crew_members')
+    .select('id, worker_user_id, worker_name')
+    .eq('operator_user_id', me)
+    .eq('hidden', false)
+  const onIds = ((crewRaw ?? []) as any[]).map((c) => c.worker_user_id).filter(Boolean)
+  const nameById: Record<string, string> = {}
+  if (onIds.length) {
+    const { data: profs } = await supabase
+      .from('worker_profiles')
+      .select('user_id, full_name, first_name, last_name')
+      .in('user_id', onIds)
+    for (const p of (profs ?? []) as any[]) {
+      nameById[p.user_id] =
+        (p.full_name || '').trim() ||
+        [p.first_name, p.last_name].filter(Boolean).join(' ').trim() ||
+        'Crew'
+    }
+  }
+  const crew = ((crewRaw ?? []) as any[]).map((c) => ({
+    id: c.id,
+    label: c.worker_user_id ? nameById[c.worker_user_id] || 'Crew' : c.worker_name || 'Crew',
+  }))
+
   return (
     <div className="space-y-8">
       <div>
@@ -63,7 +88,7 @@ export default async function PipelinePage() {
           they progress and watch the profit land.
         </p>
       </div>
-      <PipelineBoard userId={me} initialPieces={pieces} />
+      <PipelineBoard userId={me} initialPieces={pieces} crew={crew} />
     </div>
   )
 }

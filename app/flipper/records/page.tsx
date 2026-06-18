@@ -14,8 +14,6 @@ type ProfileRow = {
   username?: string | null
 }
 
-// Same name-resolution rule as the crew page: full_name first, then
-// first+last, then username, then a safe fallback.
 function displayName(p?: ProfileRow): string {
   if (!p) return 'Worker'
   const full = (p.full_name ?? '').trim()
@@ -27,19 +25,9 @@ function displayName(p?: ProfileRow): string {
 }
 
 // Federal 1099-NEC reporting threshold by tax year.
-// $600 through 2025; raised to $2,000 for payments made in 2026+ under the
-// One Big Beautiful Bill Act (signed 2025). Verified June 2026.
+// $600 through 2025; $2,000 for 2026+ (One Big Beautiful Bill Act).
 function threshold(year: number): number {
   return year >= 2026 ? 2000 : 600
-}
-
-const methodLabel: Record<string, string> = {
-  cashapp: 'Cash App',
-  venmo: 'Venmo',
-  paypal: 'PayPal',
-  zelle: 'Zelle',
-  cash: 'Cash',
-  other: 'Other',
 }
 
 export default async function RecordsPage({
@@ -51,95 +39,95 @@ export default async function RecordsPage({
   const { data: { user } } = await supabase.auth.getUser()
   const me = user!.id
 
-  // Every payment I actually marked paid (not just approved/pending).
+  // Every worker payment = a labor expense you logged and tagged to a crew
+  // member (the ledger is the one source of truth now).
   const { data: payRaw } = await supabase
-    .from('gig_payments')
-    .select('worker_user_id, amount, method, marked_paid_at, gig_id')
-    .eq('flipper_user_id', me)
-    .not('marked_paid_at', 'is', null)
+    .from('worker_payments')
+    .select('crew_member_id, amount, date, description')
+    .eq('owner_user_id', me)
   const payments = (payRaw ?? []) as {
-    worker_user_id: string | null
+    crew_member_id: string
     amount: number | null
-    method: string | null
-    marked_paid_at: string
-    gig_id: string | null
+    date: string
+    description: string | null
   }[]
 
-  // Which tax years have data? Always include the current year.
   const currentYear = new Date().getFullYear()
   const yearsSet = new Set<number>([currentYear])
-  for (const p of payments) yearsSet.add(new Date(p.marked_paid_at).getFullYear())
+  for (const p of payments) yearsSet.add(new Date(p.date).getFullYear())
   const years = Array.from(yearsSet).sort((a, b) => b - a)
 
   const selectedYear = Number(searchParams.year) || currentYear
-  const inYear = payments.filter(
-    (p) => new Date(p.marked_paid_at).getFullYear() === selectedYear
-  )
+  const inYear = payments.filter((p) => new Date(p.date).getFullYear() === selectedYear)
 
-  // Names + gig titles for the rows in this year.
-  const workerIds = Array.from(
-    new Set(inYear.map((p) => p.worker_user_id).filter(Boolean))
+  // Resolve names from the crew roster (+ profiles for on-platform crew).
+  const crewIds = Array.from(new Set(inYear.map((p) => p.crew_member_id).filter(Boolean)))
+  const { data: crewRaw } = crewIds.length
+    ? await supabase.from('crew_members').select('id, worker_user_id, worker_name').in('id', crewIds)
+    : { data: [] as any[] }
+  const crewById: Record<string, { worker_user_id: string | null; worker_name: string | null }> = {}
+  for (const c of (crewRaw ?? []) as any[]) crewById[c.id] = c
+  const onIds = Array.from(
+    new Set(((crewRaw ?? []) as any[]).map((c) => c.worker_user_id).filter(Boolean))
   ) as string[]
-  const gigIds = Array.from(
-    new Set(inYear.map((p) => p.gig_id).filter(Boolean))
-  ) as string[]
-
-  const { data: profRaw } = workerIds.length
+  const { data: profRaw } = onIds.length
     ? await supabase
         .from('worker_profiles')
         .select('user_id, full_name, first_name, last_name, username')
-        .in('user_id', workerIds)
+        .in('user_id', onIds)
     : { data: [] as any[] }
   const profById: Record<string, ProfileRow> = {}
   for (const p of (profRaw ?? []) as ProfileRow[]) profById[p.user_id] = p
 
-  const { data: gigRaw } = gigIds.length
-    ? await supabase.from('gigs').select('id, title').in('id', gigIds)
-    : { data: [] as any[] }
-  const gigTitleById: Record<string, string> = {}
-  for (const g of (gigRaw ?? []) as { id: string; title: string }[]) {
-    gigTitleById[g.id] = g.title
+  function crewName(crewId: string): { name: string; username: string | null } {
+    const c = crewById[crewId]
+    if (!c) return { name: 'Worker', username: null }
+    if (c.worker_user_id) {
+      const prof = profById[c.worker_user_id]
+      return { name: displayName(prof), username: prof?.username ?? null }
+    }
+    return { name: c.worker_name || 'Worker', username: null }
   }
 
-  // Group payments by worker.
-  type Line = { date: string; gig: string; method: string; amount: number }
+  type Line = { date: string; note: string; amount: number }
   const byWorker: Record<string, { total: number; lines: Line[] }> = {}
   for (const p of inYear) {
-    const wid = p.worker_user_id ?? 'unknown'
+    const wid = p.crew_member_id
     if (!byWorker[wid]) byWorker[wid] = { total: 0, lines: [] }
     const amt = Number(p.amount ?? 0)
     byWorker[wid].total += amt
     byWorker[wid].lines.push({
-      date: new Date(p.marked_paid_at).toLocaleDateString(),
-      gig: (p.gig_id && gigTitleById[p.gig_id]) || 'Gig',
-      method: (p.method && methodLabel[p.method]) || '—',
+      date: new Date(p.date).toLocaleDateString(),
+      note: p.description || 'Labor',
       amount: amt,
     })
   }
 
   const th = threshold(selectedYear)
   const workers = Object.keys(byWorker)
-    .map((id) => ({
-      workerId: id,
-      name: displayName(profById[id]),
-      username: profById[id]?.username ?? null,
-      total: byWorker[id].total,
-      lines: byWorker[id].lines.sort((a, b) => (a.date < b.date ? -1 : 1)),
-      flag: byWorker[id].total >= th,
-    }))
+    .map((id) => {
+      const { name, username } = crewName(id)
+      return {
+        crewId: id,
+        name,
+        username,
+        total: byWorker[id].total,
+        lines: byWorker[id].lines.sort((a, b) => (a.date < b.date ? -1 : 1)),
+        flag: byWorker[id].total >= th,
+      }
+    })
     .sort((a, b) => b.total - a.total)
 
   const grandTotal = workers.reduce((s, w) => s + w.total, 0)
   const flagged = workers.filter((w) => w.flag).length
 
-  // Flat one-row-per-payment list for the CSV export.
   const exportRows = workers.flatMap((w) =>
     w.lines.map((l) => ({
       worker: w.name,
       username: w.username ?? '',
       date: l.date,
-      gig: l.gig,
-      method: l.method,
+      gig: l.note,
+      method: '',
       amount: l.amount,
     }))
   )
@@ -153,12 +141,9 @@ export default async function RecordsPage({
             What you paid each worker, by year — for your own books and tax time.
           </p>
         </div>
-        {workers.length > 0 && (
-          <ExportButton year={selectedYear} rows={exportRows} />
-        )}
+        {workers.length > 0 && <ExportButton year={selectedYear} rows={exportRows} />}
       </div>
 
-      {/* Year selector */}
       <div className="flex items-center gap-2 flex-wrap">
         {years.map((y) => (
           <Link
@@ -181,18 +166,15 @@ export default async function RecordsPage({
             No payments recorded for {selectedYear}.
           </p>
           <p className="text-sm text-muted-foreground">
-            Payments show up here once you mark a gig paid.
+            Payments show up here when you log a labor expense on a piece and tag who you paid.
           </p>
         </div>
       ) : (
         <>
-          {/* Summary */}
           <div className="card card-body flex flex-wrap gap-8">
             <div>
               <p className="text-sm text-muted-foreground">Total paid in {selectedYear}</p>
-              <p className="text-2xl font-semibold text-foreground">
-                ${grandTotal.toFixed(2)}
-              </p>
+              <p className="text-2xl font-semibold text-foreground">${grandTotal.toFixed(2)}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Workers paid</p>
@@ -206,19 +188,20 @@ export default async function RecordsPage({
             </div>
           </div>
 
-          {/* Per-worker breakdown */}
           <div className="space-y-4">
             {workers.map((w) => (
-              <div key={w.workerId} className="card card-body space-y-3">
+              <div key={w.crewId} className="card card-body space-y-3">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-foreground">{w.name}</p>
+                      <Link
+                        href={`/flipper/crew/${w.crewId}`}
+                        className="font-semibold text-foreground hover:underline"
+                      >
+                        {w.name}
+                      </Link>
                       {w.username && (
-                        <Link
-                          href={`/u/${w.username}`}
-                          className="text-sm text-accent hover:underline"
-                        >
+                        <Link href={`/u/${w.username}`} className="text-sm text-accent hover:underline">
                           @{w.username}
                         </Link>
                       )}
@@ -239,7 +222,7 @@ export default async function RecordsPage({
                   {w.lines.map((l, i) => (
                     <div key={i} className="flex items-center justify-between gap-3 text-sm">
                       <span className="text-muted-foreground">
-                        {l.date} · {l.gig} · {l.method}
+                        {l.date} · {l.note}
                       </span>
                       <span className="text-foreground font-medium shrink-0">
                         ${l.amount.toFixed(2)}
@@ -251,12 +234,11 @@ export default async function RecordsPage({
             ))}
           </div>
 
-          {/* Disclaimer */}
           <p className="text-xs text-muted-foreground leading-relaxed">
-            This shows payments you marked paid through FlipWork; it may not include cash or
-            off-app payments you never logged here. The 1099 flag uses the federal 1099-NEC
-            threshold for {selectedYear} (${th.toLocaleString()}); state rules can differ.
-            FlipWork isn&apos;t an accountant — confirm anything tax-related with a professional.
+            This adds up the labor you logged and tagged to each worker. Labor you didn&apos;t tag to
+            anyone won&apos;t appear here. The 1099 flag uses the federal 1099-NEC threshold for{' '}
+            {selectedYear} (${th.toLocaleString()}); state rules can differ. FlipWork isn&apos;t an
+            accountant — confirm anything tax-related with a professional.
           </p>
         </>
       )}

@@ -54,9 +54,11 @@ const money = (v: number) => `${v < 0 ? '-' : ''}$${Math.abs(v).toFixed(2)}`
 export default function PipelineBoard({
   userId,
   initialPieces,
+  crew,
 }: {
   userId: string
   initialPieces: Piece[]
+  crew: { id: string; label: string }[]
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -196,7 +198,7 @@ export default function PipelineBoard({
   // ---- expense mutations ----
   async function addExpense(
     pieceId: string,
-    fields: { amount: number; note: string; category: string | null }
+    fields: { amount: number; note: string; category: string | null; crewMemberId?: string | null }
   ) {
     setError('')
     const { data, error: err } = await supabase.rpc('add_piece_expense', {
@@ -204,6 +206,7 @@ export default function PipelineBoard({
       p_amount: fields.amount,
       p_category: fields.category,
       p_note: fields.note,
+      p_crew_member_id: fields.crewMemberId ?? null,
     })
     const row: any = Array.isArray(data) ? data[0] : data
     if (err || !row) {
@@ -222,6 +225,16 @@ export default function PipelineBoard({
         p.id === pieceId ? { ...p, expenses: [...(p.expenses ?? []), exp] } : p
       )
     )
+    // If you tagged a worker, see if this payment crosses their 1099 line.
+    if (fields.crewMemberId) {
+      try {
+        await fetch('/api/payments/check-1099', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ crewMemberId: fields.crewMemberId }),
+        })
+      } catch {}
+    }
     router.refresh()
     return true
   }
@@ -357,6 +370,7 @@ export default function PipelineBoard({
                       onDelete={deletePiece}
                       onPhoto={handlePhoto}
                       onAddExpense={addExpense}
+                      crew={crew}
                       onDeleteExpense={deleteExpense}
                     />
                   ))
@@ -639,6 +653,7 @@ function PieceCard({
   onPhoto,
   onAddExpense,
   onDeleteExpense,
+  crew,
 }: {
   piece: Piece
   imgUrl: string | null
@@ -648,9 +663,10 @@ function PieceCard({
   onPhoto: (id: string, file: File) => Promise<boolean>
   onAddExpense: (
     id: string,
-    fields: { amount: number; note: string; category: string | null }
+    fields: { amount: number; note: string; category: string | null; crewMemberId?: string | null }
   ) => Promise<boolean>
   onDeleteExpense: (pieceId: string, expenseId: string) => void
+  crew: { id: string; label: string }[]
 }) {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -661,6 +677,7 @@ function PieceCard({
   const [newAmt, setNewAmt] = useState('')
   const [newNote, setNewNote] = useState('')
   const [newCat, setNewCat] = useState('')
+  const [newCrew, setNewCrew] = useState('')
   const [addingExp, setAddingExp] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
 
@@ -695,12 +712,14 @@ function PieceCard({
       amount: amt,
       note: newNote.trim(),
       category: newCat || null,
+      crewMemberId: newCat === 'labor' ? newCrew || null : null,
     })
     setAddingExp(false)
     if (ok) {
       setNewAmt('')
       setNewNote('')
       setNewCat('')
+      setNewCrew('')
     }
   }
 
@@ -873,6 +892,20 @@ function PieceCard({
                   {addingExp ? 'Adding…' : 'Add'}
                 </Button>
               </div>
+              {newCat === 'labor' && crew.length > 0 && (
+                <select
+                  value={newCrew}
+                  onChange={(e) => setNewCrew(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+                >
+                  <option value="">Who did you pay? (for 1099 tracking)</option>
+                  {crew.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
