@@ -345,7 +345,7 @@ export default function PipelineBoard({
       </div>
 
       {/* Board */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {STAGES.map((stage) => {
           const inStage = pieces.filter((p) => p.stage === stage.key)
           return (
@@ -669,6 +669,7 @@ function PieceCard({
   crew: { id: string; label: string }[]
 }) {
   const [open, setOpen] = useState(false)
+  const [zoom, setZoom] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [acq, setAcq] = useState(String(piece.acquisition_cost ?? ''))
@@ -736,6 +737,18 @@ function PieceCard({
 
   return (
     <div className="card card-body space-y-2">
+      {/* Tap the photo to see it bigger */}
+      {imgUrl && (
+        <button
+          type="button"
+          onClick={() => setZoom(true)}
+          className="block w-full cursor-zoom-in"
+          aria-label="View larger photo"
+        >
+          <img src={imgUrl} alt={piece.title} className="w-full h-28 object-cover rounded-lg" />
+        </button>
+      )}
+
       {/* Tap anywhere on this top part to open or close the card's details */}
       <button
         type="button"
@@ -743,8 +756,6 @@ function PieceCard({
         aria-expanded={open}
         className="w-full text-left space-y-2 cursor-pointer"
       >
-        {imgUrl && <img src={imgUrl} alt={piece.title} className="w-full h-28 object-cover rounded-lg" />}
-
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="font-medium text-foreground text-sm truncate">{piece.title || 'Untitled piece'}</p>
@@ -933,6 +944,22 @@ function PieceCard({
               Delete
             </button>
           </div>
+        </div>
+      )}
+
+      {zoom && imgUrl && (
+        <div
+          onClick={() => setZoom(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 cursor-zoom-out"
+          role="dialog"
+          aria-label="Larger photo"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imgUrl}
+            alt={piece.title}
+            className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"
+          />
         </div>
       )}
     </div>
