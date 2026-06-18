@@ -20,18 +20,7 @@ export default function PublicTopBar({
           <Armchair className="w-5 h-5 text-accent" strokeWidth={1.5} />
           FlipWork
         </Link>
-        <nav className="hidden sm:flex items-center gap-1 text-sm">
-          <Link
-            href="/marketplace"
-            className={
-              current === 'marketplace'
-                ? 'px-3 py-1.5 rounded-md text-foreground font-medium'
-                : 'px-3 py-1.5 rounded-md text-muted-foreground hover:text-foreground'
-            }
-          >
-            Marketplace
-          </Link>
-        </nav>
+        <nav className="hidden sm:flex items-center gap-1 text-sm" />
         <div className="flex items-center gap-2">
           <Link href="/auth/login">
             <Button variant="ghost" size="sm">
