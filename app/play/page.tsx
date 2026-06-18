@@ -171,7 +171,7 @@ export default async function PlayPage() {
     .eq('owner_user_id', me)
   const byYear: Record<number, { income: number; expense: number }[]> = {}
   const yearsSet = new Set<number>([now.getFullYear()])
-  const curExp: Record<string, number> = {}
+  const expByYM: Record<string, Record<string, number>> = {}
   for (const t of (allTxnRaw ?? []) as any[]) {
     const d = new Date(t.date)
     const y = d.getFullYear()
@@ -186,22 +186,24 @@ export default async function PlayPage() {
       else if (type === 'expense') {
         const v = debit - credit
         byYear[y][m].expense += v
-        if (y === now.getFullYear() && m === now.getMonth()) {
-          const name = l.accounts?.name || 'Other'
-          curExp[name] = (curExp[name] || 0) + v
-        }
+        const key = `${y}-${m}`
+        const name = l.accounts?.name || 'Other'
+        if (!expByYM[key]) expByYM[key] = {}
+        expByYM[key][name] = (expByYM[key][name] || 0) + v
       }
     }
   }
   const chartYears = Array.from(yearsSet).sort((a, b) => b - a)
-  const currentMonthExpenses = Object.entries(curExp)
-    .filter(([, v]) => v > 0)
-    .sort((a, b) => b[1] - a[1])
-    .map(([name, amount]) => ({ name, amount }))
+  const expensesByYM: Record<string, { name: string; amount: number }[]> = {}
+  for (const [key, cats] of Object.entries(expByYM)) {
+    expensesByYM[key] = Object.entries(cats)
+      .filter(([, val]) => val > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, amount]) => ({ name, amount }))
+  }
   const hasBooksData = chartYears.some(
     (y) => (byYear[y] ?? []).some((m) => m.income !== 0 || m.expense !== 0)
   )
-  const currentMonthLabel = now.toLocaleString('en-US', { month: 'long' })
 
   // Rank / progress from total profit — the game-score framing.
   const total = allTimeProfit
@@ -399,8 +401,8 @@ export default async function PlayPage() {
             byYear={byYear}
             years={chartYears}
             currentYear={now.getFullYear()}
-            currentMonthExpenses={currentMonthExpenses}
-            currentMonthLabel={currentMonthLabel}
+            currentMonth={now.getMonth()}
+            expensesByYM={expensesByYM}
           />
         )}
 

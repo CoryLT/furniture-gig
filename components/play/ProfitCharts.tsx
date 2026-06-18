@@ -5,7 +5,11 @@ import { useState } from 'react'
 type MonthAgg = { income: number; expense: number }
 
 const MONTH_LETTERS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
-const MONTH_NAMES = [
+const MONTH_FULL = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+const MONTH_SHORT = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
 
@@ -23,35 +27,39 @@ export default function ProfitCharts({
   byYear,
   years,
   currentYear,
-  currentMonthExpenses,
-  currentMonthLabel,
+  currentMonth,
+  expensesByYM,
 }: {
   byYear: Record<number, MonthAgg[]>
   years: number[]
   currentYear: number
-  currentMonthExpenses: { name: string; amount: number }[]
-  currentMonthLabel: string
+  currentMonth: number
+  expensesByYM: Record<string, { name: string; amount: number }[]>
 }) {
   const [year, setYear] = useState<number>(
     years.includes(currentYear) ? currentYear : years[0] ?? currentYear
   )
-  const months = byYear[year] ?? Array.from({ length: 12 }, () => ({ income: 0, expense: 0 }))
+  const [month, setMonth] = useState<number>(currentMonth)
 
+  const months = byYear[year] ?? Array.from({ length: 12 }, () => ({ income: 0, expense: 0 }))
   const totalIn = months.reduce((s, m) => s + m.income, 0)
   const totalOut = months.reduce((s, m) => s + m.expense, 0)
   const net = totalIn - totalOut
   const maxBar = Math.max(1, ...months.map((m) => Math.max(m.income, m.expense)))
 
-  const panel = {
+  const panel = { background: 'var(--play-panel)', border: '1px solid var(--play-border)' }
+  const selectStyle = {
     background: 'var(--play-panel)',
     border: '1px solid var(--play-border)',
+    color: 'var(--play-ink)',
   }
 
-  // ---- Donut data (current month) ----
-  const donutTotal = currentMonthExpenses.reduce((s, c) => s + c.amount, 0)
+  // ---- Donut data for the selected month ----
+  const monthExpenses = expensesByYM[`${year}-${month}`] ?? []
+  const donutTotal = monthExpenses.reduce((s, c) => s + c.amount, 0)
   const TOP = 6
-  const top = currentMonthExpenses.slice(0, TOP)
-  const restTotal = currentMonthExpenses.slice(TOP).reduce((s, c) => s + c.amount, 0)
+  const top = monthExpenses.slice(0, TOP)
+  const restTotal = monthExpenses.slice(TOP).reduce((s, c) => s + c.amount, 0)
   const segments = restTotal > 0 ? [...top, { name: 'Other', amount: restTotal }] : top
 
   const size = 168
@@ -66,58 +74,50 @@ export default function ProfitCharts({
     <div className="space-y-6">
       {/* ---- Profit by month ---- */}
       <section>
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between gap-2 mb-2">
           <h2 className="font-serif text-lg" style={{ color: 'var(--play-ink)' }}>
             Profit by month
           </h2>
-          <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="rounded-lg px-2.5 py-1 font-mono text-sm focus:outline-none"
-            style={{
-              background: 'var(--play-panel)',
-              border: '1px solid var(--play-border)',
-              color: 'var(--play-ink)',
-            }}
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <select
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+              className="rounded-lg px-2.5 py-1 font-mono text-sm focus:outline-none"
+              style={selectStyle}
+              aria-label="Month"
+            >
+              {MONTH_FULL.map((mn, i) => (
+                <option key={i} value={i}>
+                  {mn}
+                </option>
+              ))}
+            </select>
+            <select
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+              className="rounded-lg px-2.5 py-1 font-mono text-sm focus:outline-none"
+              style={selectStyle}
+              aria-label="Year"
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="rounded-2xl p-5" style={panel}>
-          {/* Year summary */}
+          {/* Selected month summary */}
           <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-            <div>
-              <div className="font-mono text-base font-semibold" style={{ color: 'var(--play-green)' }}>
-                {money(totalIn)}
-              </div>
-              <div className="font-sans text-[10px] uppercase tracking-wider" style={{ color: 'var(--play-muted)' }}>
-                In
-              </div>
-            </div>
-            <div>
-              <div className="font-mono text-base font-semibold" style={{ color: 'var(--play-red)' }}>
-                {money(totalOut)}
-              </div>
-              <div className="font-sans text-[10px] uppercase tracking-wider" style={{ color: 'var(--play-muted)' }}>
-                Out
-              </div>
-            </div>
-            <div>
-              <div
-                className="font-mono text-base font-semibold"
-                style={{ color: net < 0 ? 'var(--play-red)' : 'var(--play-gold)' }}
-              >
-                {money(net)}
-              </div>
-              <div className="font-sans text-[10px] uppercase tracking-wider" style={{ color: 'var(--play-muted)' }}>
-                Net
-              </div>
-            </div>
+            <Summary label="In" value={money(months[month].income)} color="var(--play-green)" />
+            <Summary label="Out" value={money(months[month].expense)} color="var(--play-red)" />
+            <Summary
+              label="Net"
+              value={money(months[month].income - months[month].expense)}
+              color={months[month].income - months[month].expense < 0 ? 'var(--play-red)' : 'var(--play-gold)'}
+            />
           </div>
 
           {/* Legend */}
@@ -128,17 +128,22 @@ export default function ProfitCharts({
             <span className="inline-flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: 'var(--play-red)' }} /> Out
             </span>
+            <span className="ml-auto">Tap a month</span>
           </div>
 
-          {/* Bars */}
+          {/* Bars — tap one to focus it */}
           <div className="flex items-end gap-1 h-36">
             {months.map((m, i) => {
               const nm = m.income - m.expense
+              const selected = i === month
               return (
-                <div
+                <button
                   key={i}
-                  className="flex-1 flex flex-col items-center gap-1 h-full"
-                  title={`${MONTH_NAMES[i]} — In ${money(m.income)}, Out ${money(m.expense)}, Net ${money(nm)}`}
+                  type="button"
+                  onClick={() => setMonth(i)}
+                  className="flex-1 flex flex-col items-center gap-1 h-full focus:outline-none"
+                  style={{ opacity: selected ? 1 : 0.4 }}
+                  title={`${MONTH_SHORT[i]} — In ${money(m.income)}, Out ${money(m.expense)}, Net ${money(nm)}`}
                 >
                   <div className="flex items-end justify-center gap-px w-full flex-1">
                     <div
@@ -150,25 +155,28 @@ export default function ProfitCharts({
                       style={{ height: `${(m.expense / maxBar) * 100}%`, background: 'var(--play-red)' }}
                     />
                   </div>
-                  <span className="font-mono text-[9px]" style={{ color: 'var(--play-muted)' }}>
+                  <span
+                    className="font-mono text-[9px]"
+                    style={{ color: selected ? 'var(--play-gold)' : 'var(--play-muted)' }}
+                  >
                     {MONTH_LETTERS[i]}
                   </span>
-                </div>
+                </button>
               )
             })}
           </div>
         </div>
       </section>
 
-      {/* ---- This month's expense breakdown ---- */}
+      {/* ---- Selected month's expense breakdown ---- */}
       <section>
         <h2 className="font-serif text-lg mb-2" style={{ color: 'var(--play-ink)' }}>
-          {currentMonthLabel} expenses
+          {MONTH_FULL[month]} {year} expenses
         </h2>
         <div className="rounded-2xl p-5" style={panel}>
           {donutTotal <= 0 ? (
             <p className="font-sans text-sm" style={{ color: 'var(--play-muted)' }}>
-              No expenses logged this month yet.
+              No expenses logged for {MONTH_FULL[month]} {year}.
             </p>
           ) : (
             <div className="flex flex-col sm:flex-row items-center gap-5">
@@ -225,6 +233,19 @@ export default function ProfitCharts({
           )}
         </div>
       </section>
+    </div>
+  )
+}
+
+function Summary({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div>
+      <div className="font-mono text-base font-semibold" style={{ color }}>
+        {value}
+      </div>
+      <div className="font-sans text-[10px] uppercase tracking-wider" style={{ color: 'var(--play-muted)' }}>
+        {label}
+      </div>
     </div>
   )
 }
