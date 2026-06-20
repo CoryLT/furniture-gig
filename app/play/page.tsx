@@ -8,6 +8,7 @@ import RankEmblem from '@/components/play/RankEmblem'
 import RankTrail from '@/components/play/RankTrail'
 import ProfitCharts from '@/components/play/ProfitCharts'
 import NeedsYou, { type NeedItem } from '@/components/play/NeedsYou'
+import SoldPeriodSelect from '@/components/play/SoldPeriodSelect'
 import EnableNotificationsButton from '@/components/notifications/EnableNotificationsButton'
 import AddToHomeScreenPrompt from '@/components/notifications/AddToHomeScreenPrompt'
 import UnreadMessagesCard from '@/components/home/UnreadMessagesCard'
@@ -81,7 +82,11 @@ type PieceVM = {
   createdAt: string | null
 }
 
-export default async function PlayPage() {
+export default async function PlayPage({
+  searchParams,
+}: {
+  searchParams: { sold?: string }
+}) {
   const supabase = createClient()
   const {
     data: { user },
@@ -166,6 +171,34 @@ export default async function PlayPage() {
   })
   const monthProfit = soldThisMonth.reduce((s, p) => s + p.realized, 0)
   const monthFlips = soldThisMonth.length
+
+  // ---- sold-period filter for the board (in-play tokens always show) ----
+  const period = typeof searchParams?.sold === 'string' ? searchParams.sold : 'month'
+  const curMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const curYearKey = String(now.getFullYear())
+  const soldMonthKeys = Array.from(
+    new Set(
+      sold.map((p: any) => (p.stage_sold_at ? String(p.stage_sold_at).slice(0, 7) : '')).filter(Boolean)
+    )
+  )
+    .sort()
+    .reverse()
+  const soldYearKeys = Array.from(new Set(soldMonthKeys.map((m) => m.slice(0, 4))))
+    .sort()
+    .reverse()
+  const soldMonthOptions = soldMonthKeys.map((k) => ({
+    key: k,
+    label: new Date(k + '-01T12:00:00').toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+  }))
+  const soldInWindow = (p: any) => {
+    const m = p.stage_sold_at ? String(p.stage_sold_at).slice(0, 7) : ''
+    const y = m.slice(0, 4)
+    if (period === 'all') return true
+    if (period === 'year') return y === curYearKey
+    if (period.startsWith('m:')) return m === period.slice(2)
+    if (period.startsWith('y:')) return y === period.slice(2)
+    return m === curMonthKey
+  }
 
   // ---- Books charts: income/expenses by month (per year) + this month's
   //      expense breakdown. Reads the ledger so it's a real money view. ----
@@ -556,8 +589,9 @@ export default async function PlayPage() {
         {/* The board — your pieces as game tokens */}
         {hasPieces ? (
           <section className="space-y-5">
+            <SoldPeriodSelect value={period} years={soldYearKeys} months={soldMonthOptions} />
             {STAGES.map((s) => {
-              const items = byStage(s.key)
+              const items = s.key === 'sold' ? sold.filter(soldInWindow) : byStage(s.key)
               return (
                 <div key={s.key}>
                   <div className="flex items-baseline justify-between mb-2">

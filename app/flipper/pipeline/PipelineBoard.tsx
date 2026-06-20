@@ -87,6 +87,7 @@ export default function PipelineBoard({
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState('')
   const [openStat, setOpenStat] = useState<string | null>(null)
+  const [period, setPeriod] = useState('month') // month | year | all | m:YYYY-MM | y:YYYY
 
   function imageUrl(path?: string | null) {
     if (!path) return null
@@ -105,6 +106,30 @@ export default function PipelineBoard({
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
   })
   const monthProfit = soldThisMonth.reduce((s, p) => s + realized(p), 0)
+
+  // ---- sold-period filter (in-play always shows; this controls which SOLD show) ----
+  const curMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const curYearKey = String(now.getFullYear())
+  const soldMonthKeys = Array.from(
+    new Set(sold.map((p) => (p.sold_at ? String(p.sold_at).slice(0, 7) : '')).filter(Boolean))
+  )
+    .sort()
+    .reverse()
+  const soldYearKeys = Array.from(new Set(soldMonthKeys.map((m) => m.slice(0, 4))))
+    .sort()
+    .reverse()
+  const monthLabel = (key: string) =>
+    new Date(key + '-01T12:00:00').toLocaleString('en-US', { month: 'long', year: 'numeric' })
+  const soldInWindow = (p: Piece) => {
+    const m = p.sold_at ? String(p.sold_at).slice(0, 7) : ''
+    const y = m.slice(0, 4)
+    if (period === 'all') return true
+    if (period === 'year') return y === curYearKey
+    if (period.startsWith('m:')) return m === period.slice(2)
+    if (period.startsWith('y:')) return y === period.slice(2)
+    return m === curMonthKey // 'month' (default)
+  }
+  const visible = pieces.filter((p) => (p.stage === 'sold' ? soldInWindow(p) : true))
 
   // ---- image upload (shared moderation flow) ----
   async function uploadImage(pieceId: string, file: File): Promise<string | null> {
@@ -438,10 +463,46 @@ export default function PipelineBoard({
         {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
       </div>
 
+      {/* Sold-period filter */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="soldPeriod" className="text-xs text-muted-foreground">
+          Show sold
+        </label>
+        <select
+          id="soldPeriod"
+          value={period}
+          onChange={(e) => setPeriod(e.target.value)}
+          className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+        >
+          <option value="month">This month</option>
+          <option value="year">This year</option>
+          <option value="all">All time</option>
+          {soldYearKeys.length > 0 && (
+            <optgroup label="By year">
+              {soldYearKeys.map((y) => (
+                <option key={y} value={'y:' + y}>
+                  {y}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {soldMonthKeys.length > 0 && (
+            <optgroup label="By month">
+              {soldMonthKeys.map((m) => (
+                <option key={m} value={'m:' + m}>
+                  {monthLabel(m)}
+                </option>
+              ))}
+            </optgroup>
+          )}
+        </select>
+        <span className="text-xs text-muted-foreground">In-play pieces always show.</span>
+      </div>
+
       {/* Board */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {STAGES.map((stage) => {
-          const inStage = pieces.filter((p) => p.stage === stage.key)
+          const inStage = visible.filter((p) => p.stage === stage.key)
           return (
             <div key={stage.key} className="space-y-3">
               <div className="flex items-center justify-between">
