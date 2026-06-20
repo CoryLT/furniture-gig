@@ -114,6 +114,22 @@ export default async function BooksPage() {
     onHand += Number(l.debit) - Number(l.credit)
   }
 
+  // Balance for every bucket, so each one can show how much is in it.
+  const { data: balLines } = await supabase
+    .from('entry_lines')
+    .select('account_id, debit, credit')
+    .eq('owner_user_id', me)
+  const rawBal: Record<string, number> = {}
+  for (const l of (balLines ?? []) as any[]) {
+    const id = l.account_id as string
+    rawBal[id] = (rawBal[id] ?? 0) + (Number(l.debit) - Number(l.credit))
+  }
+  // Cash & expense buckets grow with debits; income/equity/owed grow with credits.
+  const balanceOf = (a: { id: string; type: string }) => {
+    const raw = rawBal[a.id] ?? 0
+    return a.type === 'asset' || a.type === 'expense' ? raw : -raw
+  }
+
   // How many imported bank lines still need sorting (for the Reconcile prompt).
   const { count: toSort } = await supabase
     .from('books_bank_feed')
@@ -304,7 +320,17 @@ export default async function BooksPage() {
               <div className="text-xs text-muted-foreground">{TYPE_LABELS[ty] ?? ty}</div>
               <ul className="mt-1 divide-y divide-border rounded-xl border border-border">
                 {list.filter((a) => a.type === ty).map((a) => (
-                  <li key={a.id} className="px-4 py-2.5 text-foreground">{a.name}</li>
+                  <li key={a.id}>
+                    <Link
+                      href={'/books/account/' + a.id}
+                      className="flex items-center justify-between px-4 py-2.5 text-foreground hover:bg-muted"
+                    >
+                      <span className="truncate">{a.name}</span>
+                      <span className="ml-3 shrink-0 font-mono text-sm text-muted-foreground">
+                        {money(balanceOf(a))}
+                      </span>
+                    </Link>
+                  </li>
                 ))}
               </ul>
             </div>
