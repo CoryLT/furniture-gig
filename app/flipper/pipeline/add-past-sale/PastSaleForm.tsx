@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Check, Plus, CheckCircle2 } from 'lucide-react'
+import { Check, Plus, CheckCircle2, ImagePlus, X } from 'lucide-react'
+import { compressImageForUpload, isAcceptableImageFile } from '@/lib/imageCompression'
 
 const money = (v: number) =>
   '$' +
@@ -24,6 +25,41 @@ export default function PastSaleForm({ me }: { me: string }) {
   const [err, setErr] = useState('')
   const [savedCount, setSavedCount] = useState(0)
   const [lastSaved, setLastSaved] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  function pickFile(f: File | null) {
+    setFile(f)
+    setPreview(f ? URL.createObjectURL(f) : null)
+  }
+  function clearFile() {
+    setFile(null)
+    setPreview(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  // Uses the same moderated upload as the Pipeline. The piece must already
+  // exist (the API sets its image_path), which it does by the time we call this.
+  async function uploadPhoto(pieceId: string, f: File): Promise<boolean> {
+    if (!isAcceptableImageFile(f)) return false
+    let toSend = f
+    try {
+      toSend = await compressImageForUpload(f)
+    } catch {
+      /* fall back to original */
+    }
+    const fd = new FormData()
+    fd.append('file', toSend)
+    fd.append('pieceId', pieceId)
+    try {
+      const res = await fetch('/api/upload-piece-image', { method: 'POST', body: fd })
+      const json = await res.json()
+      return !!(res.ok && json?.image?.file_path)
+    } catch {
+      return false
+    }
+  }
 
   async function save(addAnother: boolean) {
     setErr('')
@@ -66,6 +102,13 @@ export default function PastSaleForm({ me }: { me: string }) {
     }
     const pieceId = (data as any).id
 
+    // Optional photo — don't block the sale if it fails or gets rejected.
+    let photoWarn = ''
+    if (file) {
+      const ok = await uploadPhoto(pieceId, file)
+      if (!ok) photoWarn = ' · photo didn’t upload (add it later from the Pipeline)'
+    }
+
     // 2) Cost -> Books, dated to that month.
     if (paidNum > 0) {
       const { error: pe } = await supabase.rpc('set_piece_purchase', {
@@ -93,13 +136,14 @@ export default function PastSaleForm({ me }: { me: string }) {
     }
 
     setSavedCount((c) => c + 1)
-    setLastSaved(`${title.trim()} — sold for ${money(sp)} (${month})`)
+    setLastSaved(`${title.trim()} — sold for ${money(sp)} (${month})${photoWarn}`)
 
     if (addAnother) {
       // Keep the month so logging a run of same-month sales is fast.
       setTitle('')
       setPaid('')
       setSoldFor('')
+      clearFile()
     } else {
       router.push('/flipper/pipeline')
       router.refresh()
@@ -126,6 +170,44 @@ export default function PastSaleForm({ me }: { me: string }) {
             className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
           />
         </label>
+
+        <div>
+          <span className="mb-1 block text-xs text-muted-foreground">Photo (optional)</span>
+          {preview ? (
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={preview}
+                alt=""
+                className="h-16 w-16 rounded-lg border border-border object-cover"
+              />
+              <button
+                type="button"
+                onClick={clearFile}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted"
+              >
+                <X className="h-4 w-4" />
+                Remove
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-muted"
+            >
+              <ImagePlus className="h-4 w-4" />
+              Add a photo
+            </button>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
 
         <div className="grid grid-cols-2 gap-2">
           <label className="text-xs text-muted-foreground">
