@@ -130,7 +130,7 @@ export default async function TransactionPage({
   const labelCls = 'block text-sm font-medium text-foreground mb-1'
   const helpCls = 'mt-1 text-xs text-muted-foreground'
   const fieldCls =
-    'w-full rounded-lg border border-border px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-accent'
+    'w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent'
 
   const accountOptions = TYPE_ORDER.filter((ty) => accounts.some((a) => a.type === ty)).map((ty) => (
     <optgroup key={ty} label={TYPE_LABELS[ty] ?? ty}>

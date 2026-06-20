@@ -110,7 +110,7 @@ export default async function NewExpensePage({
   const today = new Date().toISOString().slice(0, 10)
   const labelCls = 'block text-sm font-medium text-foreground mb-1'
   const fieldCls =
-    'w-full rounded-lg border border-border px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-accent'
+    'w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent'
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
