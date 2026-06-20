@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 import PipelineBoard from './PipelineBoard'
 
 // Pipeline reflects live piece data — always fresh.
@@ -121,6 +122,12 @@ export default async function PipelinePage() {
           Every piece you&apos;re flipping, from sourced to sold. Move them across as
           they progress and watch the profit land.
         </p>
+        <Link
+          href="/flipper/pipeline/add-past-sale"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+        >
+          + Add a past sale
+        </Link>
       </div>
       <PipelineBoard userId={me} initialPieces={pieces} crew={crew} inventory={inventory} />
     </div>
