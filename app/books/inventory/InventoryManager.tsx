@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Minus, Trash2, Pencil, Package, AlertTriangle, X, Check } from 'lucide-react'
+import { Plus, Minus, Trash2, Pencil, Package, PackagePlus, AlertTriangle, X, Check } from 'lucide-react'
 
 export type InvItem = {
   id: string
@@ -35,6 +35,8 @@ export default function InventoryManager({
   const [editing, setEditing] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [lightbox, setLightbox] = useState<string | null>(null)
+  const [restocking, setRestocking] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -163,19 +165,38 @@ export default function InventoryManager({
                   }}
                 />
               </li>
+            ) : restocking === it.id ? (
+              <li key={it.id}>
+                <RestockForm
+                  item={it}
+                  onCancel={() => setRestocking(null)}
+                  onSaved={(updated) => {
+                    setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+                    setRestocking(null)
+                  }}
+                />
+              </li>
             ) : (
               <li
                 key={it.id}
                 className="flex items-center gap-3 rounded-xl border border-border p-3"
               >
-                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted flex items-center justify-center">
-                  {it.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+                {it.imageUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setLightbox(it.imageUrl)}
+                    className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-accent/40"
+                    aria-label={`Enlarge photo of ${it.name}`}
+                    title="Tap to enlarge"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={it.imageUrl} alt={it.name} className="h-full w-full object-cover" />
-                  ) : (
+                  </button>
+                ) : (
+                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted flex items-center justify-center">
                     <Package className="h-5 w-5 text-muted-foreground/50" />
-                  )}
-                </div>
+                  </div>
+                )}
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -222,6 +243,19 @@ export default function InventoryManager({
                   <button
                     type="button"
                     onClick={() => {
+                      setRestocking(it.id)
+                      setEditing(null)
+                      setAdding(false)
+                    }}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-accent"
+                    aria-label="Add stock you bought"
+                    title="Add stock you bought"
+                  >
+                    <PackagePlus className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       setEditing(it.id)
                       setAdding(false)
                     }}
@@ -243,6 +277,31 @@ export default function InventoryManager({
             )
           )}
         </ul>
+      )}
+
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightbox(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            type="button"
+            onClick={() => setLightbox(null)}
+            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightbox}
+            alt=""
+            className="max-h-[90vh] max-w-[90vw] rounded-xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   )
@@ -372,6 +431,114 @@ function ItemForm({
         >
           <Check className="h-4 w-4" />
           {saving ? 'Saving…' : existing ? 'Save changes' : 'Add to inventory'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+        >
+          <X className="h-4 w-4" />
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function RestockForm({
+  item,
+  onCancel,
+  onSaved,
+}: {
+  item: InvItem
+  onCancel: () => void
+  onSaved: (it: InvItem) => void
+}) {
+  const supabase = createClient()
+  const [boughtQty, setBoughtQty] = useState('')
+  const [totalPaid, setTotalPaid] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  const addQty = parseFloat(boughtQty) || 0
+  const paid = parseFloat(totalPaid) || 0
+  const newQty = Math.round((item.quantity + addQty) * 10000) / 10000
+  // Weighted average across the whole lot: (old value + what you just paid) / new count.
+  const newAvg = newQty > 0 ? (item.avg_cost * item.quantity + paid) / newQty : 0
+  const valid = addQty > 0 && paid >= 0
+
+  async function save() {
+    if (!valid) {
+      setErr('Enter how many you bought and what you paid.')
+      return
+    }
+    setSaving(true)
+    setErr('')
+    const nextQty = newQty
+    const nextAvg = Math.round(newAvg * 10000) / 10000
+    const { error } = await supabase
+      .from('books_inventory_items')
+      .update({ quantity: nextQty, avg_cost: nextAvg })
+      .eq('id', item.id)
+    setSaving(false)
+    if (error) {
+      setErr('Could not save that purchase. Try again.')
+      return
+    }
+    onSaved({ ...item, quantity: nextQty, avg_cost: nextAvg })
+  }
+
+  return (
+    <div className="rounded-xl border border-accent/40 bg-accent/5 p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <PackagePlus className="h-4 w-4 text-accent" />
+        <p className="text-sm font-medium text-foreground">
+          Add stock you bought — {item.name}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs text-muted-foreground">
+          How many did you buy?
+          <input
+            value={boughtQty}
+            onChange={(e) => setBoughtQty(e.target.value)}
+            inputMode="decimal"
+            placeholder="e.g., 25"
+            autoFocus
+            className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+          />
+        </label>
+        <label className="text-xs text-muted-foreground">
+          Total you paid ($)
+          <input
+            value={totalPaid}
+            onChange={(e) => setTotalPaid(e.target.value)}
+            inputMode="decimal"
+            placeholder="e.g., 34.14"
+            className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+          />
+        </label>
+      </div>
+
+      {addQty > 0 && (
+        <p className="rounded-lg bg-muted px-3 py-2 text-xs text-foreground">
+          On hand: <b>{qty(item.quantity)} → {qty(newQty)}</b> · new average{' '}
+          <b>{money(newAvg)} each</b>{' '}
+          <span className="text-muted-foreground">(was {money(item.avg_cost)})</span>
+        </p>
+      )}
+
+      {err && <p className="text-xs text-red-600">{err}</p>}
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={saving || !valid}
+          onClick={save}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
+        >
+          <Check className="h-4 w-4" />
+          {saving ? 'Saving…' : 'Add to stock'}
         </button>
         <button
           type="button"
