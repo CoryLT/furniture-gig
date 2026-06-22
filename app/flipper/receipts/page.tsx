@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ReceiptScanner from './ReceiptScanner'
-import { getPlan, isPro } from '@/lib/plan'
+import { getPlan, isPro, isAdminEmail } from '@/lib/plan'
 import ProLock from '@/components/billing/ProLock'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +17,7 @@ export default async function ReceiptsPage() {
   const me = user.id
 
   const plan = await getPlan(supabase, me)
-  if (!isPro(plan)) {
+  if (!isPro(plan) && !isAdminEmail(user.email)) {
     return (
       <ProLock
         title="The receipt scanner"

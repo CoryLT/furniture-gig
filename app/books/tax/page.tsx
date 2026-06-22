@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import YearPicker from '@/components/books/YearPicker'
 import ExportCsvButton from '@/components/books/ExportCsvButton'
-import { getPlan, isPro } from '@/lib/plan'
+import { getPlan, isPro, isAdminEmail } from '@/lib/plan'
 import ProLock from '@/components/billing/ProLock'
 
 export const dynamic = 'force-dynamic'
@@ -49,7 +49,7 @@ export default async function TaxPage({
   const me = user.id
 
   const plan = await getPlan(supabase, me)
-  if (!isPro(plan)) {
+  if (!isPro(plan) && !isAdminEmail(user.email)) {
     return (
       <ProLock
         title="The tax-year summary"

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Check } from 'lucide-react'
-import { getPlan, isPro, PRO_PRICE_LABEL } from '@/lib/plan'
+import { getPlan, isPro, isAdminEmail, PRO_PRICE_LABEL } from '@/lib/plan'
 import { UpgradeButton, ManageButton } from '@/components/billing/BillingButtons'
 
 export const dynamic = 'force-dynamic'
@@ -34,7 +34,7 @@ export default async function UpgradePage({
   if (!user) redirect('/auth/login')
 
   const plan = await getPlan(supabase, user.id)
-  const pro = isPro(plan)
+  const pro = isPro(plan) || isAdminEmail(user.email)
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">

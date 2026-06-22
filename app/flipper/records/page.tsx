@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import ExportButton from './ExportButton'
-import { getPlan, isPro } from '@/lib/plan'
+import { getPlan, isPro, isAdminEmail } from '@/lib/plan'
 import ProLock from '@/components/billing/ProLock'
 
 // Records reflect live payment data — always fresh.
@@ -42,7 +42,7 @@ export default async function RecordsPage({
   const me = user!.id
 
   const plan = await getPlan(supabase, me)
-  if (!isPro(plan)) {
+  if (!isPro(plan) && !isAdminEmail(user!.email)) {
     return (
       <ProLock
         title="Payment records & 1099s"

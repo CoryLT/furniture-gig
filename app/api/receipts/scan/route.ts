@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { anthropic, SUPPORT_MODEL } from '@/lib/anthropic'
-import { getPlan, isPro } from '@/lib/plan'
+import { getPlan, isPro, isAdminEmail } from '@/lib/plan'
 
 // POST /api/receipts/scan
 // Body: FormData with a single image "file".
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
 
   // Pro-only (AI has a real per-scan cost).
   const plan = await getPlan(supabase, user.id)
-  if (!isPro(plan)) {
+  if (!isPro(plan) && !isAdminEmail(user.email)) {
     return NextResponse.json({ ok: false, error: 'pro_required' }, { status: 402 })
   }
 

@@ -34,3 +34,9 @@ export async function getPlan(supabase: SupabaseClient, userId: string): Promise
     .maybeSingle()
   return (data as PlanRow) ?? null
 }
+
+// The operator (admin) always has full access — never sees the paywall.
+export function isAdminEmail(email?: string | null): boolean {
+  const admin = (process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '').toLowerCase()
+  return !!admin && !!email && email.toLowerCase() === admin
+}
