@@ -32,10 +32,10 @@ async function updateTxn(formData: FormData) {
   const contactId = String(formData.get('contact_id') || '') || null
 
   if (!amount || amount <= 0) {
-    redirect('/books/transaction/' + id + '?error=' + encodeURIComponent('Enter an amount greater than zero.'))
+    redirect('/books/transaction/' + id + '?error=' + encodeURIComponent('Enter an amount greater than zero.') + '#saved')
   }
   if (!debitAccountId || !creditAccountId) {
-    redirect('/books/transaction/' + id + '?error=' + encodeURIComponent('Both accounts are required.'))
+    redirect('/books/transaction/' + id + '?error=' + encodeURIComponent('Both accounts are required.') + '#saved')
   }
 
   const { error } = await supabase.rpc('update_entry', {
@@ -51,7 +51,7 @@ async function updateTxn(formData: FormData) {
   })
 
   if (error) {
-    redirect('/books/transaction/' + id + '?error=' + encodeURIComponent(error.message))
+    redirect('/books/transaction/' + id + '?error=' + encodeURIComponent(error.message) + '#saved')
   }
 
   // If this entry is tied to a piece, optionally update what the piece cost.
@@ -79,14 +79,15 @@ async function updateTxn(formData: FormData) {
             '/books/transaction/' +
               id +
               '?error=' +
-              encodeURIComponent('Entry saved, but the piece cost did not update: ' + ce.message)
+              encodeURIComponent('Entry saved, but the piece cost did not update: ' + ce.message) +
+              '#saved'
           )
         }
       }
     }
   }
 
-  redirect('/books/transaction/' + id + '?ok=1')
+  redirect('/books/transaction/' + id + '?ok=1#saved')
 }
 
 // Delete the whole entry: both balanced lines, then the header.
@@ -201,17 +202,6 @@ export default async function TransactionPage({
         </Link>
       </div>
 
-      {searchParams?.ok && (
-        <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-800">
-          Saved ✓
-        </div>
-      )}
-      {searchParams?.error && (
-        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800">
-          {searchParams.error}
-        </div>
-      )}
-
       {receiptUrl && (
         <div className="mt-6">
           <p className={labelCls}>Attached receipt</p>
@@ -304,6 +294,19 @@ export default async function TransactionPage({
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
+        </div>
+
+        <div id="saved" className="scroll-mt-24">
+          {searchParams?.ok && (
+            <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-800">
+              Saved ✓
+            </div>
+          )}
+          {searchParams?.error && (
+            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+              {searchParams.error}
+            </div>
+          )}
         </div>
 
         <button
