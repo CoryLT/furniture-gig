@@ -3,7 +3,15 @@
 > Compressed May 28, 2026. Full history lives in `git log`; this doc keeps only
 > what's true *now* plus the gotchas that save the next session real time.
 
-> **Most recent first:** read `HANDOFF_2026-06-17d.md` — this session executed the
+> **Most recent first:** read `HANDOFF_2026-06-22.md` — a long session covering the
+> orange→green theme, animated hero, the past-sale backfill (now with photo + quantity),
+> Books money buckets / "Move money" transfers / Tax-year screen, the bucket-activity
+> search + thumbnails + inline delete, edit-entry improvements (piece cost, photo,
+> return-to-origin), the `/install` PWA guide, AI-support escalation emails, and — the
+> headline — **monetization**: a freemium Pro ($9/mo) tier with Stripe billing wired up
+> (checkout/portal/webhook), feature-gating (no piece cap), and admin auto-comp. It lists
+> the SQL still to run and the **Stripe finish/blocker** (the "billing not set up" =
+> `STRIPE_PRICE_ID_PRO` env var) — start there. Then `HANDOFF_2026-06-17d.md` — the
 > "make the piece the hub" plan: the **Books ledger is now the one source of truth
 > for every cost AND every worker payment** (a piece is a tag, a worker is a tag),
 > the **worker/gig side is shelved** (operator-only — Post a Job + My Jobs hidden),
