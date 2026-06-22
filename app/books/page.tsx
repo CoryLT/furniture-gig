@@ -13,7 +13,7 @@ export const revalidate = 0
 const DEFAULT_ACCOUNTS: { name: string; type: string }[] = [
   { name: 'Cash on Hand', type: 'asset' },
   { name: 'Bank / Checking', type: 'asset' },
-  { name: 'Furniture Sales', type: 'income' },
+  { name: 'Sales', type: 'income' },
   { name: 'Pieces Purchased', type: 'expense' },
   { name: 'Materials & Supplies', type: 'expense' },
   { name: 'Labor — Crew', type: 'expense' },

@@ -42,7 +42,7 @@ export default async function AccountPage({ params }: { params: { id: string } }
 
   const { data: lines } = await supabase
     .from('entry_lines')
-    .select('debit, credit, transaction_id, transactions(id, date, description)')
+    .select('debit, credit, transaction_id, transactions(id, date, description, piece_id)')
     .eq('owner_user_id', me)
     .eq('account_id', params.id)
 
@@ -56,11 +56,28 @@ export default async function AccountPage({ params }: { params: { id: string } }
       id: (t?.id as string) || '',
       date: (t?.date as string) || '',
       description: (t?.description as string) || 'Entry',
+      pieceId: (t?.piece_id as string) || '',
       amount: isDebitNormal ? delta : -delta,
     }
   })
   const balance = isDebitNormal ? raw : -raw
   rows.sort((x, y) => (y.date || '').localeCompare(x.date || ''))
+
+  // Pull a photo for any row tied to a piece (so sales show the item).
+  const pieceIds = Array.from(new Set(rows.map((r) => r.pieceId).filter(Boolean)))
+  const imgByPiece: Record<string, string> = {}
+  if (pieceIds.length > 0) {
+    const { data: pcs } = await supabase
+      .from('inventory_pieces')
+      .select('id, image_path')
+      .in('id', pieceIds)
+    for (const p of (pcs ?? []) as any[]) {
+      if (p.image_path) {
+        const { data } = supabase.storage.from('marketplace-photos').getPublicUrl(p.image_path)
+        if (data?.publicUrl) imgByPiece[p.id] = data.publicUrl
+      }
+    }
+  }
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
@@ -95,23 +112,43 @@ export default async function AccountPage({ params }: { params: { id: string } }
                 {r.id ? (
                   <Link
                     href={'/books/transaction/' + r.id}
-                    className="flex items-center justify-between px-4 py-3 hover:bg-muted"
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted"
                   >
-                    <span className="min-w-0">
+                    {r.pieceId &&
+                      (imgByPiece[r.pieceId] ? (
+                        <img
+                          src={imgByPiece[r.pieceId]}
+                          alt=""
+                          className="h-10 w-10 shrink-0 rounded-md border border-border object-cover"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 shrink-0 rounded-md border border-border bg-muted" />
+                      ))}
+                    <span className="min-w-0 flex-1">
                       <span className="block truncate text-foreground">{r.description}</span>
                       <span className="block text-xs text-muted-foreground">{r.date}</span>
                     </span>
-                    <span className="ml-3 shrink-0 font-mono text-sm text-foreground">
+                    <span className="shrink-0 font-mono text-sm text-foreground">
                       {money(r.amount)}
                     </span>
                   </Link>
                 ) : (
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <span className="min-w-0">
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    {r.pieceId &&
+                      (imgByPiece[r.pieceId] ? (
+                        <img
+                          src={imgByPiece[r.pieceId]}
+                          alt=""
+                          className="h-10 w-10 shrink-0 rounded-md border border-border object-cover"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 shrink-0 rounded-md border border-border bg-muted" />
+                      ))}
+                    <span className="min-w-0 flex-1">
                       <span className="block truncate text-foreground">{r.description}</span>
                       <span className="block text-xs text-muted-foreground">{r.date}</span>
                     </span>
-                    <span className="ml-3 shrink-0 font-mono text-sm text-foreground">
+                    <span className="shrink-0 font-mono text-sm text-foreground">
                       {money(r.amount)}
                     </span>
                   </div>
