@@ -3,7 +3,15 @@
 > Compressed May 28, 2026. Full history lives in `git log`; this doc keeps only
 > what's true *now* plus the gotchas that save the next session real time.
 
-> **Most recent first:** read `HANDOFF_2026-06-22.md` — a long session covering the
+> **Most recent first:** read `HANDOFF_2026-06-22b.md` — a session on **logging labor
+> cleanly + cleaning up the crew list**: a labor box on the past-sale form (with inline
+> "add a person"), three doors for logging labor that all land in one place (past-sale
+> form, the person's "Add a payment", and "Add labor paid on this piece" on the edit-entry
+> page), tappable/editable payment history, crew cards now counting payments from the
+> ledger (jobs→payments) so they match the detail page, a **combine-duplicates** merge,
+> dropping the "On-platform crew" label, and a dark-mode fix for the `/play`
+> profit-by-month/year dropdowns. It lists the **SQL still to confirm**
+> (`add_labor_payment`). Then read `HANDOFF_2026-06-22.md` — a long session covering the
 > orange→green theme, animated hero, the past-sale backfill (now with photo + quantity),
 > Books money buckets / "Move money" transfers / Tax-year screen, the bucket-activity
 > search + thumbnails + inline delete, edit-entry improvements (piece cost, photo,
