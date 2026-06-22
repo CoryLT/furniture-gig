@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import PiecePhotoField from '@/components/books/PiecePhotoField'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -175,6 +176,21 @@ export default async function TransactionPage({
   }
   const taggedPieceTitle = pieces.find((p) => p.id === t.piece_id)?.title || 'this piece'
 
+  // Current photo of the tagged piece (so it can be added/replaced here).
+  let pieceImageUrl: string | null = null
+  if (t.piece_id) {
+    const { data: pc } = await supabase
+      .from('inventory_pieces')
+      .select('image_path')
+      .eq('id', t.piece_id)
+      .maybeSingle()
+    const ip = (pc as any)?.image_path
+    if (ip) {
+      const { data } = supabase.storage.from('marketplace-photos').getPublicUrl(ip)
+      pieceImageUrl = data?.publicUrl ?? null
+    }
+  }
+
   const { data: contactsRaw } = await supabase
     .from('contacts')
     .select('id, name')
@@ -295,6 +311,7 @@ export default async function TransactionPage({
               What you paid for {taggedPieceTitle}. Changing this updates the piece&apos;s cost in
               your Books and its profit. Leave it as-is if it&apos;s already right.
             </p>
+            <PiecePhotoField pieceId={t.piece_id} initialUrl={pieceImageUrl} />
           </div>
         )}
 
