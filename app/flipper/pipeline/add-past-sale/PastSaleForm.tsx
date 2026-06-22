@@ -28,6 +28,10 @@ export default function PastSaleForm({
   const [soldFor, setSoldFor] = useState('')
   const [fixUp, setFixUp] = useState('')
   const [fixCrew, setFixCrew] = useState('')
+  const [crewList, setCrewList] = useState(crew)
+  const [addingPerson, setAddingPerson] = useState(false)
+  const [newPerson, setNewPerson] = useState('')
+  const [savingPerson, setSavingPerson] = useState(false)
   const [month, setMonth] = useState('') // "YYYY-MM"
   const [qty, setQty] = useState('1')
   const [saving, setSaving] = useState(false)
@@ -46,6 +50,45 @@ export default function PastSaleForm({
     setFile(null)
     setPreview(null)
     if (fileRef.current) fileRef.current.value = ''
+  }
+
+  // Add a name-only crew member right here, then select them. Same find-or-create
+  // by name the rest of the app uses, so we don't make duplicates.
+  async function addPerson() {
+    const name = newPerson.trim()
+    if (!name) return
+    setSavingPerson(true)
+    try {
+      const { data: existing } = await supabase
+        .from('crew_members')
+        .select('id')
+        .eq('operator_user_id', me)
+        .is('worker_user_id', null)
+        .ilike('worker_name', name)
+        .maybeSingle()
+      let id = (existing as any)?.id as string | undefined
+      if (!id) {
+        const { data: created, error } = await (supabase.from('crew_members') as any)
+          .insert({ operator_user_id: me, worker_name: name })
+          .select('id')
+          .single()
+        if (error || !created) {
+          setErr('Could not add that person. Try again.')
+          setSavingPerson(false)
+          return
+        }
+        id = created.id as string
+      }
+      // Show them in the dropdown (if not already there) and pick them.
+      setCrewList((list) =>
+        list.some((c) => c.id === id) ? list : [...list, { id: id as string, label: name }]
+      )
+      setFixCrew(id)
+      setNewPerson('')
+      setAddingPerson(false)
+    } finally {
+      setSavingPerson(false)
+    }
   }
 
   // Uses the same moderated upload as the Pipeline. The piece must already
@@ -287,7 +330,7 @@ export default function PastSaleForm({
               className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
             />
           </label>
-          {crew.length > 0 && (
+          <div className="space-y-1.5">
             <label className="block text-xs text-muted-foreground">
               Who did you pay? <span className="text-muted-foreground/70">(for 1099 tracking)</span>
               <select
@@ -296,14 +339,53 @@ export default function PastSaleForm({
                 className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
               >
                 <option value="">Not sure / skip</option>
-                {crew.map((c) => (
+                {crewList.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.label}
                   </option>
                 ))}
               </select>
             </label>
-          )}
+
+            {addingPerson ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={newPerson}
+                  onChange={(e) => setNewPerson(e.target.value)}
+                  placeholder="Their name"
+                  className="flex-1 min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+                />
+                <button
+                  type="button"
+                  disabled={savingPerson || !newPerson.trim()}
+                  onClick={addPerson}
+                  className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
+                >
+                  {savingPerson ? 'Adding…' : 'Add'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddingPerson(false)
+                    setNewPerson('')
+                  }}
+                  className="rounded-lg border border-border p-2 text-muted-foreground hover:bg-muted"
+                  aria-label="Cancel"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingPerson(true)}
+                className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add a person
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
