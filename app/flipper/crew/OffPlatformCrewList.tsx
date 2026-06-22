@@ -114,7 +114,7 @@ function OffCard({ row }: { row: OffRow }) {
             className="w-full font-semibold text-foreground bg-transparent border-b border-transparent hover:border-border focus:border-accent focus:outline-none pb-0.5"
           />
           <p className="text-sm text-muted-foreground mt-0.5">
-            Off-platform · {row.jobs} job{row.jobs === 1 ? '' : 's'} · {formatCurrency(row.paid)} paid
+            Off-platform · {row.jobs} payment{row.jobs === 1 ? '' : 's'} · {formatCurrency(row.paid)} paid
             {' · '}
             <Link href={`/flipper/crew/${row.id}`} className="text-accent hover:underline">
               View page

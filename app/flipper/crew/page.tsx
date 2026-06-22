@@ -129,9 +129,11 @@ export default async function CrewPage() {
     .select('crew_member_id, amount')
     .eq('owner_user_id', me)
   const paidByCrewId: Record<string, number> = {}
+  const countByCrewId: Record<string, number> = {}
   for (const w of (wpRaw ?? []) as any[]) {
     const cid = w.crew_member_id as string
     paidByCrewId[cid] = (paidByCrewId[cid] ?? 0) + Number(w.amount || 0)
+    countByCrewId[cid] = (countByCrewId[cid] ?? 0) + 1
   }
 
   const crew = workerIds
@@ -142,7 +144,7 @@ export default async function CrewPage() {
         workerId: id,
         name: displayName(prof),
         username: prof?.username ?? null,
-        jobs: stats[id].jobs,
+        jobs: countByCrewId[crewIdByWorker[id]] ?? 0,
         completed: stats[id].completed,
         paid: paidByCrewId[crewIdByWorker[id]] ?? 0,
         rating: note?.rating ?? null,
@@ -165,7 +167,7 @@ export default async function CrewPage() {
   const offCrew = ((offRaw ?? []) as any[]).map((m) => ({
     id: m.id as string,
     name: ((m.worker_name as string) || 'Unnamed').trim() || 'Unnamed',
-    jobs: (m.jobs_count as number) ?? 0,
+    jobs: countByCrewId[m.id as string] ?? 0,
     paid: paidByCrewId[m.id as string] ?? 0,
     rating: (m.rating as number) ?? null,
     notes: (m.notes as string) ?? '',

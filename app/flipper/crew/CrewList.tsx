@@ -153,7 +153,7 @@ function CrewCard({ operatorId, row }: { operatorId: string; row: CrewRow }) {
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {row.jobs} job{row.jobs === 1 ? '' : 's'} · {row.completed} completed · $
+            {row.jobs} payment{row.jobs === 1 ? '' : 's'} · {row.completed} completed · $
             {row.paid.toFixed(2)} paid
           </p>
         </div>
@@ -284,7 +284,7 @@ function RemovedSection({
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {c.jobs} job{c.jobs === 1 ? '' : 's'} · ${c.paid.toFixed(2)} paid
+                  {c.jobs} payment{c.jobs === 1 ? '' : 's'} · ${c.paid.toFixed(2)} paid
                 </p>
               </div>
               <button
