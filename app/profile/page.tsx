@@ -562,6 +562,22 @@ export default function ProfilePage() {
           <EnableNotificationsButton placement="settings" />
         </div>
 
+        {/* Add to Home Screen — persistent link to the install guide */}
+        <div className="bg-card rounded-lg shadow p-8 mt-6">
+          <h2 className="text-2xl font-serif font-bold text-foreground mb-2">
+            Add to Home Screen
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Install FlipWork on your phone for a one-tap icon, full-screen use, and notifications.
+          </p>
+          <Link
+            href="/install"
+            className="inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-accent-foreground hover:bg-accent/90"
+          >
+            See how to add it
+          </Link>
+        </div>
+
         {/* Work Samples Gallery — separate card so it has its own context */}
         <div className="bg-card rounded-lg shadow p-8 mt-6">
           <div className="flex items-center gap-2 mb-2">

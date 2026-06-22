@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Smartphone, X } from 'lucide-react'
 
 // Per-device flag: install state is per-device, so a per-device dismiss fits.
@@ -116,12 +117,20 @@ export default function AddToHomeScreenPrompt() {
             </p>
           )}
 
-          <button
-            onClick={dismiss}
-            className="mt-3 text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-          >
-            Maybe later
-          </button>
+          <div className="mt-3 flex items-center gap-4">
+            <Link
+              href="/install"
+              className="text-xs font-medium text-accent hover:text-accent/80"
+            >
+              Full step-by-step with pictures →
+            </Link>
+            <button
+              onClick={dismiss}
+              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+            >
+              Maybe later
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -193,6 +193,27 @@ export default async function HomePage() {
           </div>
         </section>
 
+        {/* ADD TO PHONE */}
+        <section className="border-t border-border">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-20 text-center">
+            <div className="mb-4 inline-flex items-center justify-center rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
+              Works like an app
+            </div>
+            <h2 className="font-serif text-3xl sm:text-4xl text-foreground mb-3">
+              Run it from your home screen
+            </h2>
+            <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
+              Add FlipWork to your phone for a one-tap icon, full-screen use, and notifications —
+              no app store needed.
+            </p>
+            <Link href="/install">
+              <Button variant="accent" size="lg" className="w-full sm:w-auto">
+                See how to add it
+              </Button>
+            </Link>
+          </div>
+        </section>
+
         {/* FINAL CTA */}
         <section className="border-t border-border bg-card">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-20 text-center">
