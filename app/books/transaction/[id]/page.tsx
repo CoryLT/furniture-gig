@@ -338,12 +338,17 @@ export default async function TransactionPage({
           )}
         </div>
 
-        <button
-          type="submit"
-          className="rounded-lg bg-accent px-5 py-2.5 font-medium text-accent-foreground hover:bg-accent/90"
-        >
-          Save changes
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            type="submit"
+            className="rounded-lg bg-accent px-5 py-2.5 font-medium text-accent-foreground hover:bg-accent/90"
+          >
+            Save changes
+          </button>
+          <Link href={backHref} className="text-sm text-muted-foreground hover:text-foreground">
+            ← Back
+          </Link>
+        </div>
       </form>
 
       <form action={deleteTxn} className="mt-8 border-t border-border pt-6">
