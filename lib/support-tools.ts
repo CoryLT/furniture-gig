@@ -11,6 +11,16 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { sendEmail } from '@/lib/email'
+import { getSiteUrl } from '@/lib/utils'
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
 
 // ------------------------------------------------------------
 // Tool schemas (Anthropic format)
@@ -172,6 +182,42 @@ export async function runTool(
         .eq('id', conversationId)
 
       if (error) return { result: `Error escalating: ${error.message}` }
+
+      // Email the operator so escalations don't sit unseen in the queue.
+      // Best-effort: never let an email hiccup break the escalation.
+      try {
+        const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL
+        if (adminEmail) {
+          let userEmail = 'a user'
+          try {
+            const { data: u } = await supabase.auth.admin.getUserById(userId)
+            if (u?.user?.email) userEmail = u.user.email
+          } catch {
+            /* fall back to generic */
+          }
+          const link = `${getSiteUrl()}/admin/support/${conversationId}`
+          await sendEmail({
+            recipientUserId: null,
+            recipientEmail: adminEmail,
+            eventType: 'support_escalation',
+            subject: `FlipWork support escalation — ${reason}`,
+            html:
+              `<p>A support chat was escalated and needs you.</p>` +
+              `<p><b>Reason:</b> ${escapeHtml(reason)}<br/>` +
+              `<b>From:</b> ${escapeHtml(userEmail)}</p>` +
+              `<p><b>Summary:</b> ${escapeHtml(summary)}</p>` +
+              `<p><a href="${link}">Open the conversation →</a></p>`,
+            text:
+              `A support chat was escalated.\n\n` +
+              `Reason: ${reason}\nFrom: ${userEmail}\nSummary: ${summary}\n\nOpen: ${link}`,
+            idempotencyKey: `support_escalation:${conversationId}`,
+            relatedEntityId: conversationId,
+          })
+        }
+      } catch {
+        /* best-effort */
+      }
+
       return {
         result: `Conversation escalated. Admin will be notified. Reason: ${reason}.`,
       }
