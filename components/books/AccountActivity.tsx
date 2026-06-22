@@ -1,8 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { Trash2 } from 'lucide-react'
+import { deleteTransaction } from '@/app/books/actions'
 
 type Row = {
   id: string
@@ -21,7 +23,29 @@ const money = (n: number) => {
 
 export default function AccountActivity({ rows }: { rows: Row[] }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const [allRows, setAllRows] = useState<Row[]>(rows)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [delErr, setDelErr] = useState('')
   const [q, setQ] = useState('')
+
+  // Keep in sync when the server sends a fresh list (e.g. after a refresh).
+  useEffect(() => setAllRows(rows), [rows])
+
+  async function onDelete(id: string) {
+    if (!id) return
+    if (!window.confirm('Delete this entry? This can’t be undone.')) return
+    setDelErr('')
+    setBusyId(id)
+    const res = await deleteTransaction(id)
+    if (res.ok) {
+      setAllRows((prev) => prev.filter((r) => r.id !== id))
+      router.refresh() // update the bucket balance up top
+    } else {
+      setDelErr(res.error || 'Could not delete. Try again.')
+    }
+    setBusyId(null)
+  }
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [min, setMin] = useState('')
@@ -31,7 +55,7 @@ export default function AccountActivity({ rows }: { rows: Row[] }) {
     const qq = q.trim().toLowerCase()
     const minN = min.trim() === '' ? null : Number(min)
     const maxN = max.trim() === '' ? null : Number(max)
-    return rows.filter((r) => {
+    return allRows.filter((r) => {
       if (qq && !r.description.toLowerCase().includes(qq)) return false
       if (from && (r.date || '') < from) return false
       if (to && (r.date || '') > to) return false
@@ -39,7 +63,7 @@ export default function AccountActivity({ rows }: { rows: Row[] }) {
       if (maxN !== null && !isNaN(maxN) && r.amount > maxN) return false
       return true
     })
-  }, [rows, q, from, to, min, max])
+  }, [allRows, q, from, to, min, max])
 
   const total = filtered.reduce((s, r) => s + r.amount, 0)
   const anyFilter = !!(q || from || to || min || max)
@@ -97,7 +121,7 @@ export default function AccountActivity({ rows }: { rows: Row[] }) {
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
-          {filtered.length} of {rows.length} · {money(total)}
+          {filtered.length} of {allRows.length} · {money(total)}
         </span>
         {anyFilter && (
           <button type="button" onClick={clear} className="font-medium text-accent hover:text-accent/80">
@@ -108,7 +132,7 @@ export default function AccountActivity({ rows }: { rows: Row[] }) {
 
       {filtered.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
-          {rows.length === 0 ? 'Nothing in this bucket yet.' : 'No matches.'}
+          {allRows.length === 0 ? 'Nothing in this bucket yet.' : 'No matches.'}
         </p>
       ) : (
         <ul className="divide-y divide-border rounded-xl border border-border">
@@ -132,7 +156,11 @@ export default function AccountActivity({ rows }: { rows: Row[] }) {
               </>
             )
             return (
-              <li key={(r.id || 'x') + ':' + i} id={'txn-' + r.id} className="scroll-mt-20">
+              <li
+                key={(r.id || 'x') + ':' + i}
+                id={'txn-' + r.id}
+                className="flex items-center scroll-mt-20"
+              >
                 {r.id ? (
                   <Link
                     href={
@@ -141,18 +169,31 @@ export default function AccountActivity({ rows }: { rows: Row[] }) {
                       '?from=' +
                       encodeURIComponent(pathname + '#txn-' + r.id)
                     }
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted"
+                    className="flex flex-1 items-center gap-3 px-4 py-3 hover:bg-muted"
                   >
                     {inner}
                   </Link>
                 ) : (
-                  <div className="flex items-center gap-3 px-4 py-3">{inner}</div>
+                  <div className="flex flex-1 items-center gap-3 px-4 py-3">{inner}</div>
+                )}
+                {r.id && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(r.id)}
+                    disabled={busyId === r.id}
+                    aria-label="Delete entry"
+                    title="Delete entry"
+                    className="px-3 py-3 text-muted-foreground hover:text-red-600 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 )}
               </li>
             )
           })}
         </ul>
       )}
+      {delErr && <p className="mt-2 text-sm text-red-600">{delErr}</p>}
     </div>
   )
 }
