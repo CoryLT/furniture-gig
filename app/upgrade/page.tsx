@@ -2,23 +2,23 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Check } from 'lucide-react'
-import { getPlan, isPro, FREE_PIECE_CAP, PRO_PRICE_LABEL } from '@/lib/plan'
+import { getPlan, isPro, PRO_PRICE_LABEL } from '@/lib/plan'
 import { UpgradeButton, ManageButton } from '@/components/billing/BillingButtons'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 const freePerks = [
-  `Track up to ${FREE_PIECE_CAP} active pieces`,
-  'Pipeline, photos & profit',
+  'Unlimited pieces in your Pipeline',
+  'Photos, profit & cash tracking',
   'Books: log sales & expenses',
   'Dashboard & charts',
 ]
 const proPerks = [
-  'Unlimited active pieces',
   'Receipt scanner (snap a photo)',
   'Tax-year summary & CSV export',
   'Payment records & 1099 tracking',
+  'New Pro tools as they ship',
   'Everything in Free',
 ]
 

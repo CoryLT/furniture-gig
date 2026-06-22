@@ -578,6 +578,23 @@ export default function ProfilePage() {
           </Link>
         </div>
 
+        {/* FlipWork Pro */}
+        <div className="bg-card rounded-lg shadow p-8 mt-6">
+          <h2 className="text-2xl font-serif font-bold text-foreground mb-2">
+            FlipWork Pro
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Unlock the receipt scanner, tax-year summary, and 1099 tracking — and the Pro tools
+            coming next.
+          </p>
+          <Link
+            href="/upgrade"
+            className="inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-accent-foreground hover:bg-accent/90"
+          >
+            See plans
+          </Link>
+        </div>
+
         {/* Work Samples Gallery — separate card so it has its own context */}
         <div className="bg-card rounded-lg shadow p-8 mt-6">
           <div className="flex items-center gap-2 mb-2">

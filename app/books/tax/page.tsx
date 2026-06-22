@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import YearPicker from '@/components/books/YearPicker'
 import ExportCsvButton from '@/components/books/ExportCsvButton'
+import { getPlan, isPro } from '@/lib/plan'
+import ProLock from '@/components/billing/ProLock'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -45,6 +47,16 @@ export default async function TaxPage({
   } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const me = user.id
+
+  const plan = await getPlan(supabase, me)
+  if (!isPro(plan)) {
+    return (
+      <ProLock
+        title="The tax-year summary"
+        blurb="Pick a year and get a clean profit & loss, cost-of-goods and inventory, and a one-click export to hand your accountant. It's part of FlipWork Pro."
+      />
+    )
+  }
 
   const nowYear = new Date().getFullYear()
   const year = Number(searchParams?.year) || nowYear

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import ExportButton from './ExportButton'
+import { getPlan, isPro } from '@/lib/plan'
+import ProLock from '@/components/billing/ProLock'
 
 // Records reflect live payment data — always fresh.
 export const dynamic = 'force-dynamic'
@@ -38,6 +40,16 @@ export default async function RecordsPage({
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const me = user!.id
+
+  const plan = await getPlan(supabase, me)
+  if (!isPro(plan)) {
+    return (
+      <ProLock
+        title="Payment records & 1099s"
+        blurb="See what you paid each person by year, get a heads-up when someone crosses the 1099 threshold, and export it all. It's part of FlipWork Pro."
+      />
+    )
+  }
 
   // Every worker payment = a labor expense you logged and tagged to a crew
   // member (the ledger is the one source of truth now).

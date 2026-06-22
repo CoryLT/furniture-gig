@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ReceiptScanner from './ReceiptScanner'
+import { getPlan, isPro } from '@/lib/plan'
+import ProLock from '@/components/billing/ProLock'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -13,6 +15,16 @@ export default async function ReceiptsPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const me = user.id
+
+  const plan = await getPlan(supabase, me)
+  if (!isPro(plan)) {
+    return (
+      <ProLock
+        title="The receipt scanner"
+        blurb="Snap a photo of a receipt and FlipWork reads the vendor, amount, and date and files it in your Books. It's part of FlipWork Pro."
+      />
+    )
+  }
 
   // Books accounts: expense ones are the "category", asset ones are "paid from".
   const { data: accountsRaw } = await supabase
