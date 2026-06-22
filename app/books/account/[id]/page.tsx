@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import AccountActivity from '@/components/books/AccountActivity'
 
 // Live data — always fresh.
 export const dynamic = 'force-dynamic'
@@ -79,6 +80,15 @@ export default async function AccountPage({ params }: { params: { id: string } }
     }
   }
 
+  // Rows for the client-side filter/search bar.
+  const clientRows = rows.map((r) => ({
+    id: r.id,
+    date: r.date,
+    description: r.description,
+    amount: r.amount,
+    img: r.pieceId ? imgByPiece[r.pieceId] ?? null : null,
+  }))
+
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
       <Link
@@ -101,62 +111,7 @@ export default async function AccountPage({ params }: { params: { id: string } }
         <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Activity
         </h2>
-        {rows.length === 0 ? (
-          <p className="mt-2 rounded-xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
-            Nothing in this bucket yet.
-          </p>
-        ) : (
-          <ul className="mt-2 divide-y divide-border rounded-xl border border-border">
-            {rows.map((r, i) => (
-              <li key={(r.id || 'x') + ':' + i}>
-                {r.id ? (
-                  <Link
-                    href={'/books/transaction/' + r.id}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted"
-                  >
-                    {r.pieceId &&
-                      (imgByPiece[r.pieceId] ? (
-                        <img
-                          src={imgByPiece[r.pieceId]}
-                          alt=""
-                          className="h-10 w-10 shrink-0 rounded-md border border-border object-cover"
-                        />
-                      ) : (
-                        <div className="h-10 w-10 shrink-0 rounded-md border border-border bg-muted" />
-                      ))}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-foreground">{r.description}</span>
-                      <span className="block text-xs text-muted-foreground">{r.date}</span>
-                    </span>
-                    <span className="shrink-0 font-mono text-sm text-foreground">
-                      {money(r.amount)}
-                    </span>
-                  </Link>
-                ) : (
-                  <div className="flex items-center gap-3 px-4 py-3">
-                    {r.pieceId &&
-                      (imgByPiece[r.pieceId] ? (
-                        <img
-                          src={imgByPiece[r.pieceId]}
-                          alt=""
-                          className="h-10 w-10 shrink-0 rounded-md border border-border object-cover"
-                        />
-                      ) : (
-                        <div className="h-10 w-10 shrink-0 rounded-md border border-border bg-muted" />
-                      ))}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-foreground">{r.description}</span>
-                      <span className="block text-xs text-muted-foreground">{r.date}</span>
-                    </span>
-                    <span className="shrink-0 font-mono text-sm text-foreground">
-                      {money(r.amount)}
-                    </span>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+        <AccountActivity rows={clientRows} />
       </section>
     </main>
   )
