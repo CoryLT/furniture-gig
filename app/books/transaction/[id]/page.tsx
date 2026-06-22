@@ -53,6 +53,39 @@ async function updateTxn(formData: FormData) {
   if (error) {
     redirect('/books/transaction/' + id + '?error=' + encodeURIComponent(error.message))
   }
+
+  // If this entry is tied to a piece, optionally update what the piece cost.
+  if (pieceId) {
+    const costRaw = formData.get('piece_cost')
+    if (costRaw !== null && String(costRaw).trim() !== '') {
+      const cost = Number(costRaw)
+      if (!isNaN(cost) && cost >= 0) {
+        // Preserve the existing purchase date so the cost doesn't jump months.
+        const { data: acq } = await supabase
+          .from('transactions')
+          .select('date')
+          .eq('owner_user_id', user.id)
+          .eq('piece_id', pieceId)
+          .like('memo', '%acq:' + pieceId)
+          .maybeSingle()
+        const acqDate = (acq as any)?.date ?? date ?? null
+        const { error: ce } = await supabase.rpc('set_piece_purchase', {
+          p_piece_id: pieceId,
+          p_amount: cost,
+          p_date: acqDate,
+        })
+        if (ce) {
+          redirect(
+            '/books/transaction/' +
+              id +
+              '?error=' +
+              encodeURIComponent('Entry saved, but the piece cost did not update: ' + ce.message)
+          )
+        }
+      }
+    }
+  }
+
   redirect('/books/transaction/' + id + '?ok=1')
 }
 
@@ -110,6 +143,25 @@ export default async function TransactionPage({
     .eq('owner_user_id', me)
     .order('created_at', { ascending: false })
   const pieces = (piecesRaw ?? []) as { id: string; title: string }[]
+
+  // Current purchase cost of the tagged piece (to let the user edit it here).
+  let pieceCost = 0
+  if (t.piece_id) {
+    const { data: acqTxn } = await supabase
+      .from('transactions')
+      .select('entry_lines(debit)')
+      .eq('owner_user_id', me)
+      .eq('piece_id', t.piece_id)
+      .like('memo', '%acq:' + t.piece_id)
+      .maybeSingle()
+    if (acqTxn) {
+      pieceCost = (((acqTxn as any).entry_lines ?? []) as any[]).reduce(
+        (s, l) => s + Number(l.debit || 0),
+        0
+      )
+    }
+  }
+  const taggedPieceTitle = pieces.find((p) => p.id === t.piece_id)?.title || 'this piece'
 
   const { data: contactsRaw } = await supabase
     .from('contacts')
@@ -222,6 +274,27 @@ export default async function TransactionPage({
             ))}
           </select>
         </div>
+
+        {t.piece_id && (
+          <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
+            <label className={labelCls} htmlFor="piece_cost">
+              What this piece cost (purchase)
+            </label>
+            <input
+              id="piece_cost"
+              name="piece_cost"
+              type="number"
+              step="0.01"
+              min="0"
+              defaultValue={pieceCost}
+              className={fieldCls}
+            />
+            <p className={helpCls}>
+              What you paid for {taggedPieceTitle}. Changing this updates the piece&apos;s cost in
+              your Books and its profit. Leave it as-is if it&apos;s already right.
+            </p>
+          </div>
+        )}
 
         <div>
           <label className={labelCls} htmlFor="contact_id">Person (optional)</label>
