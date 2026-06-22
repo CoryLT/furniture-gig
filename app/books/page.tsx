@@ -257,6 +257,9 @@ export default async function BooksPage() {
         <Link href="/books/transfer/new" className="mt-2 ml-4 inline-block text-sm font-medium text-green-700 hover:text-green-800">
           ⇄ Move money
         </Link>
+        <Link href="/books/tax" className="mt-2 ml-4 inline-block text-sm font-medium text-green-700 hover:text-green-800">
+          Tax year →
+        </Link>
       </div>
 
       <Link
