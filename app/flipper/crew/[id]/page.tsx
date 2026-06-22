@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatCurrency } from '@/lib/utils'
 import { ArrowLeft, Star } from 'lucide-react'
 import MergeCrewCard from '../MergeCrewCard'
+import AddPaymentCard from '../AddPaymentCard'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -115,6 +116,17 @@ export default async function CrewPersonPage({ params }: { params: { id: string 
   const paid = history.reduce((s, h) => s + h.amount, 0)
   const count = history.length
 
+  // Pieces for the optional "for which piece?" picker when adding a payment.
+  const { data: pieceRows } = await supabase
+    .from('inventory_pieces')
+    .select('id, title')
+    .eq('owner_user_id', me)
+    .order('created_at', { ascending: false })
+  const pieces = ((pieceRows ?? []) as any[]).map((p) => ({
+    id: p.id as string,
+    title: (p.title as string) || 'Untitled piece',
+  }))
+
   // Other crew records (for combining duplicates of the same person). Both
   // name-only and account-linked people, minus this one.
   let mergeTargets: { id: string; label: string }[] = []
@@ -165,6 +177,9 @@ export default async function CrewPersonPage({ params }: { params: { id: string 
 
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-foreground">Payment history</h2>
+        {crewMemberId && (
+          <AddPaymentCard crewMemberId={crewMemberId} personName={name} pieces={pieces} />
+        )}
         {history.length === 0 ? (
           <div className="card card-body text-sm text-muted-foreground">
             No payments logged for this person yet. When you pay them, log it as a Labor expense
