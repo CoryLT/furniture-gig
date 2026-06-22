@@ -31,6 +31,7 @@ async function updateTxn(formData: FormData) {
   const memo = String(formData.get('memo') || '') || null
   const pieceId = String(formData.get('piece_id') || '') || null
   const contactId = String(formData.get('contact_id') || '') || null
+  const crewMemberId = String(formData.get('crew_member_id') || '') || null
   const from = String(formData.get('from') || '')
 
   // On error: stay on the edit page (preserving where we came from) and
@@ -64,6 +65,17 @@ async function updateTxn(formData: FormData) {
 
   if (error) {
     redirect(errBack(error.message))
+  }
+
+  // Save who-you-paid (the crew tag) — update_entry doesn't touch this, so we
+  // set it directly. Owner-scoped, like the receipt scanner's update.
+  const { error: crewErr } = await supabase
+    .from('transactions')
+    .update({ crew_member_id: crewMemberId })
+    .eq('id', id)
+    .eq('owner_user_id', user.id)
+  if (crewErr) {
+    redirect(errBack('Saved, but could not set who was paid: ' + crewErr.message))
   }
 
   // If this entry is tied to a piece, optionally update what the piece cost.
@@ -130,7 +142,7 @@ export default async function TransactionPage({
 
   const { data: txn } = await supabase
     .from('transactions')
-    .select('id, date, description, memo, piece_id, contact_id, receipt_path, entry_lines(debit, credit, account_id)')
+    .select('id, date, description, memo, piece_id, contact_id, crew_member_id, receipt_path, entry_lines(debit, credit, account_id)')
     .eq('id', params.id)
     .eq('owner_user_id', me)
     .single()
@@ -198,6 +210,32 @@ export default async function TransactionPage({
     .eq('owner_user_id', me)
     .order('name', { ascending: true })
   const contacts = (contactsRaw ?? []) as { id: string; name: string }[]
+
+  // Crew list (people you pay) so a labor entry can be tagged to the worker —
+  // that's what feeds their payment history + the 1099 alert.
+  const { data: crewRaw } = await supabase
+    .from('crew_members')
+    .select('id, worker_user_id, worker_name')
+    .eq('operator_user_id', me)
+    .eq('hidden', false)
+  const crewUserIds = ((crewRaw ?? []) as any[]).map((c) => c.worker_user_id).filter(Boolean)
+  const crewNameByUser: Record<string, string> = {}
+  if (crewUserIds.length) {
+    const { data: cprofs } = await supabase
+      .from('worker_profiles')
+      .select('user_id, full_name, first_name, last_name')
+      .in('user_id', crewUserIds)
+    for (const p of (cprofs ?? []) as any[]) {
+      crewNameByUser[p.user_id] =
+        ((p.full_name as string) || '').trim() ||
+        [p.first_name, p.last_name].filter(Boolean).join(' ').trim() ||
+        'Crew'
+    }
+  }
+  const crew = ((crewRaw ?? []) as any[]).map((c) => ({
+    id: c.id as string,
+    label: c.worker_user_id ? crewNameByUser[c.worker_user_id] || 'Crew' : (c.worker_name as string) || 'Crew',
+  }))
 
   // Receipt photo lives in the private gig-photos bucket; sign a short-lived URL.
   let receiptUrl: string | null = null
@@ -317,7 +355,21 @@ export default async function TransactionPage({
         )}
 
         <div>
-          <label className={labelCls} htmlFor="contact_id">Person (optional)</label>
+          <label className={labelCls} htmlFor="crew_member_id">Who you paid — crew (optional)</label>
+          <select id="crew_member_id" name="crew_member_id" className={fieldCls} defaultValue={t.crew_member_id || ''}>
+            <option value="">— none —</option>
+            {crew.map((c) => (
+              <option key={c.id} value={c.id}>{c.label}</option>
+            ))}
+          </select>
+          <p className={helpCls}>
+            If this was labor you paid someone, pick them and set the Category to your Labor
+            account. It&apos;ll show in their payment history and count toward their 1099.
+          </p>
+        </div>
+
+        <div>
+          <label className={labelCls} htmlFor="contact_id">Vendor / store (optional)</label>
           <select id="contact_id" name="contact_id" className={fieldCls} defaultValue={t.contact_id || ''}>
             <option value="">— none —</option>
             {contacts.map((c) => (
