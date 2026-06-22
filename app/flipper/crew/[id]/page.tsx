@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency } from '@/lib/utils'
 import { ArrowLeft, Star } from 'lucide-react'
+import MergeCrewCard from '../MergeCrewCard'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -113,6 +114,32 @@ export default async function CrewPersonPage({ params }: { params: { id: string 
   const paid = history.reduce((s, h) => s + h.amount, 0)
   const count = history.length
 
+  // Other crew records (for combining duplicates of the same person). Both
+  // name-only and account-linked people, minus this one.
+  let mergeTargets: { id: string; label: string }[] = []
+  if (crewMemberId) {
+    const { data: allCrew } = await supabase
+      .from('crew_members')
+      .select('id, worker_user_id, worker_name')
+      .eq('operator_user_id', me)
+    const others = ((allCrew ?? []) as any[]).filter((c) => c.id !== crewMemberId)
+    const otherUserIds = others.map((c) => c.worker_user_id).filter(Boolean)
+    const nameByUser: Record<string, string> = {}
+    if (otherUserIds.length) {
+      const { data: profs } = await supabase
+        .from('worker_profiles')
+        .select('user_id, full_name, first_name, last_name, username')
+        .in('user_id', otherUserIds)
+      for (const p of (profs ?? []) as any[]) nameByUser[p.user_id] = displayName(p as any)
+    }
+    mergeTargets = others.map((c) => ({
+      id: c.id as string,
+      label: c.worker_user_id
+        ? nameByUser[c.worker_user_id] || 'Crew'
+        : (c.worker_name as string) || 'Unnamed',
+    }))
+  }
+
   return (
     <div className="space-y-6 max-w-2xl">
       <BackLink />
@@ -130,6 +157,10 @@ export default async function CrewPersonPage({ params }: { params: { id: string 
 
       <SummaryCards count={count} paid={paid} />
       <RatingNotes rating={rating} wouldRehire={wouldRehire} notes={notes} />
+
+      {crewMemberId && mergeTargets.length > 0 && (
+        <MergeCrewCard fromId={crewMemberId} fromName={name} targets={mergeTargets} />
+      )}
 
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-foreground">Payment history</h2>
