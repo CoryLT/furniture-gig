@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 type Row = {
   id: string
@@ -19,6 +20,7 @@ const money = (n: number) => {
 }
 
 export default function AccountActivity({ rows }: { rows: Row[] }) {
+  const pathname = usePathname()
   const [q, setQ] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -130,10 +132,15 @@ export default function AccountActivity({ rows }: { rows: Row[] }) {
               </>
             )
             return (
-              <li key={(r.id || 'x') + ':' + i}>
+              <li key={(r.id || 'x') + ':' + i} id={'txn-' + r.id} className="scroll-mt-20">
                 {r.id ? (
                   <Link
-                    href={'/books/transaction/' + r.id}
+                    href={
+                      '/books/transaction/' +
+                      r.id +
+                      '?from=' +
+                      encodeURIComponent(pathname + '#txn-' + r.id)
+                    }
                     className="flex items-center gap-3 px-4 py-3 hover:bg-muted"
                   >
                     {inner}

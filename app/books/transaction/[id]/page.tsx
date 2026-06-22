@@ -30,12 +30,23 @@ async function updateTxn(formData: FormData) {
   const memo = String(formData.get('memo') || '') || null
   const pieceId = String(formData.get('piece_id') || '') || null
   const contactId = String(formData.get('contact_id') || '') || null
+  const from = String(formData.get('from') || '')
+
+  // On error: stay on the edit page (preserving where we came from) and
+  // scroll to the message by the button. On success: go back to that origin.
+  const errBack = (msg: string) =>
+    '/books/transaction/' +
+    id +
+    '?error=' +
+    encodeURIComponent(msg) +
+    (from ? '&from=' + encodeURIComponent(from) : '') +
+    '#saved'
 
   if (!amount || amount <= 0) {
-    redirect('/books/transaction/' + id + '?error=' + encodeURIComponent('Enter an amount greater than zero.') + '#saved')
+    redirect(errBack('Enter an amount greater than zero.'))
   }
   if (!debitAccountId || !creditAccountId) {
-    redirect('/books/transaction/' + id + '?error=' + encodeURIComponent('Both accounts are required.') + '#saved')
+    redirect(errBack('Both accounts are required.'))
   }
 
   const { error } = await supabase.rpc('update_entry', {
@@ -51,7 +62,7 @@ async function updateTxn(formData: FormData) {
   })
 
   if (error) {
-    redirect('/books/transaction/' + id + '?error=' + encodeURIComponent(error.message) + '#saved')
+    redirect(errBack(error.message))
   }
 
   // If this entry is tied to a piece, optionally update what the piece cost.
@@ -75,19 +86,15 @@ async function updateTxn(formData: FormData) {
           p_date: acqDate,
         })
         if (ce) {
-          redirect(
-            '/books/transaction/' +
-              id +
-              '?error=' +
-              encodeURIComponent('Entry saved, but the piece cost did not update: ' + ce.message) +
-              '#saved'
-          )
+          redirect(errBack('Entry saved, but the piece cost did not update: ' + ce.message))
         }
       }
     }
   }
 
-  redirect('/books/transaction/' + id + '?ok=1#saved')
+  // Clean success — close the edit screen and go back to where they were,
+  // landing on the row they just edited so the next one is right below.
+  redirect(from || '/books')
 }
 
 // Delete the whole entry: both balanced lines, then the header.
@@ -108,12 +115,16 @@ export default async function TransactionPage({
   searchParams,
 }: {
   params: { id: string }
-  searchParams: { ok?: string; error?: string }
+  searchParams: { ok?: string; error?: string; from?: string }
 }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const me = user.id
+
+  // Where to return to (the list the user came from), falling back to Books.
+  const fromParam = typeof searchParams?.from === 'string' ? searchParams.from : ''
+  const backHref = fromParam || '/books'
 
   const { data: txn } = await supabase
     .from('transactions')
@@ -197,8 +208,8 @@ export default async function TransactionPage({
     <main className="max-w-2xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-foreground">Edit entry</h1>
-        <Link href="/books" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Back to Books
+        <Link href={backHref} className="text-sm text-muted-foreground hover:text-foreground">
+          ← Back
         </Link>
       </div>
 
@@ -218,6 +229,7 @@ export default async function TransactionPage({
 
       <form action={updateTxn} className="mt-6 space-y-5">
         <input type="hidden" name="id" value={t.id} />
+        <input type="hidden" name="from" value={fromParam} />
 
         <div>
           <label className={labelCls} htmlFor="amount">Amount ($)</label>

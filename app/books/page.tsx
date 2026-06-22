@@ -302,8 +302,8 @@ export default async function BooksPage() {
         ) : (
           <ul className="mt-2 divide-y divide-border rounded-xl border border-border">
             {txns.map((t) => (
-              <li key={t.id}>
-                <Link href={'/books/transaction/' + t.id} className="flex items-center justify-between px-4 py-3 hover:bg-muted">
+              <li key={t.id} id={'txn-' + t.id} className="scroll-mt-20">
+                <Link href={'/books/transaction/' + t.id + '?from=' + encodeURIComponent('/books#txn-' + t.id)} className="flex items-center justify-between px-4 py-3 hover:bg-muted">
                   <div>
                     <div className="text-foreground">{t.description}</div>
                     <div className="text-xs text-muted-foreground">{t.date}</div>
