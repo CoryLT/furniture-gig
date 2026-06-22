@@ -88,7 +88,7 @@ export default async function CrewPersonPage({ params }: { params: { id: string 
     if (!prof && !cm) notFound()
     crewMemberId = (cm as any)?.id ?? null
     name = displayName(prof as any)
-    subtitle = 'On-platform crew'
+    subtitle = ''
     username = (prof as any)?.username ?? null
     rating = (cm as any)?.rating ?? null
     wouldRehire = (cm as any)?.would_rehire ?? null
@@ -96,15 +96,16 @@ export default async function CrewPersonPage({ params }: { params: { id: string 
   }
 
   // Payment history = labor you logged and tagged to this person (the ledger).
-  let history: { date: string; note: string; amount: number }[] = []
+  let history: { txn_id: string; date: string; note: string; amount: number }[] = []
   if (crewMemberId) {
     const { data: payRaw } = await supabase
       .from('worker_payments')
-      .select('date, description, amount')
+      .select('txn_id, date, description, amount')
       .eq('owner_user_id', me)
       .eq('crew_member_id', crewMemberId)
     history = ((payRaw ?? []) as any[])
       .map((p) => ({
+        txn_id: p.txn_id as string,
         date: p.date as string,
         note: (p.description as string) || 'Labor',
         amount: Number(p.amount || 0),
@@ -171,22 +172,31 @@ export default async function CrewPersonPage({ params }: { params: { id: string 
           </div>
         ) : (
           <div className="card divide-y divide-border">
-            {history.map((h, i) => {
+            {history.map((h) => {
               const when = new Date(h.date + 'T00:00:00').toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
                 year: 'numeric',
               })
+              const back = `/flipper/crew/${id}#txn-${h.txn_id}`
               return (
-                <div key={i} className="flex items-center justify-between gap-3 px-4 py-3">
+                <Link
+                  key={h.txn_id}
+                  id={`txn-${h.txn_id}`}
+                  href={`/books/transaction/${h.txn_id}?from=${encodeURIComponent(back)}`}
+                  className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
+                >
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{h.note}</p>
                     <p className="text-xs text-muted-foreground">{when}</p>
                   </div>
-                  <p className="text-sm font-semibold text-foreground shrink-0">
-                    {formatCurrency(h.amount)}
-                  </p>
-                </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <p className="text-sm font-semibold text-foreground">
+                      {formatCurrency(h.amount)}
+                    </p>
+                    <span className="text-xs font-medium text-accent">Edit</span>
+                  </div>
+                </Link>
               )
             })}
           </div>
@@ -216,7 +226,7 @@ function Header({ name, subtitle }: { name: string; subtitle: string }) {
       </div>
       <div>
         <h1 className="text-2xl font-semibold text-foreground leading-tight">{name}</h1>
-        <p className="text-sm text-muted-foreground">{subtitle}</p>
+        {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
       </div>
     </div>
   )

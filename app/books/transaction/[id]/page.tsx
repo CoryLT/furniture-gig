@@ -106,9 +106,10 @@ async function deleteTxn(formData: FormData) {
   if (!user) redirect('/auth/login')
   const me = user.id
   const id = String(formData.get('id') || '')
+  const from = String(formData.get('from') || '')
   await supabase.from('entry_lines').delete().eq('transaction_id', id).eq('owner_user_id', me)
   await supabase.from('transactions').delete().eq('id', id).eq('owner_user_id', me)
-  redirect('/books')
+  redirect(from || '/books')
 }
 
 export default async function TransactionPage({
@@ -353,6 +354,7 @@ export default async function TransactionPage({
 
       <form action={deleteTxn} className="mt-8 border-t border-border pt-6">
         <input type="hidden" name="id" value={t.id} />
+        <input type="hidden" name="from" value={fromParam} />
         <button
           type="submit"
           className="rounded-lg border border-red-300 px-5 py-2.5 font-medium text-red-700 hover:bg-red-50"
