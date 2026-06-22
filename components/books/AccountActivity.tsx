@@ -83,7 +83,7 @@ export default function AccountActivity({ rows }: { rows: Row[] }) {
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search by title…"
+        placeholder="Search by name…"
         className={inputCls}
       />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
