@@ -13,16 +13,6 @@ const money = (v: number) =>
     maximumFractionDigits: 2,
   })
 
-// Fix-up cost kinds (matches the Pipeline's expense categories, minus
-// "purchase" — that's the "What you paid" box).
-const FIX_CATEGORIES = [
-  { value: 'materials', label: 'Materials' },
-  { value: 'labor', label: 'Labor' },
-  { value: 'transport', label: 'Transport' },
-  { value: 'fees', label: 'Fees' },
-  { value: 'other', label: 'Other' },
-]
-
 export default function PastSaleForm({
   me,
   crew = [],
@@ -37,7 +27,6 @@ export default function PastSaleForm({
   const [paid, setPaid] = useState('')
   const [soldFor, setSoldFor] = useState('')
   const [fixUp, setFixUp] = useState('')
-  const [fixCat, setFixCat] = useState('materials')
   const [fixCrew, setFixCrew] = useState('')
   const [month, setMonth] = useState('') // "YYYY-MM"
   const [qty, setQty] = useState('1')
@@ -151,18 +140,20 @@ export default function PastSaleForm({
         })
         if (pe) bookWarn = ' · cost didn’t reach Books (did the SQL update get run?)'
       }
-      // Optional fix-up cost (materials, labor, etc.) — one expense per piece,
-      // dated to the sale month so it lands in the right books period.
+      // Optional labor cost — money you paid someone to fix it up. One expense
+      // per piece, dated to the sale month, tagged to a crew member for 1099
+      // tracking when you pick one. (Materials/fees come from receipts instead,
+      // so we keep this to labor only — nothing here can double a receipt.)
       if (fixNum > 0) {
         const { error: fe } = await supabase.rpc('add_piece_expense', {
           p_piece_id: id,
           p_amount: fixNum,
-          p_category: fixCat,
-          p_note: 'Fix-up',
-          p_crew_member_id: fixCat === 'labor' ? fixCrew || null : null,
+          p_category: 'labor',
+          p_note: 'Labor',
+          p_crew_member_id: fixCrew || null,
           p_date: dateStr,
         })
-        if (fe) bookWarn = ' · fix-up cost didn’t reach Books (did the SQL update get run?)'
+        if (fe) bookWarn = ' · labor cost didn’t reach Books (did the SQL update get run?)'
       }
       const { error: se } = await supabase.rpc('record_piece_sale', {
         p_piece_id: id,
@@ -279,39 +270,24 @@ export default function PastSaleForm({
 
         <div className="rounded-lg border border-border/70 bg-muted/30 p-3 space-y-2">
           <span className="block text-xs font-medium text-foreground">
-            Fix-up cost (optional)
+            Labor cost (optional)
           </span>
           <p className="text-xs text-muted-foreground">
-            Money you spent fixing it up — materials, labor, gas, fees. Leave blank if there
-            was none. You can always add more later from the piece in your Pipeline.
+            Money you paid someone to help fix it up. Leave blank if there was none.
+            Materials and fees go on a receipt instead — log those with the receipt
+            scanner so nothing gets counted twice.
           </p>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="text-xs text-muted-foreground">
-              How much (each)
-              <input
-                value={fixUp}
-                onChange={(e) => setFixUp(e.target.value)}
-                inputMode="decimal"
-                placeholder="0.00"
-                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
-              />
-            </label>
-            <label className="text-xs text-muted-foreground">
-              What kind?
-              <select
-                value={fixCat}
-                onChange={(e) => setFixCat(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
-              >
-                {FIX_CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          {fixCat === 'labor' && crew.length > 0 && (
+          <label className="block text-xs text-muted-foreground">
+            How much (each)
+            <input
+              value={fixUp}
+              onChange={(e) => setFixUp(e.target.value)}
+              inputMode="decimal"
+              placeholder="0.00"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+            />
+          </label>
+          {crew.length > 0 && (
             <label className="block text-xs text-muted-foreground">
               Who did you pay? <span className="text-muted-foreground/70">(for 1099 tracking)</span>
               <select
