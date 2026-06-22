@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import PiecePhotoField from '@/components/books/PiecePhotoField'
+import AddPieceLaborField from '@/components/books/AddPieceLaborField'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -162,6 +163,8 @@ export default async function TransactionPage({
     .eq('owner_user_id', me)
     .order('name', { ascending: true })
   const accounts = (accountsRaw ?? []) as { id: string; name: string; type: string }[]
+  const isExpenseEntry =
+    accounts.find((a) => a.id === debitAccountId)?.type === 'expense'
 
   const { data: piecesRaw } = await supabase
     .from('inventory_pieces')
@@ -351,22 +354,25 @@ export default async function TransactionPage({
               your Books and its profit. Leave it as-is if it&apos;s already right.
             </p>
             <PiecePhotoField pieceId={t.piece_id} initialUrl={pieceImageUrl} />
+            <AddPieceLaborField pieceId={t.piece_id} crew={crew} />
           </div>
         )}
 
-        <div>
-          <label className={labelCls} htmlFor="crew_member_id">Who you paid — crew (optional)</label>
-          <select id="crew_member_id" name="crew_member_id" className={fieldCls} defaultValue={t.crew_member_id || ''}>
-            <option value="">— none —</option>
-            {crew.map((c) => (
-              <option key={c.id} value={c.id}>{c.label}</option>
-            ))}
-          </select>
-          <p className={helpCls}>
-            If this was labor you paid someone, pick them and set the Category to your Labor
-            account. It&apos;ll show in their payment history and count toward their 1099.
-          </p>
-        </div>
+        {isExpenseEntry && (
+          <div>
+            <label className={labelCls} htmlFor="crew_member_id">Who you paid — crew (optional)</label>
+            <select id="crew_member_id" name="crew_member_id" className={fieldCls} defaultValue={t.crew_member_id || ''}>
+              <option value="">— none —</option>
+              {crew.map((c) => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+            <p className={helpCls}>
+              If this expense was labor you paid someone, pick them — it&apos;ll show in their
+              payment history and count toward their 1099.
+            </p>
+          </div>
+        )}
 
         <div>
           <label className={labelCls} htmlFor="contact_id">Vendor / store (optional)</label>
