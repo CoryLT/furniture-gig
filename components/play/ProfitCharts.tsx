@@ -49,10 +49,12 @@ export default function ProfitCharts({
 
   const panel = { background: 'var(--play-panel)', border: '1px solid var(--play-border)' }
   const selectStyle = {
-    background: 'var(--play-panel)',
+    background: 'var(--play-field)',
     border: '1px solid var(--play-border)',
     color: 'var(--play-ink)',
   }
+  // Native dropdown popups need a solid background + readable text in both modes.
+  const optionStyle = { background: 'var(--play-field)', color: 'var(--play-ink)' }
 
   // ---- Donut data for the selected month ----
   const monthExpenses = expensesByYM[`${year}-${month}`] ?? []
@@ -87,7 +89,7 @@ export default function ProfitCharts({
               aria-label="Month"
             >
               {MONTH_FULL.map((mn, i) => (
-                <option key={i} value={i}>
+                <option key={i} value={i} style={optionStyle}>
                   {mn}
                 </option>
               ))}
@@ -100,7 +102,7 @@ export default function ProfitCharts({
               aria-label="Year"
             >
               {years.map((y) => (
-                <option key={y} value={y}>
+                <option key={y} value={y} style={optionStyle}>
                   {y}
                 </option>
               ))}

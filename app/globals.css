@@ -51,6 +51,7 @@
     --play-green: #2f9e5e;
     --play-red: #c2452f;
     --play-panel: rgba(60,45,20,0.05);
+    --play-field: #fbf6ec;
     --play-border: rgba(120,90,40,0.18);
     --play-bar-track: rgba(0,0,0,0.10);
     --play-tooltip-bg: #ffffff;
@@ -88,6 +89,7 @@
     --play-green: #67d391;
     --play-red: #f0917f;
     --play-panel: rgba(255,255,255,0.04);
+    --play-field: #241a11;
     --play-border: rgba(245,205,130,0.14);
     --play-bar-track: rgba(255,255,255,0.07);
     --play-tooltip-bg: #1c1510;
