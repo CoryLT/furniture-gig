@@ -14,6 +14,32 @@ export default async function AddPastSalePage() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
+  const me = user.id
+
+  // Crew list for the "who did you pay?" picker when a fix-up cost is labor.
+  const { data: crewRaw } = await supabase
+    .from('crew_members')
+    .select('id, worker_user_id, worker_name')
+    .eq('operator_user_id', me)
+    .eq('hidden', false)
+  const onIds = ((crewRaw ?? []) as any[]).map((c) => c.worker_user_id).filter(Boolean)
+  const nameById: Record<string, string> = {}
+  if (onIds.length) {
+    const { data: profs } = await supabase
+      .from('worker_profiles')
+      .select('user_id, full_name, first_name, last_name')
+      .in('user_id', onIds)
+    for (const p of (profs ?? []) as any[]) {
+      nameById[p.user_id] =
+        (p.full_name || '').trim() ||
+        [p.first_name, p.last_name].filter(Boolean).join(' ').trim() ||
+        'Crew'
+    }
+  }
+  const crew = ((crewRaw ?? []) as any[]).map((c) => ({
+    id: c.id,
+    label: c.worker_user_id ? nameById[c.worker_user_id] || 'Crew' : c.worker_name || 'Crew',
+  }))
 
   return (
     <main className="max-w-xl mx-auto px-4 py-8">
@@ -33,7 +59,7 @@ export default async function AddPastSalePage() {
         </p>
       </div>
 
-      <PastSaleForm me={user.id} />
+      <PastSaleForm me={me} crew={crew} />
     </main>
   )
 }

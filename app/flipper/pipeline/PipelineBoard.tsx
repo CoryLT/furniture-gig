@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -88,6 +88,17 @@ export default function PipelineBoard({
   const [error, setError] = useState('')
   const [openStat, setOpenStat] = useState<string | null>(null)
   const [period, setPeriod] = useState('month') // month | year | all | m:YYYY-MM | y:YYYY
+  const [focusId, setFocusId] = useState<string | null>(null)
+
+  // When we arrive from "Add a past sale" (or any deep link), honor a ?sold=
+  // window so the piece is actually visible, and ?focus= to open + scroll to it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const sold = params.get('sold')
+    const focus = params.get('focus')
+    if (sold) setPeriod(sold)
+    if (focus) setFocusId(focus)
+  }, [])
 
   function imageUrl(path?: string | null) {
     if (!path) return null
@@ -530,6 +541,7 @@ export default function PipelineBoard({
                       inventory={inventory}
                       onUseSupply={useSupply}
                       onRemoveSupply={removeSupply}
+                      focusId={focusId}
                     />
                   ))
                 )}
@@ -815,6 +827,7 @@ function PieceCard({
   inventory,
   onUseSupply,
   onRemoveSupply,
+  focusId,
 }: {
   piece: Piece
   imgUrl: string | null
@@ -831,6 +844,7 @@ function PieceCard({
   inventory: InvItem[]
   onUseSupply: (pieceId: string, itemId: string, qty: number) => Promise<boolean>
   onRemoveSupply: (pieceId: string, usage: UsedSupply) => void
+  focusId?: string | null
 }) {
   const [open, setOpen] = useState(false)
   const [zoom, setZoom] = useState(false)
@@ -851,6 +865,16 @@ function PieceCard({
   const [supplyQty, setSupplyQty] = useState('1')
   const [supplySearch, setSupplySearch] = useState('')
   const [usingSupply, setUsingSupply] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  // If we were deep-linked to this piece (e.g. just added a past sale), open it
+  // and scroll it into view so the expense box is right there.
+  useEffect(() => {
+    if (focusId && focusId === piece.id) {
+      setOpen(true)
+      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [focusId, piece.id])
 
   const isSold = piece.stage === 'sold'
   const profit = isSold ? realized(piece) : expected(piece)
@@ -909,7 +933,7 @@ function PieceCard({
   const expenses = piece.expenses ?? []
 
   return (
-    <div className="card card-body space-y-2">
+    <div ref={cardRef} className="card card-body space-y-2">
       {/* Tap the photo to see it bigger */}
       {imgUrl && (
         <button
