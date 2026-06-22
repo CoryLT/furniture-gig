@@ -21,6 +21,7 @@ export default function PastSaleForm({ me }: { me: string }) {
   const [paid, setPaid] = useState('')
   const [soldFor, setSoldFor] = useState('')
   const [month, setMonth] = useState('') // "YYYY-MM"
+  const [qty, setQty] = useState('1')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const [savedCount, setSavedCount] = useState(0)
@@ -41,8 +42,8 @@ export default function PastSaleForm({ me }: { me: string }) {
 
   // Uses the same moderated upload as the Pipeline. The piece must already
   // exist (the API sets its image_path), which it does by the time we call this.
-  async function uploadPhoto(pieceId: string, f: File): Promise<boolean> {
-    if (!isAcceptableImageFile(f)) return false
+  async function uploadPhoto(pieceId: string, f: File): Promise<string | null> {
+    if (!isAcceptableImageFile(f)) return null
     let toSend = f
     try {
       toSend = await compressImageForUpload(f)
@@ -55,9 +56,9 @@ export default function PastSaleForm({ me }: { me: string }) {
     try {
       const res = await fetch('/api/upload-piece-image', { method: 'POST', body: fd })
       const json = await res.json()
-      return !!(res.ok && json?.image?.file_path)
+      return res.ok && json?.image?.file_path ? (json.image.file_path as string) : null
     } catch {
-      return false
+      return null
     }
   }
 
@@ -78,71 +79,78 @@ export default function PastSaleForm({ me }: { me: string }) {
       return
     }
 
+    // Quantity — create one sold piece per item, all at the same price.
+    const n = Math.max(1, Math.min(100, parseInt(qty, 10) || 1))
+
     // Day doesn't matter — drop it mid-month so it sits cleanly in the period.
     const dateStr = `${month}-15`
     const soldIso = new Date(dateStr + 'T12:00:00').toISOString()
     setSaving(true)
 
-    // 1) Create the piece, already marked sold.
-    const { data, error } = await (supabase.from('inventory_pieces') as any)
-      .insert({
-        owner_user_id: me,
-        stage: 'sold',
-        title: title.trim(),
-        acquired_at: dateStr,
-        sold_at: soldIso,
-        sale_price: sp,
-      })
+    // 1) Create the pieces (one row per item), already marked sold.
+    const baseTitle = title.trim()
+    const rowsToInsert = Array.from({ length: n }, (_, i) => ({
+      owner_user_id: me,
+      stage: 'sold',
+      title: n > 1 ? `${baseTitle} (${i + 1} of ${n})` : baseTitle,
+      acquired_at: dateStr,
+      sold_at: soldIso,
+      sale_price: sp,
+    }))
+    const { data: created, error } = await (supabase.from('inventory_pieces') as any)
+      .insert(rowsToInsert)
       .select('id')
-      .single()
-    if (error || !data) {
+    if (error || !created || created.length === 0) {
       setSaving(false)
-      setErr('Could not save the piece. Try again.')
+      setErr('Could not save. Try again.')
       return
     }
-    const pieceId = (data as any).id
+    const ids = (created as any[]).map((r) => r.id as string)
 
-    // Optional photo — don't block the sale if it fails or gets rejected.
+    // Optional photo — upload once, then share the same image on the rest.
     let photoWarn = ''
     if (file) {
-      const ok = await uploadPhoto(pieceId, file)
-      if (!ok) photoWarn = ' · photo didn’t upload (add it later from the Pipeline)'
-    }
-
-    // 2) Cost -> Books, dated to that month.
-    if (paidNum > 0) {
-      const { error: pe } = await supabase.rpc('set_piece_purchase', {
-        p_piece_id: pieceId,
-        p_amount: paidNum,
-        p_date: dateStr,
-      })
-      if (pe) {
-        setSaving(false)
-        setErr('Saved the piece, but the cost didn’t reach Books. Did the SQL update get run?')
-        return
+      const path = await uploadPhoto(ids[0], file)
+      if (!path) {
+        photoWarn = ' · photo didn’t upload (add it later from the Pipeline)'
+      } else if (ids.length > 1) {
+        await (supabase.from('inventory_pieces') as any)
+          .update({ image_path: path })
+          .in('id', ids.slice(1))
       }
     }
 
-    // 3) Sale income -> Books, dated to that month.
-    const { error: se } = await supabase.rpc('record_piece_sale', {
-      p_piece_id: pieceId,
-      p_amount: sp,
-      p_date: dateStr,
-    })
-    setSaving(false)
-    if (se) {
-      setErr('Saved the piece, but the sale didn’t reach Books. Make sure your Books accounts are set up.')
-      return
+    // 2 + 3) Cost and sale income -> Books for each piece, dated to that month.
+    let bookWarn = ''
+    for (const id of ids) {
+      if (paidNum > 0) {
+        const { error: pe } = await supabase.rpc('set_piece_purchase', {
+          p_piece_id: id,
+          p_amount: paidNum,
+          p_date: dateStr,
+        })
+        if (pe) bookWarn = ' · cost didn’t reach Books (did the SQL update get run?)'
+      }
+      const { error: se } = await supabase.rpc('record_piece_sale', {
+        p_piece_id: id,
+        p_amount: sp,
+        p_date: dateStr,
+      })
+      if (se) bookWarn = ' · sale didn’t reach Books (check your Books accounts)'
     }
+    setSaving(false)
 
-    setSavedCount((c) => c + 1)
-    setLastSaved(`${title.trim()} — sold for ${money(sp)} (${month})${photoWarn}`)
+    setSavedCount((c) => c + n)
+    setLastSaved(
+      `${n > 1 ? n + '× ' : ''}${baseTitle} — ${money(sp)} each (${month})${photoWarn}${bookWarn}`
+    )
 
     if (addAnother) {
       // Keep the month so logging a run of same-month sales is fast.
       setTitle('')
       setPaid('')
       setSoldFor('')
+      setQty('1')
       clearFile()
     } else {
       router.push('/flipper/pipeline')
@@ -211,7 +219,7 @@ export default function PastSaleForm({ me }: { me: string }) {
 
         <div className="grid grid-cols-2 gap-2">
           <label className="text-xs text-muted-foreground">
-            What you paid ($)
+            What you paid (each)
             <input
               value={paid}
               onChange={(e) => setPaid(e.target.value)}
@@ -221,7 +229,7 @@ export default function PastSaleForm({ me }: { me: string }) {
             />
           </label>
           <label className="text-xs text-muted-foreground">
-            What it sold for ($)
+            Sold for (each)
             <input
               value={soldFor}
               onChange={(e) => setSoldFor(e.target.value)}
@@ -230,6 +238,35 @@ export default function PastSaleForm({ me }: { me: string }) {
               className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
             />
           </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <label className="text-xs text-muted-foreground">
+            How many? <span className="text-muted-foreground/70">(same price each)</span>
+            <input
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              inputMode="numeric"
+              type="number"
+              min="1"
+              max="100"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+            />
+          </label>
+          <div className="flex items-end pb-2">
+            {(() => {
+              const n = Math.max(1, Math.min(100, parseInt(qty, 10) || 1))
+              const sp = parseFloat(soldFor)
+              if (n > 1 && !isNaN(sp) && sp > 0) {
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    {n} pieces · {money(sp * n)} total
+                  </p>
+                )
+              }
+              return null
+            })()}
+          </div>
         </div>
 
         <label className="block text-xs text-muted-foreground">
