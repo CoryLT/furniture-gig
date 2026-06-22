@@ -43,7 +43,7 @@ export default async function AccountPage({ params }: { params: { id: string } }
 
   const { data: lines } = await supabase
     .from('entry_lines')
-    .select('debit, credit, transaction_id, transactions(id, date, description, piece_id)')
+    .select('debit, credit, transaction_id, transactions(id, date, description, piece_id, created_at)')
     .eq('owner_user_id', me)
     .eq('account_id', params.id)
 
@@ -56,13 +56,20 @@ export default async function AccountPage({ params }: { params: { id: string } }
     return {
       id: (t?.id as string) || '',
       date: (t?.date as string) || '',
+      created: (t?.created_at as string) || '',
       description: (t?.description as string) || 'Entry',
       pieceId: (t?.piece_id as string) || '',
       amount: isDebitNormal ? delta : -delta,
     }
   })
   const balance = isDebitNormal ? raw : -raw
-  rows.sort((x, y) => (y.date || '').localeCompare(x.date || ''))
+  // Newest day first; within the same day, keep the order they were entered
+  // (so a batch of same-date sales reads 1, 2, 3… instead of jumbled).
+  rows.sort((x, y) => {
+    const byDate = (y.date || '').localeCompare(x.date || '')
+    if (byDate !== 0) return byDate
+    return (x.created || '').localeCompare(y.created || '')
+  })
 
   // Pull a photo for any row tied to a piece (so sales show the item).
   const pieceIds = Array.from(new Set(rows.map((r) => r.pieceId).filter(Boolean)))
