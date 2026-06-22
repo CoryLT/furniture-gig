@@ -246,6 +246,15 @@ export default async function BooksPage() {
         </div>
       </div>
 
+      <div className="mt-3">
+        <Link
+          href="/flipper/pipeline/add-past-sale"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+        >
+          + Add a past sale
+        </Link>
+      </div>
+
       <div className="mt-6 rounded-xl border border-border p-5">
         <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Money on hand</div>
         <div className={'mt-1 text-3xl font-semibold ' + (onHand < 0 ? 'text-red-600' : 'text-foreground')}>
