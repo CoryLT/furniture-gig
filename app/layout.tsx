@@ -48,10 +48,10 @@ export const metadata: Metadata = {
     locale: 'en_US',
     images: [
       {
-        url: '/og-image.png',
+        url: '/og-card.png',
         width: 1200,
         height: 630,
-        alt: 'FlipWork — flip anything, build your empire. Track every flip and climb the ranks.',
+        alt: 'FlipWork — flip anything, build your empire. Track every flip from buy to sold. Built for solo flippers.',
       },
     ],
   },
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     title: 'FlipWork — Flip anything, build your empire',
     description:
       "Turn flipping into a game you'll actually play. Track every dollar from buy to sold, climb the ranks, and watch your real profit grow. Free to start.",
-    images: ['/og-image.png'],
+    images: ['/og-card.png'],
   },
 }
 
