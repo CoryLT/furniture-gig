@@ -52,10 +52,11 @@ export default async function AddPastSalePage() {
       </Link>
 
       <div className="mt-3">
-        <h1 className="text-2xl font-semibold text-foreground">Add a past sale</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Log a sale</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Punch in flips you already sold. You only need the month it sold — the exact
-          day doesn&apos;t matter for your books. Each one is logged to Books on that date.
+          Just sold something? Type what it was and what it sold for. The month is set to
+          now, so a fresh sale takes seconds — change it only for something you sold a
+          while ago. The exact day doesn&apos;t matter for your books.
         </p>
       </div>
 
