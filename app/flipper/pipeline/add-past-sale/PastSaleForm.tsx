@@ -32,7 +32,12 @@ export default function PastSaleForm({
   const [addingPerson, setAddingPerson] = useState(false)
   const [newPerson, setNewPerson] = useState('')
   const [savingPerson, setSavingPerson] = useState(false)
-  const [month, setMonth] = useState('') // "YYYY-MM"
+  const [month, setMonth] = useState(() => {
+    // Default to this month so a sale that just happened needs no date tap.
+    // Change it only for something sold a while ago.
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }) // "YYYY-MM"
   const [qty, setQty] = useState('1')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -418,7 +423,7 @@ export default function PastSaleForm({
         </div>
 
         <label className="block text-xs text-muted-foreground">
-          Month it sold <span className="text-muted-foreground/70">(day not needed)</span>
+          Month it sold <span className="text-muted-foreground/70">(set to now — change only for older sales)</span>
           <input
             type="month"
             value={month}
