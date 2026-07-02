@@ -278,7 +278,7 @@ export default async function PlayPage({
     },
     {
       key: 'profit',
-      href: '/books/sale/new',
+      href: '/flipper/pipeline/add-past-sale',
       icon: <Coins className="w-4 h-4" />,
       title: `Clear $${whole(PROFIT_GOAL)} this month`,
       label: `$${whole(Math.max(0, monthProfit))} / $${whole(PROFIT_GOAL)}`,
