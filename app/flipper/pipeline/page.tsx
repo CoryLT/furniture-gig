@@ -126,7 +126,7 @@ export default async function PipelinePage() {
           href="/flipper/pipeline/add-past-sale"
           className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
         >
-          + Add a past sale
+          + Log a sale
         </Link>
       </div>
       <PipelineBoard userId={me} initialPieces={pieces} crew={crew} inventory={inventory} />
