@@ -226,7 +226,7 @@ export default async function BooksPage() {
         </div>
         <div className="flex gap-2">
           <Link
-            href="/books/sale/new"
+            href="/flipper/pipeline/add-past-sale"
             className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 whitespace-nowrap"
           >
             Log a sale
@@ -244,15 +244,6 @@ export default async function BooksPage() {
             Snap a receipt
           </Link>
         </div>
-      </div>
-
-      <div className="mt-3">
-        <Link
-          href="/flipper/pipeline/add-past-sale"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
-        >
-          + Add a past sale
-        </Link>
       </div>
 
       <div className="mt-6 rounded-xl border border-border p-5">
