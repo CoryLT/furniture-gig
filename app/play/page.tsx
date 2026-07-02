@@ -421,6 +421,24 @@ export default async function PlayPage({
             profit so far
           </div>
 
+          {/* One-tap "Log a sale" — sits right under the hero number so a sale
+              can be logged on the go, without the bookkeeping detail. Points at
+              the fast add-a-sale form (no account picking). */}
+          <div>
+            <Link
+              href="/flipper/pipeline/add-past-sale"
+              className="mt-5 inline-flex items-center gap-2 rounded-full px-7 py-3 font-sans text-base font-bold transition active:scale-95"
+              style={{
+                color: '#1a1200',
+                backgroundImage: `linear-gradient(180deg, ${C.goldLite} 0%, ${C.gold} 60%, ${C.goldDeep} 100%)`,
+                boxShadow: '0 6px 20px rgba(245,158,11,0.35)',
+              }}
+            >
+              <Coins className="w-5 h-5" />
+              Log a sale
+            </Link>
+          </div>
+
           {monthProfit > 0 ? (
             <div
               className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-sans text-sm font-semibold"
