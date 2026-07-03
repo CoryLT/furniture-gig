@@ -50,6 +50,8 @@ export default function AccountActivity({ rows }: { rows: Row[] }) {
   const [to, setTo] = useState('')
   const [min, setMin] = useState('')
   const [max, setMax] = useState('')
+  const [sort, setSort] = useState('new') // new | old | amt_hi | amt_lo
+  const [datePreset, setDatePreset] = useState('all') // all | this_month | last_month | this_year | last_year | custom
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase()
@@ -66,6 +68,18 @@ export default function AccountActivity({ rows }: { rows: Row[] }) {
   }, [allRows, q, from, to, min, max])
 
   const total = filtered.reduce((s, r) => s + r.amount, 0)
+
+  // Apply the chosen sort on top of the filtered rows.
+  const visible = useMemo(() => {
+    const arr = [...filtered]
+    arr.sort((a, b) => {
+      if (sort === 'old') return (a.date || '').localeCompare(b.date || '')
+      if (sort === 'amt_hi') return b.amount - a.amount
+      if (sort === 'amt_lo') return a.amount - b.amount
+      return (b.date || '').localeCompare(a.date || '') // 'new' = newest first
+    })
+    return arr
+  }, [filtered, sort])
   const anyFilter = !!(q || from || to || min || max)
   const clear = () => {
     setQ('')
@@ -73,6 +87,31 @@ export default function AccountActivity({ rows }: { rows: Row[] }) {
     setTo('')
     setMin('')
     setMax('')
+    setDatePreset('all')
+  }
+
+  // Turn a "Date range" dropdown pick into From/To values.
+  const fmtDate = (dt: Date) =>
+    `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+
+  function applyDatePreset(v: string) {
+    setDatePreset(v)
+    const now = new Date()
+    if (v === 'all') {
+      setFrom('')
+      setTo('')
+    } else if (v === 'this_month' || v === 'last_month') {
+      const off = v === 'last_month' ? -1 : 0
+      const start = new Date(now.getFullYear(), now.getMonth() + off, 1)
+      const end = new Date(now.getFullYear(), now.getMonth() + off + 1, 0)
+      setFrom(fmtDate(start))
+      setTo(fmtDate(end))
+    } else if (v === 'this_year' || v === 'last_year') {
+      const y = now.getFullYear() + (v === 'last_year' ? -1 : 0)
+      setFrom(`${y}-01-01`)
+      setTo(`${y}-12-31`)
+    }
+    // 'custom' leaves whatever is in From/To alone.
   }
 
   const inputCls =
@@ -86,14 +125,40 @@ export default function AccountActivity({ rows }: { rows: Row[] }) {
         placeholder="Search by name…"
         className={inputCls}
       />
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs text-muted-foreground">
+          Sort
+          <select value={sort} onChange={(e) => setSort(e.target.value)} className={inputCls + ' mt-1'}>
+            <option value="new">Newest first</option>
+            <option value="old">Oldest first</option>
+            <option value="amt_hi">Amount: high to low</option>
+            <option value="amt_lo">Amount: low to high</option>
+          </select>
+        </label>
+        <label className="text-xs text-muted-foreground">
+          Date range
+          <select
+            value={datePreset}
+            onChange={(e) => applyDatePreset(e.target.value)}
+            className={inputCls + ' mt-1'}
+          >
+            <option value="all">All dates</option>
+            <option value="this_month">This month</option>
+            <option value="last_month">Last month</option>
+            <option value="this_year">This year</option>
+            <option value="last_year">Last year</option>
+            <option value="custom">Custom (set below)</option>
+          </select>
+        </label>
+      </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <label className="text-xs text-muted-foreground">
           From
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls + ' mt-1'} />
+          <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setDatePreset('custom') }} className={inputCls + ' mt-1'} />
         </label>
         <label className="text-xs text-muted-foreground">
           To
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls + ' mt-1'} />
+          <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setDatePreset('custom') }} className={inputCls + ' mt-1'} />
         </label>
         <label className="text-xs text-muted-foreground">
           Min $
@@ -136,7 +201,7 @@ export default function AccountActivity({ rows }: { rows: Row[] }) {
         </p>
       ) : (
         <ul className="divide-y divide-border rounded-xl border border-border">
-          {filtered.map((r, i) => {
+          {visible.map((r, i) => {
             const inner = (
               <>
                 {r.img ? (
