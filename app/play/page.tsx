@@ -538,8 +538,8 @@ export default async function PlayPage({
             }}
           />
 
-          {/* Challenges — folded in right under the rank badges, compact. */}
-          <div className="mt-6 mx-auto max-w-sm text-left space-y-2">
+          {/* Challenges — slim rows so they don't crowd the badges/counts area. */}
+          <div className="mt-5 mx-auto max-w-sm text-left space-y-1.5">
             <div
               className="text-center font-sans text-[11px] uppercase tracking-[0.3em]"
               style={{ color: C.muted }}
@@ -550,38 +550,24 @@ export default async function PlayPage({
               <Link
                 key={c.key}
                 href={c.href}
-                className="block rounded-2xl p-4"
-                style={{
-                  background: C.panel,
-                  border: `1px solid ${c.done ? 'rgba(103,211,145,0.4)' : C.panelBorder}`,
-                }}
+                className="block rounded-xl px-3 py-2"
+                style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="shrink-0" style={{ color: c.done ? C.green : C.gold }}>
-                      {c.icon}
-                    </span>
-                    <span
-                      className="font-sans text-sm font-medium truncate"
-                      style={{ color: C.cream }}
-                    >
-                      {c.title}
-                    </span>
-                  </div>
-                  {c.done ? (
-                    <span
-                      className="inline-flex items-center gap-1 font-sans text-xs font-bold uppercase tracking-wider shrink-0"
-                      style={{ color: C.green }}
-                    >
-                      <Check className="w-3.5 h-3.5" /> Done
-                    </span>
-                  ) : (
-                    <span className="font-mono text-xs shrink-0" style={{ color: C.muted }}>
-                      {c.label}
-                    </span>
-                  )}
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0" style={{ color: C.gold }}>
+                    {c.icon}
+                  </span>
+                  <span
+                    className="flex-1 min-w-0 truncate font-sans text-xs font-medium"
+                    style={{ color: C.cream }}
+                  >
+                    {c.title}
+                  </span>
+                  <span className="shrink-0 font-mono text-[11px]" style={{ color: C.muted }}>
+                    {c.label}
+                  </span>
                 </div>
-                <div className="mt-2">
+                <div className="mt-1.5">
                   <GameBar pct={c.pct} />
                 </div>
               </Link>
