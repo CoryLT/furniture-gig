@@ -37,7 +37,24 @@ interface ActorInfo {
 
 const MAX_ROWS = 15
 
-export function NotificationBell() {
+export type BellNeed = {
+  id: string
+  title: string
+  detail: string
+  fixLabel: string
+  href: string
+  sev: 'danger' | 'warning' | 'info'
+  badge: string
+}
+
+// Dot color for a need's urgency (base theme colors, not the /play theme).
+const NEED_DOT: Record<BellNeed['sev'], string> = {
+  danger: '#dc2626',
+  warning: '#d97706',
+  info: '#16a34a',
+}
+
+export function NotificationBell({ needs = [] }: { needs?: BellNeed[] }) {
   const supabase = createClient()
 
   const [open, setOpen] = useState(false)
@@ -193,6 +210,8 @@ export function NotificationBell() {
 
   // -------- Helpers --------
   const unreadCount = notifications.filter((n) => !n.read_at).length
+  // The bell badge counts unread messages PLUS open "needs you" items.
+  const attentionCount = unreadCount + needs.length
 
   async function markOneRead(id: string) {
     // Optimistic update
@@ -343,6 +362,31 @@ export function NotificationBell() {
     }
   }
 
+  // -------- Need row rendering (live "needs you" items) --------
+  function renderNeed(nd: BellNeed) {
+    return (
+      <Link
+        key={nd.id}
+        href={nd.href}
+        onClick={() => setOpen(false)}
+        className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted"
+      >
+        <span
+          className="flex-shrink-0 mt-1.5 w-2 h-2 rounded-full"
+          style={{ background: NEED_DOT[nd.sev] }}
+        />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-foreground">
+            <span className="font-medium">{nd.title}</span>
+            <span className="text-muted-foreground"> · {nd.badge}</span>
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">{nd.detail}</p>
+          <p className="text-xs font-medium text-accent mt-0.5">{nd.fixLabel} &rarr;</p>
+        </div>
+      </Link>
+    )
+  }
+
   return (
     <div className="relative" ref={wrapRef}>
       <button
@@ -352,9 +396,9 @@ export function NotificationBell() {
         aria-label="Notifications"
       >
         <Bell className="w-5 h-5 text-foreground" />
-        {unreadCount > 0 && (
+        {attentionCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-accent text-accent-foreground text-[10px] font-semibold leading-none">
-            {unreadCount > 99 ? '99+' : unreadCount}
+            {attentionCount > 99 ? '99+' : attentionCount}
           </span>
         )}
       </button>
@@ -383,20 +427,30 @@ export function NotificationBell() {
           </div>
 
           <div className="max-h-[420px] overflow-y-auto divide-y divide-border">
+            {needs.length > 0 && (
+              <div>
+                <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-muted/40">
+                  Needs you
+                </div>
+                <div className="divide-y divide-border">{needs.map(renderNeed)}</div>
+              </div>
+            )}
             {loading ? (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                 Loading…
               </div>
             ) : notifications.length === 0 ? (
-              <div className="px-4 py-8 text-center space-y-2">
-                <Bell className="w-8 h-8 mx-auto text-muted-foreground" strokeWidth={1.5} />
-                <p className="text-sm text-muted-foreground">
-                  You're all caught up.
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  We'll let you know when something happens.
-                </p>
-              </div>
+              needs.length === 0 ? (
+                <div className="px-4 py-8 text-center space-y-2">
+                  <Bell className="w-8 h-8 mx-auto text-muted-foreground" strokeWidth={1.5} />
+                  <p className="text-sm text-muted-foreground">
+                    You're all caught up.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    We'll let you know when something happens.
+                  </p>
+                </div>
+              ) : null
             ) : (
               notifications.map(renderRow)
             )}
