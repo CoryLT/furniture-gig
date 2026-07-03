@@ -14,7 +14,7 @@ import AddToHomeScreenPrompt from '@/components/notifications/AddToHomeScreenPro
 import UnreadMessagesCard from '@/components/home/UnreadMessagesCard'
 import BusinessSetupCard from '../home/BusinessSetupCard'
 import type { ReactNode } from 'react'
-import { ImageIcon, ArrowRight, TrendingUp, TrendingDown, Coins, Lock, Target, Check } from 'lucide-react'
+import { ImageIcon, ArrowRight, TrendingUp, TrendingDown, Coins, Receipt, Lock, Target, Check } from 'lucide-react'
 
 // Live data — always fresh.
 export const dynamic = 'force-dynamic'
@@ -435,13 +435,12 @@ export default async function PlayPage({
             net profit so far
           </div>
 
-          {/* One-tap "Log a sale" — sits right under the hero number so a sale
-              can be logged on the go, without the bookkeeping detail. Points at
-              the fast add-a-sale form (no account picking). */}
-          <div>
+          {/* Two quick actions under the hero number: log a sale (primary) and
+              log an expense (secondary). Both are big, thumb-friendly pills. */}
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
             <Link
               href="/flipper/pipeline/add-past-sale"
-              className="mt-5 inline-flex items-center gap-2 rounded-full px-7 py-3 font-sans text-base font-bold transition active:scale-95"
+              className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-sans text-base font-bold transition active:scale-95"
               style={{
                 color: '#1a1200',
                 backgroundImage: `linear-gradient(180deg, ${C.goldLite} 0%, ${C.gold} 60%, ${C.goldDeep} 100%)`,
@@ -450,6 +449,18 @@ export default async function PlayPage({
             >
               <Coins className="w-5 h-5" />
               Log a sale
+            </Link>
+            <Link
+              href="/books/expense/new"
+              className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-sans text-base font-bold transition active:scale-95"
+              style={{
+                color: C.cream,
+                background: 'transparent',
+                border: `1px solid ${C.panelBorder}`,
+              }}
+            >
+              <Receipt className="w-5 h-5" />
+              Log an expense
             </Link>
           </div>
 
