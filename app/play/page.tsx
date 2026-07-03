@@ -310,7 +310,15 @@ export default async function PlayPage({
     },
   ]
 
-  // ---- "Needs you" — real problems to resolve, most urgent first ----
+  // A quick "you're working on" list for the notification bell — shown each time
+  // the app opens so the current challenges are always in view.
+  const working = challenges.map((c) => ({
+    id: c.key,
+    title: c.title,
+    detail: c.label,
+    href: c.href,
+  }))
+
   const DAY = 86400000
   const AGING_DAYS = 30
   const needs: NeedItem[] = []
@@ -398,7 +406,7 @@ export default async function PlayPage({
         className="pointer-events-none fixed inset-0"
         style={{ backgroundImage: `url("${GRAIN}")`, opacity: 0.04, mixBlendMode: 'overlay', zIndex: 0 }}
       />
-      <Nav role="flipper" userName={navName} userUsername={navUsername} needs={needsTop} />
+      <Nav role="flipper" userName={navName} userUsername={navUsername} needs={needsTop} working={working} />
       <main className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-8">
         {/* Hero: rank emblem, glowing score, XP bar */}
         <section className="relative text-center pt-2">

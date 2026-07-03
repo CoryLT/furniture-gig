@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { Bell, Loader2, User } from 'lucide-react'
+import { Bell, Loader2, User, Target } from 'lucide-react'
 
 interface NotificationRow {
   id: string
@@ -47,6 +47,13 @@ export type BellNeed = {
   badge: string
 }
 
+export type BellChallenge = {
+  id: string
+  title: string
+  detail: string
+  href: string
+}
+
 // Dot color for a need's urgency (base theme colors, not the /play theme).
 const NEED_DOT: Record<BellNeed['sev'], string> = {
   danger: '#dc2626',
@@ -54,7 +61,13 @@ const NEED_DOT: Record<BellNeed['sev'], string> = {
   info: '#16a34a',
 }
 
-export function NotificationBell({ needs = [] }: { needs?: BellNeed[] }) {
+export function NotificationBell({
+  needs = [],
+  working = [],
+}: {
+  needs?: BellNeed[]
+  working?: BellChallenge[]
+}) {
   const supabase = createClient()
 
   const [open, setOpen] = useState(false)
@@ -387,6 +400,26 @@ export function NotificationBell({ needs = [] }: { needs?: BellNeed[] }) {
     )
   }
 
+  // -------- Challenge row rendering ("working on" reminders) --------
+  function renderChallenge(ch: BellChallenge) {
+    return (
+      <Link
+        key={ch.id}
+        href={ch.href}
+        onClick={() => setOpen(false)}
+        className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted"
+      >
+        <span className="flex-shrink-0 mt-0.5 text-muted-foreground">
+          <Target className="w-4 h-4" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-foreground font-medium">{ch.title}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{ch.detail}</p>
+        </div>
+      </Link>
+    )
+  }
+
   return (
     <div className="relative" ref={wrapRef}>
       <button
@@ -435,12 +468,20 @@ export function NotificationBell({ needs = [] }: { needs?: BellNeed[] }) {
                 <div className="divide-y divide-border">{needs.map(renderNeed)}</div>
               </div>
             )}
+            {working.length > 0 && (
+              <div>
+                <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-muted/40">
+                  Working on
+                </div>
+                <div className="divide-y divide-border">{working.map(renderChallenge)}</div>
+              </div>
+            )}
             {loading ? (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                 Loading…
               </div>
             ) : notifications.length === 0 ? (
-              needs.length === 0 ? (
+              needs.length === 0 && working.length === 0 ? (
                 <div className="px-4 py-8 text-center space-y-2">
                   <Bell className="w-8 h-8 mx-auto text-muted-foreground" strokeWidth={1.5} />
                   <p className="text-sm text-muted-foreground">
