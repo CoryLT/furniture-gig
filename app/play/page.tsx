@@ -4,7 +4,6 @@ import Link from 'next/link'
 import Nav from '@/components/shared/Nav'
 import CountUp from '@/components/play/CountUp'
 import GameBar from '@/components/play/GameBar'
-import RankEmblem from '@/components/play/RankEmblem'
 import RankTrail from '@/components/play/RankTrail'
 import ProfitCharts from '@/components/play/ProfitCharts'
 import { type NeedItem } from '@/components/play/NeedsYou'
@@ -414,14 +413,33 @@ export default async function PlayPage({
                 'radial-gradient(circle at 50% 32%, rgba(245,158,11,0.16), rgba(245,158,11,0) 68%)',
             }}
           />
-          <div className="flex flex-col items-center">
-            <RankEmblem index={tierIdx} size={78} state="current" idSuffix="hero" />
-            <span
-              className="mt-2 font-sans text-[11px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: C.gold }}
-            >
-              {tier.title}
-            </span>
+          {/* Rank badges + level bar — the crown, sitting above the score. */}
+          <RankTrail
+            tiers={TIERS}
+            tierIdx={tierIdx}
+            total={total}
+            colors={{
+              gold: C.gold,
+              muted: C.muted,
+              cream: C.cream,
+              green: C.green,
+              panelBorder: C.panelBorder,
+            }}
+          />
+          <div className="mt-3 max-w-xs mx-auto">
+            <GameBar pct={pct} />
+            <div className="mt-2 font-sans text-xs" style={{ color: C.muted }}>
+              {next ? (
+                <>
+                  {money(toNext)} to{' '}
+                  <span className="font-semibold" style={{ color: C.goldLite }}>
+                    {next.title}
+                  </span>
+                </>
+              ) : (
+                'Top rank — you run this town'
+              )}
+            </div>
           </div>
 
           <div
@@ -508,35 +526,7 @@ export default async function PlayPage({
             </div>
           )}
 
-          <div className="mt-6 max-w-xs mx-auto">
-            <GameBar pct={pct} />
-            <div className="mt-2 font-sans text-xs" style={{ color: C.muted }}>
-              {next ? (
-                <>
-                  {money(toNext)} to{' '}
-                  <span className="font-semibold" style={{ color: C.goldLite }}>
-                    {next.title}
-                  </span>
-                </>
-              ) : (
-                'Top rank — you run this town'
-              )}
-            </div>
-          </div>
-
-          {/* Rank trail — medallions; tap or hover one to see what it takes */}
-          <RankTrail
-            tiers={TIERS}
-            tierIdx={tierIdx}
-            total={total}
-            colors={{
-              gold: C.gold,
-              muted: C.muted,
-              cream: C.cream,
-              green: C.green,
-              panelBorder: C.panelBorder,
-            }}
-          />
+          {/* Level bar + badges moved up top, above the score. */}
 
           {/* Challenges — slim rows so they don't crowd the badges/counts area. */}
           <div className="mt-5 mx-auto max-w-sm text-left space-y-1.5">
