@@ -169,7 +169,7 @@ export default async function PlayPage({
     const d = new Date(p.stage_sold_at)
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
   })
-  const monthProfit = soldThisMonth.reduce((s, p) => s + p.realized, 0)
+  const monthGrossProfit = soldThisMonth.reduce((s, p) => s + p.realized, 0)
   const monthFlips = soldThisMonth.length
 
   // ---- sold-period filter for the board (in-play tokens always show) ----
@@ -212,6 +212,8 @@ export default async function PlayPage({
   // Lifetime business costs NOT tied to any piece (subscription, tools, gas…).
   // These are the difference between gross and net profit.
   let generalExpenses = 0
+  // Same, but only for the current month — turns the month pill into net too.
+  let generalExpensesThisMonth = 0
   for (const t of (allTxnRaw ?? []) as any[]) {
     const d = new Date(t.date)
     const y = d.getFullYear()
@@ -226,7 +228,10 @@ export default async function PlayPage({
       else if (type === 'expense') {
         const v = debit - credit
         byYear[y][m].expense += v
-        if (t.piece_id == null) generalExpenses += v
+        if (t.piece_id == null) {
+          generalExpenses += v
+          if (y === now.getFullYear() && m === now.getMonth()) generalExpensesThisMonth += v
+        }
         const key = `${y}-${m}`
         const name = l.accounts?.name || 'Other'
         if (!expByYM[key]) expByYM[key] = {}
@@ -251,6 +256,8 @@ export default async function PlayPage({
   // general business costs that aren't tied to any piece (overhead).
   const netProfit = allTimeProfit - generalExpenses
   const total = netProfit
+  // The month pill (and the monthly challenge) now show NET for the month.
+  const monthProfit = monthGrossProfit - generalExpensesThisMonth
   let tierIdx = 0
   for (let i = 0; i < TIERS.length; i++) if (total >= TIERS[i].min) tierIdx = i
   const tier = TIERS[tierIdx]
