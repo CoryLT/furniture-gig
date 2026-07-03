@@ -528,66 +528,7 @@ export default async function PlayPage({
 
           {/* Level bar + badges moved up top, above the score. */}
 
-          {/* Challenges — slim rows so they don't crowd the badges/counts area. */}
-          <div className="mt-5 mx-auto max-w-sm text-left space-y-1.5">
-            <div
-              className="text-center font-sans text-[11px] uppercase tracking-[0.3em]"
-              style={{ color: C.muted }}
-            >
-              Challenges
-            </div>
-            {challenges.map((c) => (
-              <Link
-                key={c.key}
-                href={c.href}
-                className="block rounded-xl px-3 py-2"
-                style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="shrink-0" style={{ color: C.gold }}>
-                    {c.icon}
-                  </span>
-                  <span
-                    className="flex-1 min-w-0 truncate font-sans text-xs font-medium"
-                    style={{ color: C.cream }}
-                  >
-                    {c.title}
-                  </span>
-                  <span className="shrink-0 font-mono text-[11px]" style={{ color: C.muted }}>
-                    {c.label}
-                  </span>
-                </div>
-                <div className="mt-1.5">
-                  <GameBar pct={c.pct} />
-                </div>
-              </Link>
-            ))}
-          </div>
-
-          <div
-            className="mt-5 flex items-center justify-center gap-5 font-mono text-sm"
-            style={{ color: C.cream }}
-          >
-            <span>
-              <span style={{ color: C.gold }}>{sold.length}</span>{' '}
-              <span
-                className="font-sans text-xs uppercase tracking-wider"
-                style={{ color: C.muted }}
-              >
-                flipped
-              </span>
-            </span>
-            <span style={{ color: C.panelBorder }}>|</span>
-            <span>
-              <span style={{ color: C.gold }}>{unsold.length}</span>{' '}
-              <span
-                className="font-sans text-xs uppercase tracking-wider"
-                style={{ color: C.muted }}
-              >
-                in play
-              </span>
-            </span>
-          </div>
+          {/* Challenges + tallies moved to the bottom of the page. */}
         </section>
 
         {/* "Needs you" now lives in the notification bell (top-right). */}
@@ -669,6 +610,55 @@ export default async function PlayPage({
             Open the full Pipeline <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
+
+        {/* Challenges — boxed like the other cards, parked at the bottom. */}
+        <section
+          className="rounded-2xl p-5"
+          style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}
+        >
+          <h2 className="font-serif text-lg mb-3" style={{ color: C.cream }}>
+            Challenges
+          </h2>
+          <div className="space-y-4">
+            {challenges.map((c) => (
+              <Link key={c.key} href={c.href} className="block">
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0" style={{ color: C.gold }}>
+                    {c.icon}
+                  </span>
+                  <span
+                    className="flex-1 min-w-0 truncate font-sans text-sm font-medium"
+                    style={{ color: C.cream }}
+                  >
+                    {c.title}
+                  </span>
+                  <span className="shrink-0 font-mono text-xs" style={{ color: C.muted }}>
+                    {c.label}
+                  </span>
+                </div>
+                <div className="mt-1.5">
+                  <GameBar pct={c.pct} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* Flipped / in play — tallies as boxes, matching Cash free / Tied up. */}
+        <section className="grid grid-cols-2 gap-3">
+          <Stat
+            icon={<Check className="w-3.5 h-3.5" style={{ color: C.gold }} />}
+            label="Flipped"
+            value={String(sold.length)}
+            hint="pieces sold all-time"
+          />
+          <Stat
+            icon={<Target className="w-3.5 h-3.5" style={{ color: C.gold }} />}
+            label="In play"
+            value={String(unsold.length)}
+            hint="still in your pipeline"
+          />
+        </section>
 
         {/* Carried over from the old dashboard */}
         <UnreadMessagesCard />
