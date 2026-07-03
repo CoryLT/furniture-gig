@@ -204,11 +204,14 @@ export default async function PlayPage({
   //      expense breakdown. Reads the ledger so it's a real money view. ----
   const { data: allTxnRaw } = await supabase
     .from('transactions')
-    .select('date, entry_lines(debit, credit, accounts(type, name))')
+    .select('date, piece_id, entry_lines(debit, credit, accounts(type, name))')
     .eq('owner_user_id', me)
   const byYear: Record<number, { income: number; expense: number }[]> = {}
   const yearsSet = new Set<number>([now.getFullYear()])
   const expByYM: Record<string, Record<string, number>> = {}
+  // Lifetime business costs NOT tied to any piece (subscription, tools, gas…).
+  // These are the difference between gross and net profit.
+  let generalExpenses = 0
   for (const t of (allTxnRaw ?? []) as any[]) {
     const d = new Date(t.date)
     const y = d.getFullYear()
@@ -223,6 +226,7 @@ export default async function PlayPage({
       else if (type === 'expense') {
         const v = debit - credit
         byYear[y][m].expense += v
+        if (t.piece_id == null) generalExpenses += v
         const key = `${y}-${m}`
         const name = l.accounts?.name || 'Other'
         if (!expByYM[key]) expByYM[key] = {}
@@ -243,7 +247,10 @@ export default async function PlayPage({
   )
 
   // Rank / progress from total profit — the game-score framing.
-  const total = allTimeProfit
+  // "Profit so far" is NET: the realized gross on sold pieces, minus the
+  // general business costs that aren't tied to any piece (overhead).
+  const netProfit = allTimeProfit - generalExpenses
+  const total = netProfit
   let tierIdx = 0
   for (let i = 0; i < TIERS.length; i++) if (total >= TIERS[i].min) tierIdx = i
   const tier = TIERS[tierIdx]
@@ -418,7 +425,7 @@ export default async function PlayPage({
             className="mt-2 font-sans text-[11px] uppercase tracking-[0.3em]"
             style={{ color: C.muted }}
           >
-            profit so far
+            net profit so far
           </div>
 
           {/* One-tap "Log a sale" — sits right under the hero number so a sale
