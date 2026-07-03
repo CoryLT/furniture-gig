@@ -276,28 +276,38 @@ export default async function PlayPage({
   let cashFree = 0
   for (const l of (assetLines ?? []) as any[]) cashFree += Number(l.debit) - Number(l.credit)
 
-  // Monthly challenges — short-term, resettable quests on top of the rank ladder.
-  // Targets are easy to tweak.
-  const FLIP_GOAL = 2
-  const PROFIT_GOAL = 250
+  // Monthly challenges — ROLLING goals. Each target sits just above where you
+  // are now, so there's always something to chase and no stale "done" cards.
+  // At the start of a new month, progress resets and the goals start small again.
+  const nextTier = (current: number, tiers: number[]): number => {
+    for (const t of tiers) if (current < t) return t
+    // Past the top tier — keep climbing by the last step size.
+    const step = tiers[tiers.length - 1] - (tiers[tiers.length - 2] ?? 0)
+    return Math.ceil((current + 1) / step) * step
+  }
+  const flipGoal = nextTier(monthFlips, [2, 4, 6, 8, 10, 15, 20, 30, 50, 75, 100])
+  const profitGoal = nextTier(
+    Math.max(0, monthProfit),
+    [250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 15000, 25000]
+  )
   const challenges = [
     {
       key: 'flips',
       href: '/flipper/pipeline',
       icon: <Target className="w-4 h-4" />,
-      title: `Flip ${FLIP_GOAL} this month`,
-      label: `${Math.min(monthFlips, FLIP_GOAL)} / ${FLIP_GOAL}`,
-      pct: Math.min(100, (monthFlips / FLIP_GOAL) * 100),
-      done: monthFlips >= FLIP_GOAL,
+      title: `Flip ${flipGoal} this month`,
+      label: `${monthFlips} / ${flipGoal}`,
+      pct: Math.min(100, (monthFlips / flipGoal) * 100),
+      done: false,
     },
     {
       key: 'profit',
       href: '/flipper/pipeline/add-past-sale',
       icon: <Coins className="w-4 h-4" />,
-      title: `Clear $${whole(PROFIT_GOAL)} this month`,
-      label: `$${whole(Math.max(0, monthProfit))} / $${whole(PROFIT_GOAL)}`,
-      pct: Math.min(100, Math.max(0, (monthProfit / PROFIT_GOAL) * 100)),
-      done: monthProfit >= PROFIT_GOAL,
+      title: `Clear $${whole(profitGoal)} this month`,
+      label: `$${whole(Math.max(0, monthProfit))} / $${whole(profitGoal)}`,
+      pct: Math.min(100, Math.max(0, (monthProfit / profitGoal) * 100)),
+      done: false,
     },
   ]
 
