@@ -6,13 +6,14 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Armchair, Menu } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
-import { NotificationBell } from '@/components/shared/NotificationBell'
+import { NotificationBell, type BellNeed } from '@/components/shared/NotificationBell'
 import { MessageBell } from '@/components/shared/MessageBell'
 
 interface NavProps {
   role: 'worker' | 'admin' | 'flipper'
   userName?: string
   userUsername?: string
+  needs?: BellNeed[]
 }
 
 type NavItem = { href: string; label: string } | { divider: true }
@@ -53,7 +54,7 @@ const adminLinks: NavItem[] = [
   { href: '/admin/payouts', label: 'Payouts' },
 ]
 
-export default function Nav({ role, userName, userUsername }: NavProps) {
+export default function Nav({ role, userName, userUsername, needs }: NavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -308,7 +309,7 @@ export default function Nav({ role, userName, userUsername }: NavProps) {
 
         <div className="flex items-center gap-2 sm:gap-3">
           {role !== 'admin' && <MessageBell />}
-          {role !== 'admin' && <NotificationBell />}
+          {role !== 'admin' && <NotificationBell needs={needs} />}
           <ThemeToggle />
           <div className="relative" ref={dropdownRef}>
             <button
