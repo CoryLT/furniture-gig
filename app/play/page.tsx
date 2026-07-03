@@ -7,7 +7,7 @@ import GameBar from '@/components/play/GameBar'
 import RankEmblem from '@/components/play/RankEmblem'
 import RankTrail from '@/components/play/RankTrail'
 import ProfitCharts from '@/components/play/ProfitCharts'
-import NeedsYou, { type NeedItem } from '@/components/play/NeedsYou'
+import { type NeedItem } from '@/components/play/NeedsYou'
 import SoldPeriodSelect from '@/components/play/SoldPeriodSelect'
 import EnableNotificationsButton from '@/components/notifications/EnableNotificationsButton'
 import AddToHomeScreenPrompt from '@/components/notifications/AddToHomeScreenPrompt'
@@ -389,7 +389,7 @@ export default async function PlayPage({
         className="pointer-events-none fixed inset-0"
         style={{ backgroundImage: `url("${GRAIN}")`, opacity: 0.04, mixBlendMode: 'overlay', zIndex: 0 }}
       />
-      <Nav role="flipper" userName={navName} userUsername={navUsername} />
+      <Nav role="flipper" userName={navName} userUsername={navUsername} needs={needsTop} />
       <main className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-8">
         {/* Hero: rank emblem, glowing score, XP bar */}
         <section className="relative text-center pt-2">
@@ -543,10 +543,7 @@ export default async function PlayPage({
           </div>
         </section>
 
-        {/* Needs you — real problems to resolve, the heart of the loop */}
-        {(needs.length > 0 || hasPieces) && (
-          <NeedsYou items={needsTop} extra={needsExtra} />
-        )}
+        {/* "Needs you" now lives in the notification bell (top-right). */}
 
         {/* Challenges — your next goals to chase */}
         <section>
