@@ -145,16 +145,24 @@ fee or commission on any amount you pay or receive.
 
 6. FEES AND SUBSCRIPTIONS
 
-6.1. Access to the Service, or to certain features, may require a paid
-subscription. If you subscribe to a paid plan, the price, billing period,
-and features will be described at the time of purchase.
+6.1. The Service offers a free plan and one or more paid subscription
+plans (for example, "FlipWork Pro"). Some features are available only on a
+paid plan, and free plans may have usage limits. If you subscribe to a
+paid plan, the price, billing period, and features will be described at
+the time of purchase.
 
-6.2. Unless stated otherwise, paid subscriptions renew automatically at
-the end of each billing period at the then-current price until you
-cancel. You may cancel at any time, effective at the end of the current
-billing period.
+6.2. Payment processing. Paid subscriptions are billed through a
+third-party payment processor. You provide your payment details (such as
+card information) directly to that processor, and its terms and privacy
+policy also apply to your payment. FlipWork does not receive or store your
+full card number.
 
-6.3. Except where required by law, fees are non-refundable and partial
+6.3. Unless stated otherwise, paid subscriptions renew automatically at
+the end of each billing period at the then-current price until you cancel.
+You may cancel at any time through your account or the billing portal,
+effective at the end of the current billing period.
+
+6.4. Except where required by law, fees are non-refundable and partial
 periods are not prorated. We may change our prices or plans on a
 going-forward basis with reasonable notice. You are responsible for any
 applicable taxes.
@@ -442,7 +450,13 @@ payments you make to helpers, used to produce your records and automated
 tax-threshold reminders (such as 1099 alerts). FlipWork does not process
 these payments; we only store what you enter.
 
-2.7. Technical and usage data. Basic information needed to operate and
+2.7. Billing information. If you subscribe to a paid plan, our third-party
+payment processor collects your payment details (such as card information)
+directly to process your subscription. We do not receive or store your
+full card number. We store your subscription status and an identifier
+(such as a customer or subscription ID) provided by the processor.
+
+2.8. Technical and usage data. Basic information needed to operate and
 secure the Service, such as log data, device and browser information,
 authentication cookies or local storage, and — if you enable
 notifications — a push-notification token.
@@ -467,6 +481,7 @@ it only to provide their services to us. These include providers of:
   - Hosting, database, authentication, and file storage;
   - Application hosting and delivery;
   - Email delivery (for notifications and account emails);
+  - Payment processing (to bill paid subscriptions and manage billing);
   - Image moderation (to screen uploaded images); and
   - Artificial intelligence (to power receipt scanning and the support
     chat), which means receipt images and support-chat messages may be
