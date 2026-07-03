@@ -473,6 +473,20 @@ export default async function PlayPage({
             </div>
           )}
 
+          {/* Profit-by-month visual — moved up to sit beneath the sale button
+              and above the level progress bar. */}
+          {hasBooksData && (
+            <div className="mt-6 text-left">
+              <ProfitCharts
+                byYear={byYear}
+                years={chartYears}
+                currentYear={now.getFullYear()}
+                currentMonth={now.getMonth()}
+                expensesByYM={expensesByYM}
+              />
+            </div>
+          )}
+
           <div className="mt-6 max-w-xs mx-auto">
             <GameBar pct={pct} />
             <div className="mt-2 font-sans text-xs" style={{ color: C.muted }}>
@@ -532,17 +546,6 @@ export default async function PlayPage({
         {/* Needs you — real problems to resolve, the heart of the loop */}
         {(needs.length > 0 || hasPieces) && (
           <NeedsYou items={needsTop} extra={needsExtra} />
-        )}
-
-        {/* Profit detail + this month's expense breakdown */}
-        {hasBooksData && (
-          <ProfitCharts
-            byYear={byYear}
-            years={chartYears}
-            currentYear={now.getFullYear()}
-            currentMonth={now.getMonth()}
-            expensesByYM={expensesByYM}
-          />
         )}
 
         {/* Challenges — your next goals to chase */}
