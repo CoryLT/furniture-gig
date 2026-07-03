@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '@/components/shared/Nav'
 import CountUp from '@/components/play/CountUp'
-import ProfitBreakdown from '@/components/play/ProfitBreakdown'
 import GameBar from '@/components/play/GameBar'
 import RankEmblem from '@/components/play/RankEmblem'
 import RankTrail from '@/components/play/RankTrail'
@@ -435,15 +434,6 @@ export default async function PlayPage({
           >
             net profit so far
           </div>
-
-          <ProfitBreakdown
-            gross={allTimeProfit}
-            overhead={generalExpenses}
-            net={netProfit}
-            gold={C.gold}
-            muted={C.muted}
-            panelBorder={C.panelBorder}
-          />
 
           {/* One-tap "Log a sale" — sits right under the hero number so a sale
               can be logged on the go, without the bookkeeping detail. Points at
