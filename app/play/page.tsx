@@ -455,23 +455,15 @@ export default async function PlayPage({
 
           {monthProfit > 0 ? (
             <div
-              className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-sans text-sm font-semibold"
-              style={{
-                color: C.green,
-                background: 'rgba(103,211,145,0.12)',
-                border: '1px solid rgba(103,211,145,0.25)',
-              }}
+              className="mt-3 inline-flex items-center gap-1.5 font-sans text-sm font-semibold"
+              style={{ color: C.green }}
             >
               <TrendingUp className="w-4 h-4" /> {money(monthProfit)} this month
             </div>
           ) : monthProfit < 0 ? (
             <div
-              className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-sans text-sm font-semibold"
-              style={{
-                color: C.red,
-                background: 'rgba(240,145,127,0.12)',
-                border: '1px solid rgba(240,145,127,0.25)',
-              }}
+              className="mt-3 inline-flex items-center gap-1.5 font-sans text-sm font-semibold"
+              style={{ color: C.red }}
             >
               <TrendingDown className="w-4 h-4" /> {money(monthProfit)} this month
             </div>
