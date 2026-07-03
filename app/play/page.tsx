@@ -528,40 +528,14 @@ export default async function PlayPage({
             }}
           />
 
-          <div
-            className="mt-5 flex items-center justify-center gap-5 font-mono text-sm"
-            style={{ color: C.cream }}
-          >
-            <span>
-              <span style={{ color: C.gold }}>{sold.length}</span>{' '}
-              <span
-                className="font-sans text-xs uppercase tracking-wider"
-                style={{ color: C.muted }}
-              >
-                flipped
-              </span>
-            </span>
-            <span style={{ color: C.panelBorder }}>|</span>
-            <span>
-              <span style={{ color: C.gold }}>{unsold.length}</span>{' '}
-              <span
-                className="font-sans text-xs uppercase tracking-wider"
-                style={{ color: C.muted }}
-              >
-                in play
-              </span>
-            </span>
-          </div>
-        </section>
-
-        {/* "Needs you" now lives in the notification bell (top-right). */}
-
-        {/* Challenges — your next goals to chase */}
-        <section>
-          <h2 className="font-serif text-lg mb-2" style={{ color: C.cream }}>
-            Challenges
-          </h2>
-          <div className="space-y-2">
+          {/* Challenges — folded in right under the rank badges, compact. */}
+          <div className="mt-6 mx-auto max-w-sm text-left space-y-2">
+            <div
+              className="text-center font-sans text-[11px] uppercase tracking-[0.3em]"
+              style={{ color: C.muted }}
+            >
+              Challenges
+            </div>
             {challenges.map((c) => (
               <Link
                 key={c.key}
@@ -603,7 +577,37 @@ export default async function PlayPage({
               </Link>
             ))}
           </div>
+
+          <div
+            className="mt-5 flex items-center justify-center gap-5 font-mono text-sm"
+            style={{ color: C.cream }}
+          >
+            <span>
+              <span style={{ color: C.gold }}>{sold.length}</span>{' '}
+              <span
+                className="font-sans text-xs uppercase tracking-wider"
+                style={{ color: C.muted }}
+              >
+                flipped
+              </span>
+            </span>
+            <span style={{ color: C.panelBorder }}>|</span>
+            <span>
+              <span style={{ color: C.gold }}>{unsold.length}</span>{' '}
+              <span
+                className="font-sans text-xs uppercase tracking-wider"
+                style={{ color: C.muted }}
+              >
+                in play
+              </span>
+            </span>
+          </div>
         </section>
+
+        {/* "Needs you" now lives in the notification bell (top-right). */}
+
+        {/* Challenges now live up in the hero, folded in with the rank badges. */}
+
 
         {/* Cash free vs tied up — HUD resource counters */}
         <section className="grid grid-cols-2 gap-3">
