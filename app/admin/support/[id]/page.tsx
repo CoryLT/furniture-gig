@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import AdminSupportActions from './AdminSupportActions'
+import AdminReplyBox from './AdminReplyBox'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -158,6 +159,12 @@ export default async function AdminSupportConversationPage({
           </div>
         ))}
       </div>
+
+      {/* Admin reply — sends a push to the user and keeps the
+          conversation in the escalated queue. */}
+      {(convo as any).status !== 'resolved' && (
+        <AdminReplyBox conversationId={params.id} />
+      )}
     </main>
   )
 }
