@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Send, Plus, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
+import { Send, Plus, AlertCircle, CheckCircle2, Loader2, UserRound } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -145,6 +145,46 @@ export default function SupportClient({ initialConversations }: Props) {
     }
   }
 
+  // "Talk to a person" — flags the current conversation for Cory
+  // (or starts a new one and flags that) without the AI in the loop.
+  async function escalateToPerson() {
+    if (sending) return
+    const ok = window.confirm(
+      "Send this chat to Cory (a human)? He'll follow up here in the chat, and you'll get a notification when he replies."
+    )
+    if (!ok) return
+
+    setError(null)
+    setSending(true)
+    try {
+      const res = await fetch('/api/support/escalate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: activeId || null }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data?.error || 'Could not send to a person right now.')
+        setSending(false)
+        return
+      }
+
+      // Reload the conversation so the ack message shows and the
+      // sidebar picks up the new "escalated" badge.
+      const nextId: string = data.conversationId
+      const listRes = await fetch('/api/support/conversations', { cache: 'no-store' })
+      if (listRes.ok) {
+        const listData = await listRes.json()
+        setConversations(listData.conversations || [])
+      }
+      await loadConversation(nextId)
+    } catch (e: any) {
+      setError(e?.message || 'Network error.')
+    } finally {
+      setSending(false)
+    }
+  }
+
   async function markResolved() {
     if (!activeId) return
     try {
@@ -236,14 +276,27 @@ export default function SupportClient({ initialConversations }: Props) {
               </span>
             )}
           </div>
-          {activeId && activeStatus === 'active' && (
-            <button
-              onClick={markResolved}
-              className="text-xs text-muted-foreground hover:text-foreground underline"
-            >
-              Mark resolved
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {activeStatus !== 'resolved' && activeStatus !== 'escalated' && (
+              <button
+                onClick={escalateToPerson}
+                disabled={sending}
+                className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:text-accent disabled:opacity-50"
+                title="Send this chat to Cory instead of the AI"
+              >
+                <UserRound className="w-3.5 h-3.5" />
+                Talk to a person
+              </button>
+            )}
+            {activeId && activeStatus === 'active' && (
+              <button
+                onClick={markResolved}
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+              >
+                Mark resolved
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Messages */}
@@ -359,6 +412,19 @@ export default function SupportClient({ initialConversations }: Props) {
               </Button>
             </form>
           )}
+
+          {/* Direct email fallback for when the whole chat is down or
+              the user wants to reach a person outside this thread. */}
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            Chat not working, or need to reach out directly?{' '}
+            <a
+              href="mailto:CoryThacker@proton.me"
+              className="underline hover:text-foreground"
+            >
+              Email us
+            </a>
+            .
+          </p>
         </div>
       </section>
     </div>
