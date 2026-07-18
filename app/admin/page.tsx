@@ -1,17 +1,14 @@
 import Link from 'next/link'
 import {
   Users,
-  Briefcase,
-  DollarSign,
-  TrendingUp,
+  Package,
   AlertCircle,
   Flag,
   MessageSquare,
   Activity,
-  CheckCircle2,
-  Clock,
-  ShoppingBag,
   Crown,
+  DollarSign,
+  Sparkles,
 } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -24,30 +21,11 @@ export const revalidate = 0
 // ============================================================
 // FlipWork Admin Dashboard
 // ============================================================
-// Replaces the old "quick links + new gig" admin landing page
-// with a real ops/analytics view. No editing or posting happens
-// here — that all lives on the user side. This is for Cory to
-// see how the platform is doing.
+// FlipWork is now an operator-only hub (workers/gigs/marketplace
+// are shelved). This dashboard reflects that: user growth, Pro
+// subscribers, MRR, and engagement measured by pieces logged.
+// No gig or marketplace stats appear here.
 // ============================================================
-
-type PayoutRow = {
-  id: string
-  gig_id: string
-  amount: number | null
-  gross_amount: number | null
-  platform_fee_amount: number | null
-  payment_status: string | null
-  payout_status: string | null
-  created_at: string
-}
-
-type GigRow = {
-  id: string
-  title: string
-  status: string
-  pay_amount: number | null
-  created_at: string
-}
 
 type UserRow = {
   id: string
@@ -56,15 +34,26 @@ type UserRow = {
   created_at: string
 }
 
-type ListingRow = {
+type PieceRow = {
   id: string
-  title: string
-  status: string
+  title: string | null
+  stage: string | null
+  sale_price: number | null
+  owner_user_id: string
   created_at: string
+  sold_at: string | null
 }
 
-// Money-touched payments (real money has moved or is held).
-const REAL_MONEY_STATUSES = ['authorized', 'captured', 'transferred', 'refunded']
+type SubRow = {
+  user_id: string
+  status: string | null
+  is_founding: boolean | null
+  updated_at: string
+}
+
+// Priced at $9/mo — matches PRO_PRICE_LABEL in lib/plan.ts. If the
+// price changes, update both.
+const PRO_MONTHLY_PRICE = 9
 
 export default async function AdminDashboard() {
   // Verify the caller is actually an admin before bypassing RLS.
@@ -108,50 +97,37 @@ export default async function AdminDashboard() {
   const [
     { count: totalUsers },
     { count: usersThisWeek },
-    { count: totalGigs },
-    { count: gigsThisWeek },
-    { count: openGigs },
-    { count: activeClaims },
-    { count: totalListings },
+    { count: totalPieces },
+    { count: piecesThisWeek },
+    { count: piecesSoldThisWeek },
     { count: escalatedSupport },
     { count: openImageReports },
-    { count: openListingReports },
     { count: proUsers },
     { count: foundingUsers },
     { count: trialingUsers },
+    { data: activeOwnerRows },
   ] = await Promise.all([
     supabase.from('users').select('id', { count: 'exact', head: true }),
     supabase
       .from('users')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', sevenDaysAgoISO),
-    supabase.from('gigs').select('id', { count: 'exact', head: true }),
+    supabase.from('inventory_pieces').select('id', { count: 'exact', head: true }),
     supabase
-      .from('gigs')
+      .from('inventory_pieces')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', sevenDaysAgoISO),
     supabase
-      .from('gigs')
+      .from('inventory_pieces')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'open'),
-    supabase
-      .from('gig_claims')
-      .select('id', { count: 'exact', head: true })
-      .in('status', ['active', 'submitted_for_review']),
-    supabase
-      .from('marketplace_listings')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'active'),
+      .eq('stage', 'sold')
+      .gte('sold_at', sevenDaysAgoISO),
     supabase
       .from('support_conversations')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'escalated'),
     supabase
       .from('image_reports')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'open'),
-    supabase
-      .from('listing_reports')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'open'),
     // Anyone on Pro right now: paying (active), on a trial, or comped
@@ -171,6 +147,13 @@ export default async function AdminDashboard() {
       .from('subscriptions')
       .select('user_id', { count: 'exact', head: true })
       .eq('status', 'trialing'),
+    // Active operators this week — anyone who created or touched a
+    // piece within the last 7 days. We fetch owner ids and dedupe in
+    // JS (Supabase JS doesn't do DISTINCT directly).
+    supabase
+      .from('inventory_pieces')
+      .select('owner_user_id')
+      .gte('updated_at', sevenDaysAgoISO),
   ])
 
   // Split Pro into "paying" (real money) vs "comped" (founding members
@@ -180,44 +163,26 @@ export default async function AdminDashboard() {
   const totalPro = proUsers ?? 0
   const paying = Math.max(0, totalPro - founding - trialing)
 
-  // ---------- MONEY ----------
-  // Pull all payouts that touched real money for the all-time totals,
-  // and ALL payouts in the last 30 days for the chart.
-  const { data: moneyPayoutsRaw } = await supabase
-    .from('payout_records')
-    .select(
-      'id, gig_id, amount, gross_amount, platform_fee_amount, payment_status, payout_status, created_at',
-    )
-    .in('payment_status', REAL_MONEY_STATUSES)
+  // MRR estimate = paying users × monthly price. Doesn't try to model
+  // Stripe discounts or annual plans — just a directional number.
+  const estimatedMrr = paying * PRO_MONTHLY_PRICE
 
-  const moneyPayouts = (moneyPayoutsRaw ?? []) as PayoutRow[]
+  // Distinct operators active this week
+  const activeOperators = new Set(
+    ((activeOwnerRows ?? []) as { owner_user_id: string }[]).map(
+      (r) => r.owner_user_id,
+    ),
+  ).size
 
-  // All-time platform money flow = sum of gross_amount on captured/transferred.
-  const movedStatuses = ['captured', 'transferred']
-  const totalGmv = moneyPayouts
-    .filter((p) => p.payment_status && movedStatuses.includes(p.payment_status))
-    .reduce((sum, p) => sum + Number(p.gross_amount ?? p.amount ?? 0), 0)
+  // ---------- 30-DAY SIGNUP CHART ----------
+  // Growth is the story we care about, so replace the old money-flow
+  // chart with a daily-signup bar chart over the last 30 days.
+  const { data: chartUsersRaw } = await supabase
+    .from('users')
+    .select('id, created_at')
+    .gte('created_at', thirtyDaysAgoISO)
 
-  // All-time platform fees earned (your 2%).
-  const totalPlatformFees = moneyPayouts
-    .filter((p) => p.payment_status && movedStatuses.includes(p.payment_status))
-    .reduce((sum, p) => sum + Number(p.platform_fee_amount ?? 0), 0)
-
-  // Money in flight (authorized but not yet captured)
-  const moneyInFlight = moneyPayouts
-    .filter((p) => p.payment_status === 'authorized')
-    .reduce((sum, p) => sum + Number(p.gross_amount ?? p.amount ?? 0), 0)
-
-  // ---------- 30-DAY MONEY CHART ----------
-  // Group captured-money days into a daily bar chart.
-  const chartPayouts = moneyPayouts.filter(
-    (p) =>
-      new Date(p.created_at) >= thirtyDaysAgo &&
-      p.payment_status &&
-      movedStatuses.includes(p.payment_status),
-  )
-
-  // Bucket by YYYY-MM-DD
+  // Bucket by YYYY-MM-DD, filling in zero-days so the chart is dense.
   const dailyTotals = new Map<string, number>()
   for (let i = 0; i < 30; i++) {
     const d = new Date()
@@ -225,13 +190,10 @@ export default async function AdminDashboard() {
     const key = d.toISOString().slice(0, 10)
     dailyTotals.set(key, 0)
   }
-  for (const p of chartPayouts) {
-    const key = p.created_at.slice(0, 10)
+  for (const u of (chartUsersRaw ?? []) as { created_at: string }[]) {
+    const key = u.created_at.slice(0, 10)
     if (dailyTotals.has(key)) {
-      dailyTotals.set(
-        key,
-        (dailyTotals.get(key) ?? 0) + Number(p.gross_amount ?? p.amount ?? 0),
-      )
+      dailyTotals.set(key, (dailyTotals.get(key) ?? 0) + 1)
     }
   }
   const chartData = Array.from(dailyTotals.entries()).map(([day, amt]) => ({
@@ -239,14 +201,14 @@ export default async function AdminDashboard() {
     amount: amt,
   }))
   const maxDaily = Math.max(1, ...chartData.map((d) => d.amount))
+  const totalSignups30d = chartData.reduce((s, d) => s + d.amount, 0)
 
   // ---------- RECENT ACTIVITY ----------
-  // Pull the most recent items across a few tables and merge into one feed.
+  // Signups, Pro upgrades, and pieces added across all operators.
   const [
     { data: recentUsersRaw },
-    { data: recentGigsRaw },
-    { data: recentListingsRaw },
-    { data: recentPayoutsRaw },
+    { data: recentPiecesRaw },
+    { data: recentSubsRaw },
   ] = await Promise.all([
     supabase
       .from('users')
@@ -254,28 +216,39 @@ export default async function AdminDashboard() {
       .order('created_at', { ascending: false })
       .limit(10),
     supabase
-      .from('gigs')
-      .select('id, title, status, pay_amount, created_at')
+      .from('inventory_pieces')
+      .select('id, title, stage, sale_price, owner_user_id, created_at, sold_at')
       .order('created_at', { ascending: false })
       .limit(10),
     supabase
-      .from('marketplace_listings')
-      .select('id, title, status, created_at')
-      .order('created_at', { ascending: false })
-      .limit(10),
-    supabase
-      .from('payout_records')
-      .select(
-        'id, gig_id, gross_amount, payment_status, created_at',
-      )
-      .in('payment_status', REAL_MONEY_STATUSES)
-      .order('created_at', { ascending: false })
+      .from('subscriptions')
+      .select('user_id, status, is_founding, updated_at')
+      .or('status.eq.active,status.eq.trialing,is_founding.eq.true')
+      .order('updated_at', { ascending: false })
       .limit(10),
   ])
 
+  // Resolve owner emails for the recent pieces + Pro upgrades so the
+  // activity feed has names, not raw uuids. One batched lookup so we
+  // don't fire N sequential queries.
+  const idsToResolve = new Set<string>()
+  for (const p of (recentPiecesRaw ?? []) as PieceRow[]) idsToResolve.add(p.owner_user_id)
+  for (const s of (recentSubsRaw ?? []) as SubRow[]) idsToResolve.add(s.user_id)
+  const idList = Array.from(idsToResolve)
+  const emailById = new Map<string, string>()
+  if (idList.length > 0) {
+    const { data: usersLookup } = await supabase
+      .from('users')
+      .select('id, email')
+      .in('id', idList)
+    for (const u of (usersLookup ?? []) as { id: string; email: string | null }[]) {
+      if (u.email) emailById.set(u.id, u.email)
+    }
+  }
+
   type ActivityEvent = {
     when: string
-    kind: 'signup' | 'gig' | 'listing' | 'payment'
+    kind: 'signup' | 'piece' | 'sold' | 'pro'
     label: string
     href: string | null
   }
@@ -292,46 +265,45 @@ export default async function AdminDashboard() {
       href: null,
     })
   }
-  for (const g of (recentGigsRaw ?? []) as GigRow[]) {
-    events.push({
-      when: g.created_at,
-      kind: 'gig',
-      label: `Gig posted: "${g.title}" — ${formatCurrency(g.pay_amount ?? 0)}`,
-      href: `/admin/gigs`,
-    })
+
+  for (const p of (recentPiecesRaw ?? []) as PieceRow[]) {
+    const ownerLabel = emailById.get(p.owner_user_id) || 'user'
+    const title = (p.title || '').trim() || 'Untitled piece'
+    // Emit a 'sold' event if the piece was sold, using sold_at as the
+    // timestamp so it lands correctly in the feed. Otherwise emit the
+    // created event.
+    if (p.stage === 'sold' && p.sold_at) {
+      const price = Number(p.sale_price ?? 0)
+      events.push({
+        when: p.sold_at,
+        kind: 'sold',
+        label:
+          `Piece sold — "${title}"` +
+          (price > 0 ? ` for ${formatCurrency(price)}` : '') +
+          ` (${ownerLabel})`,
+        href: null,
+      })
+    } else {
+      events.push({
+        when: p.created_at,
+        kind: 'piece',
+        label: `Piece added — "${title}" (${ownerLabel})`,
+        href: null,
+      })
+    }
   }
-  for (const l of (recentListingsRaw ?? []) as ListingRow[]) {
+
+  for (const s of (recentSubsRaw ?? []) as SubRow[]) {
+    const owner = emailById.get(s.user_id) || 'user'
+    let label: string
+    if (s.is_founding) label = `Founding member — ${owner}`
+    else if (s.status === 'trialing') label = `Pro trial started — ${owner}`
+    else label = `Pro upgrade — ${owner}`
     events.push({
-      when: l.created_at,
-      kind: 'listing',
-      label: `Listing posted: "${l.title}"`,
+      when: s.updated_at,
+      kind: 'pro',
+      label,
       href: null,
-    })
-  }
-  for (const p of (recentPayoutsRaw ?? []) as Array<{
-    id: string
-    gig_id: string
-    gross_amount: number | null
-    payment_status: string | null
-    created_at: string
-  }>) {
-    const statusLabel =
-      p.payment_status === 'authorized'
-        ? 'authorized'
-        : p.payment_status === 'captured'
-        ? 'captured'
-        : p.payment_status === 'transferred'
-        ? 'paid to worker'
-        : p.payment_status === 'refunded'
-        ? 'refunded'
-        : p.payment_status ?? 'updated'
-    events.push({
-      when: p.created_at,
-      kind: 'payment',
-      label: `Payment ${statusLabel} — ${formatCurrency(
-        Number(p.gross_amount ?? 0),
-      )}`,
-      href: `/admin/payouts`,
     })
   }
 
@@ -382,96 +354,101 @@ export default async function AdminDashboard() {
           }
         />
         <StatTile
-          icon={<Briefcase className="w-4 h-4 text-foreground" />}
-          tint="neutral"
-          label="Total gigs"
-          value={String(totalGigs ?? 0)}
-          sub={
-            gigsThisWeek
-              ? `+${gigsThisWeek} this week`
-              : 'No new gigs this week'
-          }
-        />
-        <StatTile
-          icon={<DollarSign className="w-4 h-4 text-accent" />}
-          tint="accent"
-          label="Total $ moved"
-          value={formatCurrency(totalGmv)}
-          sub={
-            moneyInFlight > 0
-              ? `${formatCurrency(moneyInFlight)} in flight`
-              : 'All settled'
-          }
-        />
-        <StatTile
-          icon={<TrendingUp className="w-4 h-4 text-green-600" />}
+          icon={<DollarSign className="w-4 h-4 text-green-600" />}
           tint="green"
-          label="Platform fees"
-          value={formatCurrency(totalPlatformFees)}
-          sub="2% of gigs paid"
+          label="Est. MRR"
+          value={formatCurrency(estimatedMrr)}
+          sub={
+            paying === 0
+              ? 'No paying users yet'
+              : `${paying} × ${formatCurrency(PRO_MONTHLY_PRICE)}/mo`
+          }
+        />
+        <StatTile
+          icon={<Package className="w-4 h-4 text-foreground" />}
+          tint="neutral"
+          label="Total pieces logged"
+          value={String(totalPieces ?? 0)}
+          sub={
+            piecesThisWeek
+              ? `+${piecesThisWeek} this week`
+              : 'No new pieces this week'
+          }
+        />
+        <StatTile
+          icon={<Sparkles className="w-4 h-4 text-accent" />}
+          tint="accent"
+          label="Active this week"
+          value={String(activeOperators)}
+          sub={
+            activeOperators === 0
+              ? 'No active operators'
+              : `logged a piece in 7 days`
+          }
         />
       </div>
 
-      {/* Money chart */}
+      {/* Signups chart — early-stage this is the number to watch */}
       <div className="card">
         <div className="card-body">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-semibold text-foreground">
-                Money flow — last 30 days
+                Signups — last 30 days
               </h2>
               <p className="text-xs text-muted-foreground">
-                Daily total of captured payments (excludes authorizations
-                that haven&apos;t been captured yet)
+                {totalSignups30d === 0
+                  ? 'Daily new-user count. Nothing in the last 30 days.'
+                  : `Daily new-user count · ${totalSignups30d} new user${
+                      totalSignups30d === 1 ? '' : 's'
+                    } in the last 30 days`}
               </p>
             </div>
           </div>
 
-          {totalGmv === 0 ? (
+          {totalSignups30d === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
-              No captured payments yet. The chart will fill in as gigs are
-              paid out.
+              No signups yet in the last 30 days. The chart will fill in as
+              people join.
             </div>
           ) : (
-            <MoneyBars data={chartData} max={maxDaily} />
+            <DailyBars data={chartData} max={maxDaily} />
           )}
         </div>
       </div>
 
-      {/* Operational tiles */}
+      {/* Operational tiles — engagement + moderation queues */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <OpsTile
-          icon={<Briefcase className="w-4 h-4 text-foreground" />}
-          label="Open gigs"
-          value={openGigs ?? 0}
-          href="/admin/gigs"
+          icon={<Package className="w-4 h-4 text-foreground" />}
+          label="Pieces sold this week"
+          value={piecesSoldThisWeek ?? 0}
+          href="/admin"
         />
         <OpsTile
-          icon={<Clock className="w-4 h-4 text-amber-600" />}
-          label="Active claims"
-          value={activeClaims ?? 0}
-          href="/admin/gigs"
+          icon={<Sparkles className="w-4 h-4 text-accent" />}
+          label="Active operators (7d)"
+          value={activeOperators}
+          href="/admin"
         />
         <OpsTile
-          icon={<ShoppingBag className="w-4 h-4 text-foreground" />}
-          label="Live listings"
-          value={totalListings ?? 0}
-          href="/marketplace"
+          icon={<MessageSquare className="w-4 h-4 text-foreground" />}
+          label="Escalated support"
+          value={escalatedSupport ?? 0}
+          href="/admin/support"
+          tint={(escalatedSupport ?? 0) > 0 ? 'amber' : undefined}
         />
         <OpsTile
-          icon={<CheckCircle2 className="w-4 h-4 text-green-600" />}
-          label="All settled?"
-          value={moneyInFlight === 0 ? 'Yes' : 'No'}
-          href="/admin/payouts"
-          tint={moneyInFlight === 0 ? 'green' : 'amber'}
+          icon={<Flag className="w-4 h-4 text-foreground" />}
+          label="Flagged images"
+          value={openImageReports ?? 0}
+          href="/admin/reports"
+          tint={(openImageReports ?? 0) > 0 ? 'amber' : undefined}
         />
       </div>
 
       {/* Attention required */}
-      {(escalatedSupport ?? 0) +
-        (openImageReports ?? 0) +
-        (openListingReports ?? 0) >
-        0 && (
+      {(escalatedSupport ?? 0) + (openImageReports ?? 0) > 0 && (
         <div className="card border-amber-300/60 bg-amber-50/50">
           <div className="card-body">
             <div className="flex items-start gap-3">
@@ -499,16 +476,6 @@ export default async function AdminDashboard() {
                       <Flag className="w-3.5 h-3.5" />
                       {openImageReports} flagged image
                       {openImageReports === 1 ? '' : 's'}
-                    </Link>
-                  )}
-                  {(openListingReports ?? 0) > 0 && (
-                    <Link
-                      href="/admin/reports"
-                      className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-card border border-border hover:bg-muted"
-                    >
-                      <Flag className="w-3.5 h-3.5" />
-                      {openListingReports} flagged listing
-                      {openListingReports === 1 ? '' : 's'}
                     </Link>
                   )}
                 </div>
@@ -641,14 +608,15 @@ function OpsTile({
   )
 }
 
-function MoneyBars({
+function DailyBars({
   data,
   max,
 }: {
   data: { day: string; amount: number }[]
   max: number
 }) {
-  // Hand-rolled SVG bar chart, same visual style as the home dashboard.
+  // Hand-rolled SVG bar chart. Height is proportional to `amount`
+  // (used for money or counts — same shape either way).
   const width = 700
   const height = 140
   const padding = 8
@@ -678,7 +646,7 @@ function MoneyBars({
               className="fill-accent"
               opacity={d.amount === 0 ? 0.15 : 0.85}
             >
-              <title>{`${d.day}: ${formatCurrency(d.amount)}`}</title>
+              <title>{`${d.day}: ${d.amount} signup${d.amount === 1 ? '' : 's'}`}</title>
             </rect>
           )
         })}
@@ -691,12 +659,12 @@ function MoneyBars({
   )
 }
 
-function EventDot({ kind }: { kind: 'signup' | 'gig' | 'listing' | 'payment' }) {
+function EventDot({ kind }: { kind: 'signup' | 'piece' | 'sold' | 'pro' }) {
   const color = {
     signup: 'bg-blue-500',
-    gig: 'bg-foreground',
-    listing: 'bg-amber-500',
-    payment: 'bg-green-500',
+    piece: 'bg-foreground',
+    sold: 'bg-green-500',
+    pro: 'bg-amber-500',
   }[kind]
   return (
     <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${color}`} />

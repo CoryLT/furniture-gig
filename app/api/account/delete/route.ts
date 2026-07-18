@@ -52,7 +52,7 @@ const USER_OWNED_TABLES: Sweep[] = [
 
   // --- pieces + everything hanging off them ---
   { table: "piece_supplies", column: "user_id" },
-  { table: "inventory_pieces", column: "user_id" },
+  { table: "inventory_pieces", column: "owner_user_id" },
 
   // --- crew + contacts ---
   { table: "crew_members", column: "operator_user_id" },
