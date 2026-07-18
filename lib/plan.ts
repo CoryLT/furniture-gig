@@ -16,12 +16,18 @@ export type PlanRow = {
   is_founding: boolean
   stripe_customer_id: string | null
   current_period_end: string | null
+  // Time-bounded comp (e.g. from a "1 free year" campaign). If set
+  // and in the future, the user is Pro regardless of stripe status.
+  comp_expires_at?: string | null
 }
 
 // Is this subscription row a paying (or comped) Pro account?
 export function isPro(row: PlanRow | null | undefined): boolean {
   if (!row) return false
   if (row.is_founding) return true
+  if (row.comp_expires_at && new Date(row.comp_expires_at) > new Date()) {
+    return true
+  }
   return row.status === 'active' || row.status === 'trialing'
 }
 
@@ -29,7 +35,7 @@ export function isPro(row: PlanRow | null | undefined): boolean {
 export async function getPlan(supabase: SupabaseClient, userId: string): Promise<PlanRow | null> {
   const { data } = await supabase
     .from('subscriptions')
-    .select('status, is_founding, stripe_customer_id, current_period_end')
+    .select('status, is_founding, stripe_customer_id, current_period_end, comp_expires_at')
     .eq('user_id', userId)
     .maybeSingle()
   return (data as PlanRow) ?? null

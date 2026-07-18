@@ -69,17 +69,20 @@ export type EmailEventType =
   | 'new_message'
   | 'tax_1099_threshold'
   | 'support_escalation'
+  | 'marketing_offer'
   | 'test'
 
 // Map each event type to the column on notification_preferences
 // that controls it. 'test' is for our smoke-test endpoint and
-// always sends.
+// always sends. 'marketing_offer' respects email_marketing so
+// unsubscribes are honored.
 const EVENT_TO_PREFERENCE_COLUMN: Record<EmailEventType, string | null> = {
   gig_picked: 'email_picked',
   gig_rejected: 'email_rejected',
   new_message: 'email_messages',
   tax_1099_threshold: null,
   support_escalation: null,
+  marketing_offer: 'email_marketing',
   test: null,
 }
 
