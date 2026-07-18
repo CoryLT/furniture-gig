@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Clock,
   ShoppingBag,
+  Crown,
 } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -115,6 +116,9 @@ export default async function AdminDashboard() {
     { count: escalatedSupport },
     { count: openImageReports },
     { count: openListingReports },
+    { count: proUsers },
+    { count: foundingUsers },
+    { count: trialingUsers },
   ] = await Promise.all([
     supabase.from('users').select('id', { count: 'exact', head: true }),
     supabase
@@ -150,7 +154,31 @@ export default async function AdminDashboard() {
       .from('listing_reports')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'open'),
+    // Anyone on Pro right now: paying (active), on a trial, or comped
+    // via is_founding. Same rule as lib/plan.ts#isPro so the count
+    // matches what users experience in the app.
+    supabase
+      .from('subscriptions')
+      .select('user_id', { count: 'exact', head: true })
+      .or('status.eq.active,status.eq.trialing,is_founding.eq.true'),
+    // Comped/founding members (subset of the Pro count above).
+    supabase
+      .from('subscriptions')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('is_founding', true),
+    // On a paid trial (subset of the Pro count above).
+    supabase
+      .from('subscriptions')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('status', 'trialing'),
   ])
+
+  // Split Pro into "paying" (real money) vs "comped" (founding members
+  // get Pro for free) so Cory sees the actual revenue-generating count.
+  const founding = foundingUsers ?? 0
+  const trialing = trialingUsers ?? 0
+  const totalPro = proUsers ?? 0
+  const paying = Math.max(0, totalPro - founding - trialing)
 
   // ---------- MONEY ----------
   // Pull all payouts that touched real money for the all-time totals,
@@ -324,7 +352,7 @@ export default async function AdminDashboard() {
       </div>
 
       {/* Hero stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <StatTile
           icon={<Users className="w-4 h-4 text-blue-600" />}
           tint="blue"
@@ -334,6 +362,23 @@ export default async function AdminDashboard() {
             usersThisWeek
               ? `+${usersThisWeek} this week`
               : 'No new signups this week'
+          }
+        />
+        <StatTile
+          icon={<Crown className="w-4 h-4 text-amber-600" />}
+          tint="amber"
+          label="Pro subscribers"
+          value={String(totalPro)}
+          sub={
+            totalPro === 0
+              ? 'No Pro users yet'
+              : [
+                  `${paying} paying`,
+                  trialing > 0 ? `${trialing} on trial` : null,
+                  founding > 0 ? `${founding} founding` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
           }
         />
         <StatTile
@@ -537,7 +582,7 @@ function StatTile({
   sub,
 }: {
   icon: React.ReactNode
-  tint: 'blue' | 'neutral' | 'accent' | 'green'
+  tint: 'blue' | 'neutral' | 'accent' | 'green' | 'amber'
   label: string
   value: string
   sub?: string
@@ -547,6 +592,7 @@ function StatTile({
     neutral: 'bg-muted',
     accent: 'bg-accent/10',
     green: 'bg-green-50',
+    amber: 'bg-amber-50',
   }[tint]
   return (
     <div className="card card-body">
