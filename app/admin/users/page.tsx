@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { formatDate } from '@/lib/utils'
 import { isPro } from '@/lib/plan'
 import UsersTable from './UsersTable'
+import CampaignSendButton from './CampaignSendButton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -169,7 +170,7 @@ export default async function AdminUsersPage() {
               Every account on FlipWork. Newest first.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             <SummaryChip
               icon={<UsersIcon className="w-3.5 h-3.5" />}
               label={`${rows.length} total`}
@@ -182,6 +183,7 @@ export default async function AdminUsersPage() {
               icon={<Sparkles className="w-3.5 h-3.5 text-accent" />}
               label={`${activeCount} active (7d)`}
             />
+            <CampaignSendButton />
           </div>
         </div>
       </div>
