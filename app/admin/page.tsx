@@ -335,6 +335,7 @@ export default async function AdminDashboard() {
               ? `+${usersThisWeek} this week`
               : 'No new signups this week'
           }
+          href="/admin/users"
         />
         <StatTile
           icon={<Crown className="w-4 h-4 text-amber-600" />}
@@ -547,12 +548,14 @@ function StatTile({
   label,
   value,
   sub,
+  href,
 }: {
   icon: React.ReactNode
   tint: 'blue' | 'neutral' | 'accent' | 'green' | 'amber'
   label: string
   value: string
   sub?: string
+  href?: string
 }) {
   const tintBg = {
     blue: 'bg-blue-50',
@@ -561,8 +564,8 @@ function StatTile({
     green: 'bg-green-50',
     amber: 'bg-amber-50',
   }[tint]
-  return (
-    <div className="card card-body">
+  const body = (
+    <>
       <div className="flex items-center gap-2">
         <div className={`w-7 h-7 rounded-md flex items-center justify-center ${tintBg}`}>
           {icon}
@@ -571,8 +574,19 @@ function StatTile({
       </div>
       <p className="mt-3 text-2xl font-semibold text-foreground">{value}</p>
       {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
-    </div>
+    </>
   )
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="card card-body hover:shadow-md transition-shadow"
+      >
+        {body}
+      </Link>
+    )
+  }
+  return <div className="card card-body">{body}</div>
 }
 
 function OpsTile({
@@ -615,45 +629,145 @@ function DailyBars({
   data: { day: string; amount: number }[]
   max: number
 }) {
-  // Hand-rolled SVG bar chart. Height is proportional to `amount`
-  // (used for money or counts — same shape either way).
+  // Hand-rolled SVG bar chart with:
+  //   - A peak / avg / total summary above so single-signup days
+  //     don't look like "nothing happened."
+  //   - A dashed reference line at the peak, labeled with the value.
+  //   - Non-zero bars given a floor height so a single signup still
+  //     shows as a visible bar (not a hairline).
+  //   - Date labels sprinkled across the bottom (every ~5 days) so
+  //     you can tell WHEN the tall bars are, not just how tall.
   const width = 700
-  const height = 140
+  const height = 160
   const padding = 8
   const innerW = width - padding * 2
   const innerH = height - padding * 2
   const barW = innerW / data.length
+  const MIN_NONZERO_H = 4 // px, so single signups are visible
+
+  const total = data.reduce((s, d) => s + d.amount, 0)
+  const avg = data.length ? total / data.length : 0
+  const peakDay = data.reduce(
+    (best, d) => (d.amount > best.amount ? d : best),
+    data[0] ?? { day: '', amount: 0 },
+  )
+
+  // Pick ~6 evenly spaced days for the x-axis labels.
+  const labelCount = 6
+  const labelStep = Math.max(1, Math.floor(data.length / labelCount))
+  const labelIndexes: number[] = []
+  for (let i = 0; i < data.length; i += labelStep) labelIndexes.push(i)
+  if (labelIndexes[labelIndexes.length - 1] !== data.length - 1) {
+    labelIndexes.push(data.length - 1)
+  }
 
   return (
-    <div className="w-full overflow-x-auto">
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="w-full h-32 min-w-[600px]"
-        preserveAspectRatio="none"
-      >
-        {data.map((d, i) => {
-          const h = max > 0 ? (d.amount / max) * innerH : 0
-          const x = padding + i * barW
-          const y = padding + (innerH - h)
-          return (
-            <rect
-              key={d.day}
-              x={x + 1}
-              y={y}
-              width={Math.max(0, barW - 2)}
-              height={h}
-              rx="2"
-              className="fill-accent"
-              opacity={d.amount === 0 ? 0.15 : 0.85}
-            >
-              <title>{`${d.day}: ${d.amount} signup${d.amount === 1 ? '' : 's'}`}</title>
-            </rect>
-          )
-        })}
-      </svg>
-      <div className="flex justify-between text-[10px] text-muted-foreground mt-1 px-1">
-        <span>{data[0]?.day && formatDate(data[0].day)}</span>
-        <span>Today</span>
+    <div className="w-full">
+      {/* Summary strip — tells you the story at a glance */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground mb-3">
+        <span>
+          Peak:{' '}
+          <span className="font-medium text-foreground">
+            {peakDay?.amount ?? 0}
+            {peakDay?.amount === 1 ? ' signup' : ' signups'}
+          </span>
+          {peakDay?.amount > 0 && peakDay.day && (
+            <> on {formatDate(peakDay.day)}</>
+          )}
+        </span>
+        <span>
+          Avg:{' '}
+          <span className="font-medium text-foreground">{avg.toFixed(1)}</span>
+          /day
+        </span>
+        <span>
+          Total:{' '}
+          <span className="font-medium text-foreground">{total}</span> in{' '}
+          {data.length} days
+        </span>
+      </div>
+
+      <div className="w-full overflow-x-auto">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="w-full h-40 min-w-[600px]"
+          preserveAspectRatio="none"
+        >
+          {/* Peak reference line + label */}
+          {max > 0 && (
+            <>
+              <line
+                x1={padding}
+                y1={padding}
+                x2={width - padding}
+                y2={padding}
+                className="stroke-border"
+                strokeDasharray="3,3"
+                strokeWidth={1}
+              />
+              <text
+                x={width - padding - 2}
+                y={padding + 10}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{ fontSize: '10px' }}
+              >
+                {max}
+              </text>
+            </>
+          )}
+          {/* Zero baseline */}
+          <line
+            x1={padding}
+            y1={height - padding}
+            x2={width - padding}
+            y2={height - padding}
+            className="stroke-border"
+            strokeWidth={1}
+          />
+
+          {data.map((d, i) => {
+            const rawH = max > 0 ? (d.amount / max) * innerH : 0
+            const h = d.amount > 0 ? Math.max(rawH, MIN_NONZERO_H) : 0
+            const x = padding + i * barW
+            const y = padding + (innerH - h)
+            return (
+              <rect
+                key={d.day}
+                x={x + 1}
+                y={y}
+                width={Math.max(0, barW - 2)}
+                height={h}
+                rx="2"
+                className={d.amount > 0 ? 'fill-accent' : 'fill-muted'}
+                opacity={d.amount === 0 ? 0.35 : 0.9}
+              >
+                <title>{`${formatDate(d.day)}: ${d.amount} signup${
+                  d.amount === 1 ? '' : 's'
+                }`}</title>
+              </rect>
+            )
+          })}
+        </svg>
+
+        {/* X-axis date labels — evenly spaced across the width */}
+        <div className="relative mt-1 h-4 min-w-[600px]">
+          {labelIndexes.map((i) => {
+            if (i >= data.length) return null
+            // Centre each label on its bar.
+            const pct = ((i + 0.5) / data.length) * 100
+            const isLast = i === data.length - 1
+            return (
+              <span
+                key={i}
+                className="absolute text-[10px] text-muted-foreground -translate-x-1/2 whitespace-nowrap"
+                style={{ left: `${pct}%` }}
+              >
+                {isLast ? 'Today' : formatDate(data[i].day)}
+              </span>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
