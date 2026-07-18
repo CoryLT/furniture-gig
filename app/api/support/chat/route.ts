@@ -9,6 +9,22 @@ import {
 } from '@/lib/anthropic'
 import { SUPPORT_SYSTEM_PROMPT } from '@/lib/support-prompt'
 import { SUPPORT_TOOLS, runTool } from '@/lib/support-tools'
+import { sendEmail } from '@/lib/email'
+import { getSiteUrl } from '@/lib/utils'
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+// Stock reply shown when the user sends a message in a conversation
+// that's already flagged for admin follow-up. We keep the AI out of
+// the loop so Cory can respond himself.
+const ESCALATED_ACK =
+  "Thanks — I've added your message to the chat and pinged the admin so they see it. They'll follow up here."
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -61,7 +77,7 @@ export async function POST(req: Request) {
     if (!convo || (convo as any).user_id !== user.id) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
-    if ((convo as any).status !== 'active') {
+    if ((convo as any).status === 'resolved') {
       return NextResponse.json(
         {
           error:
@@ -75,6 +91,76 @@ export async function POST(req: Request) {
         { error: "This conversation has reached its length limit. Please start a new one." },
         { status: 400 }
       )
+    }
+
+    // If the chat is already flagged for admin, we don't invoke the AI
+    // for follow-up messages — those belong to Cory. Save the message,
+    // ping Cory, add a stock acknowledgement, and return.
+    if ((convo as any).status === 'escalated') {
+      await admin.from('support_messages').insert({
+        conversation_id: conversationId,
+        role: 'user',
+        content: incomingMessage,
+      } as any)
+
+      await admin.from('support_messages').insert({
+        conversation_id: conversationId,
+        role: 'assistant',
+        content: ESCALATED_ACK,
+      } as any)
+
+      await admin
+        .from('support_conversations')
+        .update({
+          message_count: ((convo as any).message_count || 0) + 2,
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', conversationId)
+
+      // Best-effort ping so Cory knows there's a fresh message on an
+      // already-escalated chat. Dedupe key stays on the conversation
+      // so we don't spam him with an email per user reply — the
+      // email helper will skip the duplicate.
+      try {
+        const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL
+        if (adminEmail) {
+          let userEmail = 'a user'
+          try {
+            const { data: u } = await admin.auth.admin.getUserById(user.id)
+            if (u?.user?.email) userEmail = u.user.email
+          } catch {
+            /* fall back */
+          }
+          const link = `${getSiteUrl()}/admin/support/${conversationId}`
+          await sendEmail({
+            recipientUserId: null,
+            recipientEmail: adminEmail,
+            eventType: 'support_escalation',
+            subject: 'FlipWork support — new message on an escalated chat',
+            html:
+              `<p>The user replied on an already-escalated support chat.</p>` +
+              `<p><b>From:</b> ${escapeHtml(userEmail)}</p>` +
+              `<p><b>Message:</b> ${escapeHtml(incomingMessage)}</p>` +
+              `<p><a href="${link}">Open the conversation →</a></p>`,
+            text:
+              `The user replied on an already-escalated support chat.\n\n` +
+              `From: ${userEmail}\n` +
+              `Message: ${incomingMessage}\n\n` +
+              `Open: ${link}`,
+            idempotencyKey: `support_escalation:${conversationId}`,
+            relatedEntityId: conversationId,
+          })
+        }
+      } catch (e) {
+        console.warn('escalated reply email failed (ignored):', e)
+      }
+
+      return NextResponse.json({
+        conversationId,
+        reply: ESCALATED_ACK,
+        status: 'escalated',
+        escalated: true,
+      })
     }
   } else {
     // Check daily rate limit
