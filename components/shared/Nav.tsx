@@ -51,6 +51,8 @@ const userLinks: NavItem[] = [
 
 const adminLinks: NavItem[] = [
   { href: '/admin', label: 'Dashboard' },
+  { href: '/admin/users', label: 'Users' },
+  { href: '/admin/support', label: 'Support' },
   { href: '/admin/gigs', label: 'Gigs' },
   { href: '/admin/payouts', label: 'Payouts' },
 ]
