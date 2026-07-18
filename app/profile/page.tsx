@@ -13,6 +13,7 @@ import { PhotoGallery, type GalleryPhoto } from '@/components/ui/PhotoGallery';
 import PayoutHandlesSection from '@/components/profile/PayoutHandlesSection';
 import BusinessSetupCard from '@/app/home/BusinessSetupCard';
 import EnableNotificationsButton from '@/components/notifications/EnableNotificationsButton';
+import DeleteAccountCard from '@/components/profile/DeleteAccountCard';
 import { compressImageForUpload } from '@/lib/imageCompression';
 
 export default function ProfilePage() {
@@ -623,6 +624,10 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* Danger zone — full account delete lives here so it's the
+            last thing on the settings screen and hard to hit by accident. */}
+        <DeleteAccountCard />
       </div>
     </div>
   );
