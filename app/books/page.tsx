@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import BooksCharts from './BooksCharts'
+import OwnerMoney from '@/components/books/OwnerMoney'
 
 // The books are live, per-operator data — always fresh.
 export const dynamic = 'force-dynamic'
@@ -103,20 +104,63 @@ export default async function BooksPage() {
     )
   }
 
-  // "Money on hand" = your real bank balance. We deliberately EXCLUDE the
-  // "Cash on Hand" bucket: that one is driven by the pieces/sales logging as a
-  // profit-tracking lens, not physical money, so mixing it in made this number
-  // drift. Your money lives in the bank, and the bank is fed by your statements.
-  const { data: assetLines } = await supabase
-    .from('entry_lines')
-    .select('debit, credit, accounts!inner(type, name)')
+  // Owner money: draws (what you pay yourself) vs contributions (what you put
+  // in), grouped by month for the visual below. Keyed on the exact account IDs
+  // so no other transaction can ever be miscounted here.
+  const { data: ownerAccts } = await supabase
+    .from('accounts')
+    .select('id, name')
     .eq('owner_user_id', me)
-    .eq('accounts.type', 'asset')
-  let onHand = 0
-  for (const l of (assetLines ?? []) as any[]) {
-    const name = (l.accounts?.name ?? '') as string
-    if (name === 'Cash on Hand') continue // profit-tracking bucket, not real cash
-    onHand += Number(l.debit) - Number(l.credit)
+    .in('name', ["Owner's Contributions", "Owner's Draws"])
+  const contribId = (ownerAccts ?? []).find((a: any) => a.name === "Owner's Contributions")?.id as string | undefined
+  const drawId = (ownerAccts ?? []).find((a: any) => a.name === "Owner's Draws")?.id as string | undefined
+  const ownerAcctIds = [contribId, drawId].filter(Boolean) as string[]
+
+  const ownerByMonth = new Map<string, { contributions: number; draws: number }>()
+  if (ownerAcctIds.length > 0) {
+    const { data: ownerLines } = await supabase
+      .from('entry_lines')
+      .select('account_id, debit, credit, transactions!inner(date)')
+      .eq('owner_user_id', me)
+      .in('account_id', ownerAcctIds)
+    for (const l of (ownerLines ?? []) as any[]) {
+      const date = l.transactions?.date as string | undefined
+      if (!date) continue
+      const ym = date.slice(0, 7) // YYYY-MM
+      const rec = ownerByMonth.get(ym) ?? { contributions: 0, draws: 0 }
+      if (l.account_id === contribId) {
+        rec.contributions += Number(l.credit) - Number(l.debit) // equity grows with credits
+      } else if (l.account_id === drawId) {
+        rec.draws += Number(l.debit) - Number(l.credit) // a draw is booked as a debit
+      }
+      ownerByMonth.set(ym, rec)
+    }
+  }
+
+  // Continuous month list from earliest activity through this month (no gaps).
+  const ownerMonths: { ym: string; label: string; contributions: number; draws: number }[] = []
+  const ownerKeys = [...ownerByMonth.keys()].sort()
+  if (ownerKeys.length > 0) {
+    let [y, mo] = ownerKeys[0].split('-').map(Number)
+    const now = new Date()
+    const endY = now.getFullYear()
+    const endMo = now.getMonth() + 1
+    while (y < endY || (y === endY && mo <= endMo)) {
+      const ym = `${y}-${String(mo).padStart(2, '0')}`
+      const rec = ownerByMonth.get(ym) ?? { contributions: 0, draws: 0 }
+      const label = new Date(y, mo - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+      ownerMonths.push({
+        ym,
+        label,
+        contributions: Math.max(0, rec.contributions),
+        draws: Math.max(0, rec.draws),
+      })
+      mo++
+      if (mo > 12) {
+        mo = 1
+        y++
+      }
+    }
   }
 
   // Balance for every bucket, so each one can show how much is in it.
@@ -257,20 +301,8 @@ export default async function BooksPage() {
         </div>
       </div>
 
-      <div className="mt-6 rounded-xl border border-border p-5">
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Money on hand</div>
-        <div className={'mt-1 text-3xl font-semibold ' + (onHand < 0 ? 'text-red-600' : 'text-foreground')}>
-          {money(onHand)}
-        </div>
-        <Link href="/books/cash/new" className="mt-2 inline-block text-sm font-medium text-green-700 hover:text-green-800">
-          + Add cash
-        </Link>
-        <Link href="/books/transfer/new" className="mt-2 ml-4 inline-block text-sm font-medium text-green-700 hover:text-green-800">
-          ⇄ Move money
-        </Link>
-        <Link href="/books/tax" className="mt-2 ml-4 inline-block text-sm font-medium text-green-700 hover:text-green-800">
-          Tax year →
-        </Link>
+      <div className="mt-6">
+        <OwnerMoney months={ownerMonths} />
       </div>
 
       <Link
