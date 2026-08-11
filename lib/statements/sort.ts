@@ -148,16 +148,18 @@ export function sortTxn(txn: NormalizedTxn): SortResult {
       }
     }
     // --- A sale landing in the bank (Venmo / Cash App / Zelle / ATM deposit).
-    //     Book it straight into the bank as Sales income so the bank balance
-    //     matches your statement. (No phantom "cash on hand" move — that was
-    //     what drove the old drift.)
+    //     You already log each sale piece-by-piece, so this deposit is that
+    //     money ARRIVING in the bank, not a second sale. Book it as a move from
+    //     the internal Cash on Hand bucket into the bank: bank goes up by the
+    //     real amount, and Sales is NOT counted twice.
     if (has(text, SALE_INFLOWS)) {
       return {
-        action: 'income',
-        label: 'Sale',
-        reason: 'Money from a sale landing in the bank.',
+        action: 'transfer',
+        label: 'Sale money arrived',
+        reason: 'Already-logged sale money landing in the bank (not a new sale).',
         confident: true,
-        accountName: ACCOUNTS.sales,
+        fromAccountName: ACCOUNTS.cash,
+        toAccountName: ACCOUNTS.bank,
       }
     }
     // --- Money you put into the business (owner contribution). ---------------
