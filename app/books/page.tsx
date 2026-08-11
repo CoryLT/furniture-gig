@@ -2,8 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
-import BooksCharts from './BooksCharts'
-import OwnerMoney from '@/components/books/OwnerMoney'
+import MoneyOverview from '@/components/books/MoneyOverview'
 
 // The books are live, per-operator data — always fresh.
 export const dynamic = 'force-dynamic'
@@ -104,57 +103,79 @@ export default async function BooksPage() {
     )
   }
 
-  // Owner money: draws (what you pay yourself) vs contributions (what you put
-  // in), grouped by month for the visual below. Keyed on the exact account IDs
-  // so no other transaction can ever be miscounted here.
-  const { data: ownerAccts } = await supabase
+  // ---- Unified monthly money data for the combined overview card ----
+  // One pass over the last ~24 months of transactions gives us everything the
+  // card needs: sales (income), expenses (+ categories), and owner
+  // contributions/draws (equity), all grouped by month.
+  const { data: ovAccts } = await supabase
     .from('accounts')
-    .select('id, name')
+    .select('id, name, type')
     .eq('owner_user_id', me)
-    .in('name', ["Owner's Contributions", "Owner's Draws"])
-  const contribId = (ownerAccts ?? []).find((a: any) => a.name === "Owner's Contributions")?.id as string | undefined
-  const drawId = (ownerAccts ?? []).find((a: any) => a.name === "Owner's Draws")?.id as string | undefined
-  const ownerAcctIds = [contribId, drawId].filter(Boolean) as string[]
+  const acctById = new Map<string, { name: string; type: string }>()
+  for (const a of (ovAccts ?? []) as any[]) acctById.set(a.id, { name: a.name, type: a.type })
 
-  const ownerByMonth = new Map<string, { contributions: number; draws: number }>()
-  if (ownerAcctIds.length > 0) {
-    const { data: ownerLines } = await supabase
-      .from('entry_lines')
-      .select('account_id, debit, credit, transactions!inner(date)')
-      .eq('owner_user_id', me)
-      .in('account_id', ownerAcctIds)
-    for (const l of (ownerLines ?? []) as any[]) {
-      const date = l.transactions?.date as string | undefined
-      if (!date) continue
-      const ym = date.slice(0, 7) // YYYY-MM
-      const rec = ownerByMonth.get(ym) ?? { contributions: 0, draws: 0 }
-      if (l.account_id === contribId) {
-        rec.contributions += Number(l.credit) - Number(l.debit) // equity grows with credits
-      } else if (l.account_id === drawId) {
-        rec.draws += Number(l.debit) - Number(l.credit) // a draw is booked as a debit
+  const ovStart = new Date(new Date().getFullYear() - 2, new Date().getMonth(), 1)
+  const { data: ovRaw } = await supabase
+    .from('transactions')
+    .select('date, entry_lines(account_id, debit, credit)')
+    .eq('owner_user_id', me)
+    .gte('date', ovStart.toISOString().slice(0, 10))
+  const ovTxns = (ovRaw ?? []) as any[]
+
+  type OvRec = { income: number; expense: number; contributions: number; draws: number }
+  const ovByMonth = new Map<string, OvRec>()
+  const catByMonth = new Map<string, Map<string, number>>()
+  for (const t of ovTxns) {
+    const ym = (t.date as string)?.slice(0, 7)
+    if (!ym) continue
+    const rec = ovByMonth.get(ym) ?? { income: 0, expense: 0, contributions: 0, draws: 0 }
+    for (const l of (t.entry_lines ?? []) as any[]) {
+      const a = acctById.get(l.account_id)
+      if (!a) continue
+      const debit = Number(l.debit || 0)
+      const credit = Number(l.credit || 0)
+      if (a.type === 'income') {
+        rec.income += credit - debit
+      } else if (a.type === 'expense') {
+        const v = debit - credit
+        rec.expense += v
+        const cm = catByMonth.get(ym) ?? new Map<string, number>()
+        cm.set(a.name, (cm.get(a.name) || 0) + v)
+        catByMonth.set(ym, cm)
+      } else if (a.name === "Owner's Contributions") {
+        rec.contributions += credit - debit
+      } else if (a.name === "Owner's Draws") {
+        rec.draws += debit - credit
       }
-      ownerByMonth.set(ym, rec)
     }
+    ovByMonth.set(ym, rec)
   }
 
   // Continuous month list from earliest activity through this month (no gaps).
-  const ownerMonths: { ym: string; label: string; contributions: number; draws: number }[] = []
-  const ownerKeys = [...ownerByMonth.keys()].sort()
-  if (ownerKeys.length > 0) {
-    let [y, mo] = ownerKeys[0].split('-').map(Number)
-    const now = new Date()
-    const endY = now.getFullYear()
-    const endMo = now.getMonth() + 1
+  const overviewMonths: {
+    ym: string; label: string; income: number; expense: number; contributions: number; draws: number
+  }[] = []
+  const expenseCats: { ym: string; name: string; amount: number }[] = []
+  const ovKeys = [...ovByMonth.keys()].sort()
+  if (ovKeys.length > 0) {
+    let [y, mo] = ovKeys[0].split('-').map(Number)
+    const nowD = new Date()
+    const endY = nowD.getFullYear()
+    const endMo = nowD.getMonth() + 1
     while (y < endY || (y === endY && mo <= endMo)) {
       const ym = `${y}-${String(mo).padStart(2, '0')}`
-      const rec = ownerByMonth.get(ym) ?? { contributions: 0, draws: 0 }
+      const rec = ovByMonth.get(ym) ?? { income: 0, expense: 0, contributions: 0, draws: 0 }
       const label = new Date(y, mo - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-      ownerMonths.push({
+      overviewMonths.push({
         ym,
         label,
+        income: Math.max(0, rec.income),
+        expense: Math.max(0, rec.expense),
         contributions: Math.max(0, rec.contributions),
         draws: Math.max(0, rec.draws),
       })
+      const cm = catByMonth.get(ym)
+      if (cm) for (const [name, amount] of cm) if (amount > 0) expenseCats.push({ ym, name, amount })
       mo++
       if (mo > 12) {
         mo = 1
@@ -162,6 +183,7 @@ export default async function BooksPage() {
       }
     }
   }
+  const hasOverview = overviewMonths.some((m) => m.income || m.expense || m.contributions || m.draws)
 
   // Balance for every bucket, so each one can show how much is in it.
   const { data: balLines } = await supabase
@@ -216,53 +238,6 @@ export default async function BooksPage() {
     }
   })
 
-  // ---- Chart data: last 6 months of income vs expenses + top categories ----
-  const now = new Date()
-  const windowStart = new Date(now.getFullYear(), now.getMonth() - 5, 1)
-  const { data: chartRaw } = await supabase
-    .from('transactions')
-    .select('date, entry_lines(debit, credit, accounts(type, name))')
-    .eq('owner_user_id', me)
-    .gte('date', windowStart.toISOString().slice(0, 10))
-  const chartTxns = (chartRaw ?? []) as any[]
-
-  const months: { label: string; income: number; expense: number }[] = []
-  const monthIndex: Record<string, number> = {}
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    monthIndex[`${d.getFullYear()}-${d.getMonth()}`] = months.length
-    months.push({ label: d.toLocaleDateString('en-US', { month: 'short' }), income: 0, expense: 0 })
-  }
-
-  const catTotals: Record<string, number> = {}
-  let totalIncome = 0
-  let totalExpense = 0
-  for (const t of chartTxns) {
-    const d = new Date(t.date)
-    const idx = monthIndex[`${d.getFullYear()}-${d.getMonth()}`]
-    for (const l of (t.entry_lines ?? []) as any[]) {
-      const type = l.accounts?.type
-      const name = l.accounts?.name || 'Other'
-      const debit = Number(l.debit || 0)
-      const credit = Number(l.credit || 0)
-      if (type === 'income') {
-        const v = credit - debit
-        totalIncome += v
-        if (idx !== undefined) months[idx].income += v
-      } else if (type === 'expense') {
-        const v = debit - credit
-        totalExpense += v
-        catTotals[name] = (catTotals[name] || 0) + v
-        if (idx !== undefined) months[idx].expense += v
-      }
-    }
-  }
-  const topCats = Object.entries(catTotals)
-    .filter(([, v]) => v > 0)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([name, amount]) => ({ name, amount }))
-  const hasChartData = totalIncome > 0 || totalExpense > 0
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
@@ -301,9 +276,11 @@ export default async function BooksPage() {
         </div>
       </div>
 
-      <div className="mt-6">
-        <OwnerMoney months={ownerMonths} />
-      </div>
+      {hasOverview && (
+        <div className="mt-6">
+          <MoneyOverview months={overviewMonths} expenseCats={expenseCats} />
+        </div>
+      )}
 
       <Link
         href="/books/inventory"
@@ -327,15 +304,6 @@ export default async function BooksPage() {
           </div>
           <span className="whitespace-nowrap rounded-lg bg-accent px-4 py-2 font-medium text-accent-foreground">Reconcile →</span>
         </Link>
-      )}
-
-      {hasChartData && (
-        <BooksCharts
-          months={months}
-          totalIncome={totalIncome}
-          totalExpense={totalExpense}
-          topCats={topCats}
-        />
       )}
 
       <section className="mt-8">
