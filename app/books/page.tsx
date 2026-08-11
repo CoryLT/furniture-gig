@@ -241,14 +241,12 @@ export default async function BooksPage() {
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Books</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Your double-entry bookkeeping, built right into FlipWork.
-          </p>
-        </div>
-        <div className="flex gap-2">
+      <div>
+        <h1 className="text-2xl font-semibold text-foreground">Books</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Your double-entry bookkeeping, built right into FlipWork.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
           <Link
             href="/flipper/pipeline/add-past-sale"
             className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 whitespace-nowrap"
