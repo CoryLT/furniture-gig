@@ -103,14 +103,19 @@ export default async function BooksPage() {
     )
   }
 
-  // Money on hand = debits minus credits across your asset buckets.
+  // "Money on hand" = your real bank balance. We deliberately EXCLUDE the
+  // "Cash on Hand" bucket: that one is driven by the pieces/sales logging as a
+  // profit-tracking lens, not physical money, so mixing it in made this number
+  // drift. Your money lives in the bank, and the bank is fed by your statements.
   const { data: assetLines } = await supabase
     .from('entry_lines')
-    .select('debit, credit, accounts!inner(type)')
+    .select('debit, credit, accounts!inner(type, name)')
     .eq('owner_user_id', me)
     .eq('accounts.type', 'asset')
   let onHand = 0
   for (const l of (assetLines ?? []) as any[]) {
+    const name = (l.accounts?.name ?? '') as string
+    if (name === 'Cash on Hand') continue // profit-tracking bucket, not real cash
     onHand += Number(l.debit) - Number(l.credit)
   }
 
