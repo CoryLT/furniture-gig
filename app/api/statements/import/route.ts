@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { anthropic, SUPPORT_MODEL } from '@/lib/anthropic'
 import { getPlan, isPro, isAdminEmail } from '@/lib/plan'
-import { parseRelayCsv, type NormalizedTxn } from '@/lib/statements/relay'
+import { type NormalizedTxn } from '@/lib/statements/relay'
+import { parseAnyBankCsv } from '@/lib/statements/csv'
 import { readStatementPdf } from '@/lib/statements/wellsfargo'
 import { sortTxn, ACCOUNTS, type SortResult } from '@/lib/statements/sort'
 
@@ -69,7 +70,7 @@ export async function POST(req: Request): Promise<NextResponse<Summary>> {
       } else {
         // Treat any non-PDF as a Relay-style CSV.
         const text = new TextDecoder('utf-8').decode(await f.arrayBuffer())
-        lines.push(...parseRelayCsv(text))
+        lines.push(...parseAnyBankCsv(text))
       }
     } catch (e) {
       console.error('[statement import] read error:', e)

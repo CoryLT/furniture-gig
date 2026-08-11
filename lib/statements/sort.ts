@@ -60,7 +60,7 @@ function has(text: string, needles: string[]): boolean {
 
 // Gas stations & convenience stores -> fuel.
 const FUEL = [
-  'circle k', "bj's fuel", 'bjs fuel', 'quiktrip', 'quik trip', 'sheetz', 'wawa',
+  'circle k', 'circlek', "bj's fuel", 'bjs fuel', 'quiktrip', 'quik trip', 'sheetz', 'wawa',
   'sunoco', 'speedway', 'shell', 'exxon', 'mobil', 'chevron', 'texaco', 'bp ',
   'marathon', 'valero', 'citgo', 'racetrac', 'race trac', 'kangaroo', 'sams gas',
   "sam's gas", 'costco gas', 'murphy', '7-eleven', '7 eleven', 'quik mart',
