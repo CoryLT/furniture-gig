@@ -243,6 +243,12 @@ export default async function BooksPage() {
           >
             Snap a receipt
           </Link>
+          <Link
+            href="/books/import"
+            className="rounded-lg border border-accent/40 px-4 py-2 font-medium text-accent hover:bg-accent/10 whitespace-nowrap"
+          >
+            Import a statement
+          </Link>
         </div>
       </div>
 
