@@ -100,10 +100,12 @@ const CONTRIBUTION_INFLOWS = [
   'opening deposit', 'ach pull', 'from thacker', 'transfer from',
 ]
 
-// Signs a money-OUT line is you paying yourself (owner draw).
+// Signs a money-OUT line is you paying yourself (owner draw). You take money
+// out two ways: transfers to your personal accounts, and Zelle to Erica Rhew.
 const DRAW_OUTFLOWS = [
   'owner withdrawal', 'clear access', 'way2save', 'way 2 save', 'brokerage',
   'to thacker', 'transfer to', 'ach push',
+  'rhew erica', 'erica rhew', // Zelle to Erica = how you pay yourself
 ]
 
 export function sortTxn(txn: NormalizedTxn): SortResult {
@@ -121,17 +123,16 @@ export function sortTxn(txn: NormalizedTxn): SortResult {
     }
   }
 
-  // --- ATM cash withdrawal: real money leaving the bank. We book it against
-  //     Owner's Draws so the bank balance drops by the true amount (keeping
-  //     "Money on hand" correct). We do NOT route it into a separate cash
-  //     bucket — that bucket drifts and the operator doesn't want to track it.
+  // --- ATM cash withdrawal: you pull this cash to buy supplies, not to pay
+  //     yourself — so it is NOT a draw. Default it to Materials (retag if a
+  //     given one was really personal).
   if (has(text, ['atm withdrawal', 'withdrawal authorized', 'cash withdrawal'])) {
     return {
       action: 'expense',
-      label: 'ATM cash out',
-      reason: 'Cash pulled out of the bank. Retag it if it was really supplies.',
+      label: 'ATM cash (supplies)',
+      reason: 'Cash pulled out, which you use for supplies. Retag if it was personal.',
       confident: true,
-      accountName: ACCOUNTS.ownerDraw,
+      accountName: ACCOUNTS.materials,
     }
   }
 
