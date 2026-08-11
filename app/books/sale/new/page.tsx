@@ -16,7 +16,6 @@ async function logSale(formData: FormData) {
 
   const date = String(formData.get('date') || '')
   const amount = Number(formData.get('amount'))
-  const assetAccountId = String(formData.get('asset_account_id') || '')
   const incomeAccountId = String(formData.get('income_account_id') || '')
   const description = String(formData.get('description') || '')
   const memo = String(formData.get('memo') || '') || null
@@ -53,8 +52,23 @@ async function logSale(formData: FormData) {
   if (!amount || amount <= 0) {
     redirect('/books/sale/new?error=' + encodeURIComponent('Enter an amount greater than zero.'))
   }
-  if (!assetAccountId || !incomeAccountId) {
-    redirect('/books/sale/new?error=' + encodeURIComponent('Pick where the money landed and an income type.'))
+  if (!incomeAccountId) {
+    redirect('/books/sale/new?error=' + encodeURIComponent('Pick an income type.'))
+  }
+
+  // A sale always lands in the internal "Cash on Hand" tracking bucket. Your
+  // real money is tracked from imported bank statements, so there's no
+  // "cash vs bank" choice to get wrong here (and nothing double-counts).
+  const { data: cashAcct } = await supabase
+    .from('accounts')
+    .select('id')
+    .eq('owner_user_id', user.id)
+    .eq('type', 'asset')
+    .eq('name', 'Cash on Hand')
+    .maybeSingle()
+  const assetAccountId = cashAcct?.id || ''
+  if (!assetAccountId) {
+    redirect('/books/sale/new?error=' + encodeURIComponent('Set up your Books accounts first.'))
   }
 
   const { error } = await supabase.rpc('record_cash_sale', {
@@ -90,7 +104,6 @@ export default async function NewSalePage({
     .eq('owner_user_id', me)
     .order('name', { ascending: true })
   const accounts = (accountsRaw ?? []) as { id: string; name: string; type: string }[]
-  const assetAccounts = accounts.filter((a) => a.type === 'asset')
   const incomeAccounts = accounts.filter((a) => a.type === 'income')
 
   const { data: piecesRaw } = await supabase
@@ -141,16 +154,6 @@ export default async function NewSalePage({
         <div>
           <label className={labelCls} htmlFor="amount">Amount ($)</label>
           <input id="amount" name="amount" type="number" step="0.01" min="0" placeholder="0.00" className={fieldCls} required />
-        </div>
-
-        <div>
-          <label className={labelCls} htmlFor="asset_account_id">Money landed in</label>
-          <select id="asset_account_id" name="asset_account_id" className={fieldCls} required>
-            <option value="">Choose an account…</option>
-            {assetAccounts.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
         </div>
 
         <div>

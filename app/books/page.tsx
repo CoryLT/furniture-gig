@@ -336,7 +336,7 @@ export default async function BooksPage() {
             <div key={ty}>
               <div className="text-xs text-muted-foreground">{TYPE_LABELS[ty] ?? ty}</div>
               <ul className="mt-1 divide-y divide-border rounded-xl border border-border">
-                {list.filter((a) => a.type === ty).map((a) => (
+                {list.filter((a) => a.type === ty && a.name !== 'Cash on Hand').map((a) => (
                   <li key={a.id}>
                     <Link
                       href={'/books/account/' + a.id}
