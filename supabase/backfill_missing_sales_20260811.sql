@@ -9,8 +9,9 @@
 -- own "log a sale". Offset goes to the internal Cash on Hand bucket, so it's
 -- consistent with every other logged sale and doesn't touch any bank balance.
 --
--- Only books pieces that have a real sold DATE (undated ones are held back for
--- review). Query-driven and idempotent — safe to re-run.
+-- Books every sold-with-price piece that has no ledger sale. Dated ones use
+-- their sold date; undated ones fall back to when the piece was created.
+-- Query-driven and idempotent — safe to re-run.
 --
 -- Run in FlipWork Web App, Primary db.
 -- ============================================================
@@ -24,12 +25,12 @@ begin
   if v_uid is null or v_cash is null or v_sales is null then raise exception 'Missing account.'; end if;
 
   for rec in
-    select ip.id, ip.title, ip.sale_price, ip.sold_at::date as d
+    select ip.id, ip.title, ip.sale_price,
+           coalesce(ip.sold_at::date, ip.created_at::date, current_date) as d
     from public.inventory_pieces ip
     where ip.owner_user_id = v_uid
       and ip.stage = 'sold'
       and ip.sale_price > 0
-      and ip.sold_at is not null
       and not exists (
         select 1 from public.transactions t
         where t.owner_user_id = v_uid and t.piece_id = ip.id and t.memo = 'sale:' || ip.id)
