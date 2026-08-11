@@ -97,7 +97,7 @@ const SALE_INFLOWS = [
 // Signs a money-IN line is you funding the business (owner contribution).
 const CONTRIBUTION_INFLOWS = [
   'clear access', 'way2save', 'way 2 save', 'brokerage', 'savings',
-  'opening deposit', 'ach pull', 'from thacker', 'transfer from',
+  'opening deposit', 'ach pull', 'from thacker', 'cory thacker', 'transfer from',
 ]
 
 // Signs a money-OUT line is you paying yourself (owner draw). You take money
@@ -137,6 +137,16 @@ export function sortTxn(txn: NormalizedTxn): SortResult {
   }
 
   if (isMoneyIn) {
+    // --- A supplies return / refund coming back (credit reduces Materials). --
+    if (has(text, ['purchase return', 'return authorized', 'refund'])) {
+      return {
+        action: 'income',
+        label: 'Supplies refund',
+        reason: 'A return coming back into the bank, lowering supplies cost.',
+        confident: true,
+        accountName: ACCOUNTS.materials,
+      }
+    }
     // --- A sale landing in the bank (Venmo / Cash App / Zelle / ATM deposit).
     //     Book it straight into the bank as Sales income so the bank balance
     //     matches your statement. (No phantom "cash on hand" move — that was
