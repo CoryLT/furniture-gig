@@ -30,6 +30,7 @@ import type { NormalizedTxn } from './relay'
 export const ACCOUNTS = {
   cash: 'Cash on Hand',
   bank: 'Bank / Checking',
+  sales: 'Sales',
   materials: 'Materials & Supplies',
   fuel: 'Transport & Gas',
   software: 'Software & Subscriptions',
@@ -120,28 +121,32 @@ export function sortTxn(txn: NormalizedTxn): SortResult {
     }
   }
 
-  // --- ATM cash withdrawal: money moved to your wallet, not a purchase. ------
+  // --- ATM cash withdrawal: real money leaving the bank. We book it against
+  //     Owner's Draws so the bank balance drops by the true amount (keeping
+  //     "Money on hand" correct). We do NOT route it into a separate cash
+  //     bucket — that bucket drifts and the operator doesn't want to track it.
   if (has(text, ['atm withdrawal', 'withdrawal authorized', 'cash withdrawal'])) {
     return {
-      action: 'transfer',
-      label: 'ATM cash to your wallet',
-      reason: 'Cash out of the bank. The furniture it buys gets logged on the piece.',
+      action: 'expense',
+      label: 'ATM cash out',
+      reason: 'Cash pulled out of the bank. Retag it if it was really supplies.',
       confident: true,
-      fromAccountName: ACCOUNTS.bank,
-      toAccountName: ACCOUNTS.cash,
+      accountName: ACCOUNTS.ownerDraw,
     }
   }
 
   if (isMoneyIn) {
-    // --- Sales you already logged (Venmo / Cash App / Zelle / ATM deposit). --
+    // --- A sale landing in the bank (Venmo / Cash App / Zelle / ATM deposit).
+    //     Book it straight into the bank as Sales income so the bank balance
+    //     matches your statement. (No phantom "cash on hand" move — that was
+    //     what drove the old drift.)
     if (has(text, SALE_INFLOWS)) {
       return {
-        action: 'transfer',
-        label: 'Sale money — already counted',
-        reason: 'You logged this sale in the app, so we just move the cash into the bank.',
+        action: 'income',
+        label: 'Sale',
+        reason: 'Money from a sale landing in the bank.',
         confident: true,
-        fromAccountName: ACCOUNTS.cash,
-        toAccountName: ACCOUNTS.bank,
+        accountName: ACCOUNTS.sales,
       }
     }
     // --- Money you put into the business (owner contribution). ---------------
