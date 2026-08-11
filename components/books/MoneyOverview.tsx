@@ -138,18 +138,18 @@ export default function MoneyOverview({ months, expenseCats }: { months: Month[]
           </div>
           <div className="mt-3 flex gap-6">
             <div>
-              <div className="text-[11px] text-muted-foreground">Money in</div>
+              <div className="text-[11px] text-muted-foreground">Total moved in</div>
               <div className="mt-0.5 text-lg font-medium text-green-600">{money(totalIn)}</div>
             </div>
             <div>
-              <div className="text-[11px] text-muted-foreground">Money out</div>
+              <div className="text-[11px] text-muted-foreground">Total moved out</div>
               <div className="mt-0.5 text-lg font-medium text-red-600">{money(totalOut)}</div>
             </div>
           </div>
           <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-            Money in and out include transfers between your own accounts, so they run high. The{' '}
-            <span className="font-medium text-foreground">Net</span> is the number that reflects what you've really put
-            in or taken out.
+            Moved in/out count every transfer, including money you shuffle between your own accounts, so
+            they run high. <span className="font-medium text-foreground">Net</span> is what you've truly
+            put in or taken out on balance.
           </p>
         </>
       )}
