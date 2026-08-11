@@ -66,23 +66,32 @@ export default function OwnerMoney({ months }: { months: Month[] }) {
         </div>
       </div>
 
-      {/* Totals for the selected period */}
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        <div>
-          <div className="text-xs text-muted-foreground">Put in</div>
-          <div className="mt-0.5 text-2xl font-semibold text-green-600">{money(totalIn)}</div>
+      {/* Net is the number to trust; gross in/out run high because money moved
+          between your own accounts counts on both sides. */}
+      <div className="mt-4">
+        <div className="text-xs text-muted-foreground">
+          {net >= 0 ? 'Net put into the business' : 'Net taken out of the business'}
         </div>
-        <div>
-          <div className="text-xs text-muted-foreground">Took out</div>
-          <div className="mt-0.5 text-2xl font-semibold text-red-600">{money(totalOut)}</div>
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground">Net{net >= 0 ? ' in business' : ' overdrawn'}</div>
-          <div className={'mt-0.5 text-2xl font-semibold ' + (net < 0 ? 'text-red-600' : 'text-foreground')}>
-            {money(net)}
-          </div>
+        <div className={'mt-0.5 text-3xl font-semibold ' + (net < 0 ? 'text-red-600' : 'text-foreground')}>
+          {money(Math.abs(net))}
         </div>
       </div>
+
+      <div className="mt-3 flex gap-6">
+        <div>
+          <div className="text-[11px] text-muted-foreground">Money in</div>
+          <div className="mt-0.5 text-lg font-medium text-green-600">{money(totalIn)}</div>
+        </div>
+        <div>
+          <div className="text-[11px] text-muted-foreground">Money out</div>
+          <div className="mt-0.5 text-lg font-medium text-red-600">{money(totalOut)}</div>
+        </div>
+      </div>
+
+      <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+        Money in and out include transfers between your own accounts, so they run high.
+        The <span className="font-medium text-foreground">Net</span> is the number that reflects what you've really put in or taken out.
+      </p>
 
       {filtered.length === 0 ? (
         <p className="mt-5 text-sm text-muted-foreground">
